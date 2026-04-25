@@ -19,19 +19,25 @@ internal data class RopeHandleHit(
     val pointPx: Offset,
 )
 
-internal fun parcelSizePx(project: PlannerProject): Size = Size(
-    width = project.parcel.widthMeters * project.pixelsPerMeter,
-    height = project.parcel.heightMeters * project.pixelsPerMeter,
-)
+internal fun parcelSizePx(project: PlannerProject): Size =
+    Size(
+        width = project.parcel.widthMeters * project.pixelsPerMeter,
+        height = project.parcel.heightMeters * project.pixelsPerMeter,
+    )
 
-internal fun centeredParcelOriginPx(canvasSizePx: Size, parcelSizePx: Size): Offset {
+internal fun centeredParcelOriginPx(
+    canvasSizePx: Size,
+    parcelSizePx: Size,
+): Offset {
     val x = ((canvasSizePx.width - parcelSizePx.width) / 2f).coerceAtLeast(16f)
     val y = ((canvasSizePx.height - parcelSizePx.height) / 2f).coerceAtLeast(16f)
     return Offset(x, y)
 }
 
-internal fun Vec2.toOffsetPx(pixelsPerMeter: Float = 1f, originPx: Offset = Offset.Zero): Offset =
-    Offset(originPx.x + x * pixelsPerMeter, originPx.y + y * pixelsPerMeter)
+internal fun Vec2.toOffsetPx(
+    pixelsPerMeter: Float = 1f,
+    originPx: Offset = Offset.Zero,
+): Offset = Offset(originPx.x + x * pixelsPerMeter, originPx.y + y * pixelsPerMeter)
 
 internal fun Vec2.toOffset(): Offset = Offset(x, y)
 
@@ -49,4 +55,3 @@ internal fun ropeHandleHits(
         }
     }
 }
-

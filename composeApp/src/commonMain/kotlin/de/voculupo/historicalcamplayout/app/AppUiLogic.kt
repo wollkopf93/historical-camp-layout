@@ -7,12 +7,9 @@ internal object AppUiLogic {
 
     fun isPhoneLayout(widthDp: Float): Boolean = widthDp < PHONE_BREAKPOINT_DP
 
-    fun shouldUseCompactShell(isAndroid: Boolean): Boolean {
-        return isAndroid
-    }
+    fun shouldUseCompactShell(isAndroid: Boolean): Boolean = isAndroid
 
     fun toolForCompactPresetSelection(): PlannerToolMode = PlannerToolMode.PlaceTent
 
     fun shouldAutoOpenProperties(selectedAssetIds: Set<String>): Boolean = selectedAssetIds.isNotEmpty()
 }
-

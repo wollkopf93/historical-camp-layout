@@ -1,0 +1,40 @@
+build:
+  maxIssues: 0
+
+naming:
+  FunctionNaming:
+    active: false
+  MatchingDeclarationName:
+    active: false
+
+complexity:
+  CyclomaticComplexMethod:
+    threshold: 80
+  ComplexCondition:
+    threshold: 9
+  LargeClass:
+    threshold: 2000
+  LongMethod:
+    threshold: 700
+  LongParameterList:
+    functionThreshold: 70
+    constructorThreshold: 15
+    ignoreDefaultParameters: true
+  NestedBlockDepth:
+    threshold: 6
+  TooManyFunctions:
+    thresholdInFiles: 40
+    thresholdInClasses: 80
+    thresholdInInterfaces: 80
+    thresholdInObjects: 60
+    thresholdInEnums: 80
+
+style:
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: false
+  ReturnCount:
+    active: false
+  UnusedPrivateMember:
+    active: false

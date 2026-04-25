@@ -5,12 +5,21 @@ import kotlinx.serialization.json.Json
 
 interface ProjectStorage {
     fun saveProject(project: PlannerProject)
+
     fun loadProject(): PlannerProject?
+
     fun exportProjectFile(project: PlannerProject)
+
     fun importProjectFile(): PlannerProject?
+
     fun saveInventory(presets: List<TentPreset>)
+
     fun loadInventory(): List<TentPreset>?
-    fun exportProjectPng(project: PlannerProject, presets: List<TentPreset>)
+
+    fun exportProjectPng(
+        project: PlannerProject,
+        presets: List<TentPreset>,
+    )
 }
 
 expect object ProjectStorageProvider {
@@ -18,11 +27,11 @@ expect object ProjectStorageProvider {
 }
 
 object PlannerJson {
-    val json = Json {
-        prettyPrint = true
-        ignoreUnknownKeys = true
-    }
+    val json =
+        Json {
+            prettyPrint = true
+            ignoreUnknownKeys = true
+        }
 }
 
 fun PlannerProject.toJson(): String = PlannerJson.json.encodeToString(this)
-

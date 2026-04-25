@@ -1,7 +1,7 @@
 ﻿package de.voculupo.historicalcamplayout
 
-import android.content.Context
 import android.content.ContentValues
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Paint
@@ -28,6 +28,7 @@ actual object ProjectStorageProvider {
 
 private class AndroidProjectStorage : ProjectStorage {
     private fun baseDir(): File? = AndroidContextHolder.appContext?.filesDir
+
     private fun resolver() = AndroidContextHolder.appContext?.contentResolver
 
     override fun saveProject(project: PlannerProject) {
@@ -67,7 +68,10 @@ private class AndroidProjectStorage : ProjectStorage {
         return runCatching { PlannerJson.json.decodeFromString<List<TentPreset>>(file.readText()) }.getOrNull()
     }
 
-    override fun exportProjectPng(project: PlannerProject, presets: List<TentPreset>) {
+    override fun exportProjectPng(
+        project: PlannerProject,
+        presets: List<TentPreset>,
+    ) {
         val presetsById = presets.associateBy { it.id }
         val meterBounds = exportBoundsMeters(project, presetsById, paddingMeters = 1.0f)
         val ppm = project.pixelsPerMeter.coerceAtLeast(20f)
@@ -78,20 +82,22 @@ private class AndroidProjectStorage : ProjectStorage {
 
         val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
         val strokePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-        val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-            color = android.graphics.Color.rgb(0x1F, 0x1F, 0x1F)
-            textSize = 36f
-            isFakeBoldText = true
-            setShadowLayer(4f, 0f, 1f, android.graphics.Color.argb(90, 255, 255, 255))
-        }
-        val labelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-            color = android.graphics.Color.rgb(0x22, 0x22, 0x22)
-            textSize = 18f
-            isFakeBoldText = true
-            setShadowLayer(3f, 0f, 1f, android.graphics.Color.argb(120, 255, 255, 255))
-        }
+        val titlePaint =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.FILL
+                color = android.graphics.Color.rgb(0x1F, 0x1F, 0x1F)
+                textSize = 36f
+                isFakeBoldText = true
+                setShadowLayer(4f, 0f, 1f, android.graphics.Color.argb(90, 255, 255, 255))
+            }
+        val labelPaint =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.FILL
+                color = android.graphics.Color.rgb(0x22, 0x22, 0x22)
+                textSize = 18f
+                isFakeBoldText = true
+                setShadowLayer(3f, 0f, 1f, android.graphics.Color.argb(120, 255, 255, 255))
+            }
 
         fillPaint.color = android.graphics.Color.argb(255, 0xEA, 0xE1, 0xCF)
         canvas.drawRect(0f, 0f, widthPx.toFloat(), heightPx.toFloat(), fillPaint)
@@ -130,21 +136,24 @@ private class AndroidProjectStorage : ProjectStorage {
         strokePaint.strokeWidth = 3f
         canvas.drawRect(parcelLeft, parcelTop, parcelLeft + parcelW, parcelTop + parcelH, strokePaint)
 
-        val guideStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.STROKE
-            color = android.graphics.Color.argb(170, 0x4A, 0x5A, 0x4A)
-            strokeWidth = 2f
-        }
-        val guideLabelPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-            color = android.graphics.Color.rgb(0x2F, 0x26, 0x1A)
-            textSize = 22f
-            isFakeBoldText = true
-        }
-        val guideLabelBg = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            style = Paint.Style.FILL
-            color = android.graphics.Color.argb(225, 0xF2, 0xEA, 0xDB)
-        }
+        val guideStroke =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.STROKE
+                color = android.graphics.Color.argb(170, 0x4A, 0x5A, 0x4A)
+                strokeWidth = 2f
+            }
+        val guideLabelPaint =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.FILL
+                color = android.graphics.Color.rgb(0x2F, 0x26, 0x1A)
+                textSize = 22f
+                isFakeBoldText = true
+            }
+        val guideLabelBg =
+            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                style = Paint.Style.FILL
+                color = android.graphics.Color.argb(225, 0xF2, 0xEA, 0xDB)
+            }
         val topGuideY = (parcelTop - 20f).coerceAtLeast(12f)
         val leftGuideX = (parcelLeft - 20f).coerceAtLeast(12f)
         canvas.drawLine(parcelLeft, topGuideY, parcelLeft + parcelW, topGuideY, guideStroke)
@@ -155,12 +164,13 @@ private class AndroidProjectStorage : ProjectStorage {
         val widthLabelW = guideLabelPaint.measureText(widthLabel)
         val widthBaselineY = topGuideY - 9f
         val widthX = parcelLeft + parcelW / 2f - widthLabelW / 2f
-        val widthBg = android.graphics.RectF(
-            widthX - 7f,
-            widthBaselineY - guideLabelPaint.textSize,
-            widthX + widthLabelW + 7f,
-            widthBaselineY + 6f,
-        )
+        val widthBg =
+            android.graphics.RectF(
+                widthX - 7f,
+                widthBaselineY - guideLabelPaint.textSize,
+                widthX + widthLabelW + 7f,
+                widthBaselineY + 6f,
+            )
         canvas.drawRoundRect(widthBg, 6f, 6f, guideLabelBg)
         canvas.drawText(widthLabel, widthX, widthBaselineY, guideLabelPaint)
 
@@ -172,12 +182,13 @@ private class AndroidProjectStorage : ProjectStorage {
         val heightLabelW = guideLabelPaint.measureText(heightLabel)
         val heightBaselineY = parcelTop + parcelH / 2f + guideLabelPaint.textSize / 3f
         val heightX = leftGuideX + 10f
-        val heightBg = android.graphics.RectF(
-            heightX - 7f,
-            heightBaselineY - guideLabelPaint.textSize,
-            heightX + heightLabelW + 7f,
-            heightBaselineY + 6f,
-        )
+        val heightBg =
+            android.graphics.RectF(
+                heightX - 7f,
+                heightBaselineY - guideLabelPaint.textSize,
+                heightX + heightLabelW + 7f,
+                heightBaselineY + 6f,
+            )
         canvas.drawRoundRect(heightBg, 6f, 6f, guideLabelBg)
         canvas.drawText(heightLabel, heightX, heightBaselineY, guideLabelPaint)
 
@@ -229,14 +240,19 @@ private class AndroidProjectStorage : ProjectStorage {
         writeDownloadsPng(PNG_FILE, image)
     }
 
-    private fun writeDownloadsTextFile(fileName: String, mimeType: String, content: String) {
+    private fun writeDownloadsTextFile(
+        fileName: String,
+        mimeType: String,
+        content: String,
+    ) {
         val resolver = resolver() ?: return
         findDownloadsFileUri(fileName)?.let { existing -> resolver.delete(existing, null, null) }
-        val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-            put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
-            put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/")
-        }
+        val values =
+            ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, mimeType)
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/")
+            }
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return
         resolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(content) }
     }
@@ -247,14 +263,18 @@ private class AndroidProjectStorage : ProjectStorage {
         return resolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
     }
 
-    private fun writeDownloadsPng(fileName: String, bitmap: Bitmap) {
+    private fun writeDownloadsPng(
+        fileName: String,
+        bitmap: Bitmap,
+    ) {
         val resolver = resolver() ?: return
         findDownloadsFileUri(fileName)?.let { existing -> resolver.delete(existing, null, null) }
-        val values = ContentValues().apply {
-            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
-            put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
-            put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/")
-        }
+        val values =
+            ContentValues().apply {
+                put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+                put(MediaStore.MediaColumns.MIME_TYPE, "image/png")
+                put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/")
+            }
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return
         resolver.openOutputStream(uri)?.use { stream ->
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)
@@ -266,17 +286,18 @@ private class AndroidProjectStorage : ProjectStorage {
         val projection = arrayOf(MediaStore.MediaColumns._ID)
         val selection = "${MediaStore.MediaColumns.DISPLAY_NAME} = ?"
         val args = arrayOf(fileName)
-        resolver.query(
-            MediaStore.Downloads.EXTERNAL_CONTENT_URI,
-            projection,
-            selection,
-            args,
-            null,
-        )?.use { cursor ->
-            if (!cursor.moveToFirst()) return null
-            val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID))
-            return android.net.Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id.toString())
-        }
+        resolver
+            .query(
+                MediaStore.Downloads.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                args,
+                null,
+            )?.use { cursor ->
+                if (!cursor.moveToFirst()) return null
+                val id = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.MediaColumns._ID))
+                return android.net.Uri.withAppendedPath(MediaStore.Downloads.EXTERNAL_CONTENT_URI, id.toString())
+            }
         return null
     }
 }
@@ -326,15 +347,16 @@ private fun worldAssetPath(
     bounds: BoundsMeters,
     pixelsPerMeter: Float,
 ): Path {
-    val points = if (preset.polygonPoints.isNotEmpty()) {
-        preset.polygonPoints
-    } else {
-        GeometryHelper.generatePoints(preset.shape, preset.widthMeters, preset.heightMeters).ifEmpty {
-            val hw = preset.widthMeters / 2f
-            val hh = preset.heightMeters / 2f
-            listOf(Vec2(-hw, -hh), Vec2(hw, -hh), Vec2(hw, hh), Vec2(-hw, hh))
+    val points =
+        if (preset.polygonPoints.isNotEmpty()) {
+            preset.polygonPoints
+        } else {
+            GeometryHelper.generatePoints(preset.shape, preset.widthMeters, preset.heightMeters).ifEmpty {
+                val hw = preset.widthMeters / 2f
+                val hh = preset.heightMeters / 2f
+                listOf(Vec2(-hw, -hh), Vec2(hw, -hh), Vec2(hw, hh), Vec2(-hw, hh))
+            }
         }
-    }
     val path = Path()
     if (points.isEmpty()) return path
     val firstWorld = GeometryEngine.worldPoint(asset, points.first())
@@ -352,4 +374,3 @@ private fun worldAssetPath(
     path.close()
     return path
 }
-

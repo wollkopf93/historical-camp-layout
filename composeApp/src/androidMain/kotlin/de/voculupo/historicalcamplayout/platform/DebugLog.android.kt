@@ -2,7 +2,9 @@
 
 import android.util.Log
 
-actual fun platformDebugLog(tag: String, message: String) {
+actual fun platformDebugLog(
+    tag: String,
+    message: String,
+) {
     Log.d(tag, message)
 }
-

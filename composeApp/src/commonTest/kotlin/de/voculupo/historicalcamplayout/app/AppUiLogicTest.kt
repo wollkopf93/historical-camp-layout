@@ -7,7 +7,6 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AppUiLogicTest {
-
     @Test
     fun isPhoneLayout_usesCompactBreakpoint() {
         assertTrue(AppUiLogic.isPhoneLayout(320f))
@@ -26,4 +25,3 @@ class AppUiLogicTest {
         assertTrue(AppUiLogic.shouldAutoOpenProperties(setOf("asset-1")))
     }
 }
-

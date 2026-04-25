@@ -1,5 +1,7 @@
-﻿import org.jetbrains.compose.desktop.application.dsl.TargetFormat
+﻿import io.gitlab.arturbosch.detekt.Detekt
+import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.File
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
@@ -8,6 +10,8 @@ plugins {
     alias(libs.plugins.composeMultiplatform)
     alias(libs.plugins.composeCompiler)
     alias(libs.plugins.composeHotReload)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
 }
 
 kotlin {
@@ -16,13 +20,13 @@ kotlin {
             jvmTarget.set(JvmTarget.JVM_11)
         }
     }
-    
+
     jvm {
         mainRun {
             mainClass = "de.voculupo.historicalcamplayout.MainKt"
         }
     }
-    
+
     sourceSets {
         androidMain.dependencies {
             implementation(libs.compose.uiToolingPreview)
@@ -51,12 +55,21 @@ kotlin {
 
 android {
     namespace = "de.voculupo.historicalcamplayout"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
+    compileSdk =
+        libs.versions.android.compileSdk
+            .get()
+            .toInt()
 
     defaultConfig {
         applicationId = "de.voculupo.historicalcamplayout"
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        targetSdk = libs.versions.android.targetSdk.get().toInt()
+        minSdk =
+            libs.versions.android.minSdk
+                .get()
+                .toInt()
+        targetSdk =
+            libs.versions.android.targetSdk
+                .get()
+                .toInt()
         versionCode = 1
         versionName = "1.0"
     }
@@ -78,6 +91,37 @@ android {
 
 dependencies {
     debugImplementation(libs.compose.uiTooling)
+    ktlintRuleset(libs.compose.rules.ktlint)
+}
+
+detekt {
+    buildUponDefaultConfig = true
+    allRules = false
+    parallel = true
+    config.setFrom(files("$rootDir/detekt.yml"))
+}
+
+tasks.withType<Detekt>().configureEach {
+    setSource(
+        files(
+            "src/commonMain/kotlin",
+            "src/androidMain/kotlin",
+            "src/jvmMain/kotlin",
+            "src/commonTest/kotlin",
+        ),
+    )
+    include("**/*.kt", "**/*.kts")
+    exclude("**/build/**")
+}
+
+ktlint {
+    version.set("1.8.0")
+    filter {
+        include("**/src/**/*.kt")
+        include("**/*.kts")
+        exclude("**/build/**")
+        exclude { element -> element.file.path.contains("${File.separator}build${File.separator}") }
+    }
 }
 
 compose.desktop {
@@ -102,10 +146,8 @@ compose.desktop {
                 shortcut = true
                 menu = true
                 menuGroup = "Lagerplaner"
+                iconFile.set(project.file("branding/windows/lagerplaner.ico"))
             }
         }
     }
 }
-
-
-

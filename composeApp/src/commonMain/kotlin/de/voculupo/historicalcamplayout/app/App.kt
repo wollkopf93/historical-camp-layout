@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,21 +22,21 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -52,18 +53,17 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import de.voculupo.historicalcamplayout.PlannerToolMode
 import de.voculupo.historicalcamplayout.PlannerUiState
-import de.voculupo.historicalcamplayout.getPlatform
 import de.voculupo.historicalcamplayout.features.inventory.InventoryPane
 import de.voculupo.historicalcamplayout.features.planner.canvas.PlannerCanvas
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
 import de.voculupo.historicalcamplayout.features.properties.PropertiesPane
+import de.voculupo.historicalcamplayout.getPlatform
 import kotlinx.coroutines.delay
 
 private data class PresetDragState(
@@ -78,60 +78,61 @@ data class PresetDropRequest(
     val token: Long = kotlin.random.Random.nextLong(),
 )
 
-private val MedievalLightColorScheme = lightColorScheme(
-    primary = Color(0xFF6B4A2A),
-    onPrimary = Color(0xFFFDF6E8),
-    primaryContainer = Color(0xFFE6D5B8),
-    onPrimaryContainer = Color(0xFF3C2A19),
-    secondary = Color(0xFF8A6B3D),
-    onSecondary = Color(0xFFFDF6E8),
-    secondaryContainer = Color(0xFFEFE3CF),
-    onSecondaryContainer = Color(0xFF3E311E),
-    tertiary = Color(0xFF6A5A3C),
-    onTertiary = Color(0xFFF6EFE1),
-    background = Color(0xFFEAE1CF),
-    onBackground = Color(0xFF2F261A),
-    surface = Color(0xFFF2EADB),
-    onSurface = Color(0xFF2F261A),
-    inverseSurface = Color(0xFF5A4832),
-    inverseOnSurface = Color(0xFFF8F0E2),
-    outline = Color(0xFF8A7A62),
-    outlineVariant = Color(0xFFC4B59D),
-    error = Color(0xFF8B3A32),
-    onError = Color(0xFFFFF5F3),
-)
+private val MedievalLightColorScheme =
+    lightColorScheme(
+        primary = Color(0xFF6B4A2A),
+        onPrimary = Color(0xFFFDF6E8),
+        primaryContainer = Color(0xFFE6D5B8),
+        onPrimaryContainer = Color(0xFF3C2A19),
+        secondary = Color(0xFF8A6B3D),
+        onSecondary = Color(0xFFFDF6E8),
+        secondaryContainer = Color(0xFFEFE3CF),
+        onSecondaryContainer = Color(0xFF3E311E),
+        tertiary = Color(0xFF6A5A3C),
+        onTertiary = Color(0xFFF6EFE1),
+        background = Color(0xFFEAE1CF),
+        onBackground = Color(0xFF2F261A),
+        surface = Color(0xFFF2EADB),
+        onSurface = Color(0xFF2F261A),
+        inverseSurface = Color(0xFF5A4832),
+        inverseOnSurface = Color(0xFFF8F0E2),
+        outline = Color(0xFF8A7A62),
+        outlineVariant = Color(0xFFC4B59D),
+        error = Color(0xFF8B3A32),
+        onError = Color(0xFFFFF5F3),
+    )
 
-private val MedievalDarkColorScheme = darkColorScheme(
-    primary = Color(0xFFD0B38A),
-    onPrimary = Color(0xFF3A2817),
-    primaryContainer = Color(0xFF5A4126),
-    onPrimaryContainer = Color(0xFFF0DFC5),
-    secondary = Color(0xFFC3A677),
-    onSecondary = Color(0xFF3D2E1B),
-    secondaryContainer = Color(0xFF564128),
-    onSecondaryContainer = Color(0xFFEEDFC3),
-    tertiary = Color(0xFFC4B089),
-    onTertiary = Color(0xFF362B1B),
-    background = Color(0xFF2A241C),
-    onBackground = Color(0xFFE9DEC8),
-    surface = Color(0xFF332C23),
-    onSurface = Color(0xFFE9DEC8),
-    inverseSurface = Color(0xFFE7D8BF),
-    inverseOnSurface = Color(0xFF342B21),
-    outline = Color(0xFF9B8B72),
-    outlineVariant = Color(0xFF5D5142),
-    error = Color(0xFFCF8A82),
-    onError = Color(0xFF3F1613),
-)
+private val MedievalDarkColorScheme =
+    darkColorScheme(
+        primary = Color(0xFFD0B38A),
+        onPrimary = Color(0xFF3A2817),
+        primaryContainer = Color(0xFF5A4126),
+        onPrimaryContainer = Color(0xFFF0DFC5),
+        secondary = Color(0xFFC3A677),
+        onSecondary = Color(0xFF3D2E1B),
+        secondaryContainer = Color(0xFF564128),
+        onSecondaryContainer = Color(0xFFEEDFC3),
+        tertiary = Color(0xFFC4B089),
+        onTertiary = Color(0xFF362B1B),
+        background = Color(0xFF2A241C),
+        onBackground = Color(0xFFE9DEC8),
+        surface = Color(0xFF332C23),
+        onSurface = Color(0xFFE9DEC8),
+        inverseSurface = Color(0xFFE7D8BF),
+        inverseOnSurface = Color(0xFF342B21),
+        outline = Color(0xFF9B8B72),
+        outlineVariant = Color(0xFF5D5142),
+        error = Color(0xFFCF8A82),
+        onError = Color(0xFF3F1613),
+    )
 
 @Composable
-@Preview
-fun App() {
+fun App(modifier: Modifier = Modifier) {
     val viewModel = remember { PlannerViewModel() }
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val density = LocalDensity.current
     val rootFocusRequester = remember { FocusRequester() }
-    var leftPaneWidthDp by remember { mutableStateOf(340f) }
+    var leftPaneWidthDp by remember { mutableFloatStateOf(340f) }
     var shiftPressed by remember { mutableStateOf(false) }
     var dragState by remember { mutableStateOf<PresetDragState?>(null) }
     var dropRequest by remember { mutableStateOf<PresetDropRequest?>(null) }
@@ -156,29 +157,34 @@ fun App() {
         colorScheme = colorScheme,
     ) {
         BoxWithConstraints(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(MaterialTheme.colorScheme.surface)
-                .focusRequester(rootFocusRequester)
-                .focusable()
-                .onPreviewKeyEvent { keyEvent ->
-                    when {
-                        keyEvent.key == Key.ShiftLeft || keyEvent.key == Key.ShiftRight -> {
-                            shiftPressed = keyEvent.type == KeyEventType.KeyDown
-                            false
-                        }
-                        keyEvent.type == KeyEventType.KeyDown &&
-                            (keyEvent.key == Key.Delete || keyEvent.key == Key.Escape) -> {
-                            if (state.selectedAssetIds.isNotEmpty()) {
-                                viewModel.deleteSelection()
-                                true
-                            } else {
+            modifier =
+                modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.surface)
+                    .focusRequester(rootFocusRequester)
+                    .focusable()
+                    .onPreviewKeyEvent { keyEvent ->
+                        when {
+                            keyEvent.key == Key.ShiftLeft || keyEvent.key == Key.ShiftRight -> {
+                                shiftPressed = keyEvent.type == KeyEventType.KeyDown
+                                false
+                            }
+
+                            keyEvent.type == KeyEventType.KeyDown &&
+                                (keyEvent.key == Key.Delete || keyEvent.key == Key.Escape) -> {
+                                if (state.selectedAssetIds.isNotEmpty()) {
+                                    viewModel.deleteSelection()
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+
+                            else -> {
                                 false
                             }
                         }
-                        else -> false
-                    }
-                },
+                    },
         ) {
             val useCompactShell = AppUiLogic.shouldUseCompactShell(isAndroid = isAndroid)
             if (useCompactShell) {
@@ -187,9 +193,9 @@ fun App() {
                     shiftPressed = false,
                     dropRequest = dropRequest,
                     suppressTapTemporarily = suppressTapTemporarily,
-                    onDropHandled = { dropRequest = null },
+                    onDropHandle = { dropRequest = null },
                     onTool = viewModel::setTool,
-                    onPresetSelected = { id ->
+                    onPresetSelect = { id ->
                         viewModel.selectPreset(id)
                         viewModel.setTool(AppUiLogic.toolForCompactPresetSelection())
                     },
@@ -205,9 +211,9 @@ fun App() {
                     onPlacePresetAt = viewModel::placePresetAt,
                     onSelection = viewModel::setSelection,
                     onSelectionToggle = viewModel::toggleSelection,
-                    onRopeSelected = viewModel::selectRopeIndex,
-                    onRopeStakeDragged = viewModel::updateRopeStakeWorld,
-                    onRopeAnchorDragged = viewModel::updateRopeAnchorWorld,
+                    onRopeSelect = viewModel::selectRopeIndex,
+                    onRopeStakeDrag = viewModel::updateRopeStakeWorld,
+                    onRopeAnchorDrag = viewModel::updateRopeAnchorWorld,
                     onMeasureTap = viewModel::onMeasureTap,
                     onBlockZoneTap = viewModel::onBlockZoneTap,
                     onZoomIn = viewModel::zoomIn,
@@ -220,7 +226,7 @@ fun App() {
                     onParcelUpdate = viewModel::updateParcel,
                     onZoomReset = viewModel::resetZoom,
                     onClearZones = viewModel::clearBlockZones,
-                    onProjectNameChanged = viewModel::setProjectName,
+                    onProjectNameChange = viewModel::setProjectName,
                     onSave = viewModel::saveProject,
                     onLoad = viewModel::loadProject,
                     onExportProjectFile = viewModel::exportProjectFile,
@@ -228,17 +234,17 @@ fun App() {
                     onExportPng = viewModel::exportPng,
                     onUndo = viewModel::undo,
                     onRedo = viewModel::redo,
-                    onLabelChanged = viewModel::setSelectedLabel,
+                    onLabelChange = viewModel::setSelectedLabel,
                     onRotate = viewModel::setSelectedRotation,
                     onToggleRopes = viewModel::toggleRopesForSelected,
                     onAddRope = viewModel::addRopeToSelected,
                     onRemoveRope = viewModel::removeRopeFromSelected,
                     onRestoreDefaultRopes = viewModel::restoreDefaultRopesForSelected,
                     onSelectRopeIndex = viewModel::selectRopeIndex,
-                    onRopeScaleChanged = viewModel::setSelectedRopeLengthScale,
-                    onRopeAngleChanged = viewModel::setSelectedRopeAngleOffset,
-                    onRopeAnchorXChanged = viewModel::setSelectedRopeAnchorX,
-                    onRopeAnchorYChanged = viewModel::setSelectedRopeAnchorY,
+                    onRopeScaleChange = viewModel::setSelectedRopeLengthScale,
+                    onRopeAngleChange = viewModel::setSelectedRopeAngleOffset,
+                    onRopeAnchorXChange = viewModel::setSelectedRopeAnchorX,
+                    onRopeAnchorYChange = viewModel::setSelectedRopeAnchorY,
                     onGroup = viewModel::groupSelection,
                     onUngroup = viewModel::ungroupSelection,
                     onDuplicate = viewModel::duplicateSelection,
@@ -249,15 +255,15 @@ fun App() {
                     state = state,
                     density = density,
                     leftPaneWidthDp = leftPaneWidthDp,
-                    onLeftPaneWidthDpChanged = { leftPaneWidthDp = it },
+                    onLeftPaneWidthDpChange = { leftPaneWidthDp = it },
                     darkThemeEnabled = darkThemeEnabled,
                     onToggleTheme = { darkThemeEnabled = !darkThemeEnabled },
                     shiftPressed = shiftPressed,
                     dropRequest = dropRequest,
                     suppressTapTemporarily = suppressTapTemporarily,
-                    onDropHandled = { dropRequest = null },
+                    onDropHandle = { dropRequest = null },
                     onTool = viewModel::setTool,
-                    onPresetSelected = viewModel::selectPreset,
+                    onPresetSelect = viewModel::selectPreset,
                     onPresetDragStart = { id, label, rootPosition -> dragState = PresetDragState(id, label, rootPosition) },
                     onPresetDrag = { rootPosition -> dragState = dragState?.copy(rootPosition = rootPosition) },
                     onPresetDragEnd = { id, rootPosition ->
@@ -270,9 +276,9 @@ fun App() {
                     onPlacePresetAt = viewModel::placePresetAt,
                     onSelection = viewModel::setSelection,
                     onSelectionToggle = viewModel::toggleSelection,
-                    onRopeSelected = viewModel::selectRopeIndex,
-                    onRopeStakeDragged = viewModel::updateRopeStakeWorld,
-                    onRopeAnchorDragged = viewModel::updateRopeAnchorWorld,
+                    onRopeSelect = viewModel::selectRopeIndex,
+                    onRopeStakeDrag = viewModel::updateRopeStakeWorld,
+                    onRopeAnchorDrag = viewModel::updateRopeAnchorWorld,
                     onMeasureTap = viewModel::onMeasureTap,
                     onBlockZoneTap = viewModel::onBlockZoneTap,
                     onZoomIn = viewModel::zoomIn,
@@ -285,7 +291,7 @@ fun App() {
                     onParcelUpdate = viewModel::updateParcel,
                     onZoomReset = viewModel::resetZoom,
                     onClearZones = viewModel::clearBlockZones,
-                    onProjectNameChanged = viewModel::setProjectName,
+                    onProjectNameChange = viewModel::setProjectName,
                     onSave = viewModel::saveProject,
                     onLoad = viewModel::loadProject,
                     onExportProjectFile = viewModel::exportProjectFile,
@@ -293,17 +299,17 @@ fun App() {
                     onExportPng = viewModel::exportPng,
                     onUndo = viewModel::undo,
                     onRedo = viewModel::redo,
-                    onLabelChanged = viewModel::setSelectedLabel,
+                    onLabelChange = viewModel::setSelectedLabel,
                     onRotate = viewModel::setSelectedRotation,
                     onToggleRopes = viewModel::toggleRopesForSelected,
                     onAddRope = viewModel::addRopeToSelected,
                     onRemoveRope = viewModel::removeRopeFromSelected,
                     onRestoreDefaultRopes = viewModel::restoreDefaultRopesForSelected,
                     onSelectRopeIndex = viewModel::selectRopeIndex,
-                    onRopeScaleChanged = viewModel::setSelectedRopeLengthScale,
-                    onRopeAngleChanged = viewModel::setSelectedRopeAngleOffset,
-                    onRopeAnchorXChanged = viewModel::setSelectedRopeAnchorX,
-                    onRopeAnchorYChanged = viewModel::setSelectedRopeAnchorY,
+                    onRopeScaleChange = viewModel::setSelectedRopeLengthScale,
+                    onRopeAngleChange = viewModel::setSelectedRopeAngleOffset,
+                    onRopeAnchorXChange = viewModel::setSelectedRopeAnchorX,
+                    onRopeAnchorYChange = viewModel::setSelectedRopeAnchorY,
                     onGroup = viewModel::groupSelection,
                     onUngroup = viewModel::ungroupSelection,
                     onDuplicate = viewModel::duplicateSelection,
@@ -312,9 +318,12 @@ fun App() {
             }
             dragState?.let { drag ->
                 Card(
-                    modifier = Modifier
-                        .padding(start = with(density) { drag.rootPosition.x.toDp() }, top = with(density) { drag.rootPosition.y.toDp() })
-                        .border(1.dp, MaterialTheme.colorScheme.primary),
+                    modifier =
+                        Modifier
+                            .padding(
+                                start = with(density) { drag.rootPosition.x.toDp() },
+                                top = with(density) { drag.rootPosition.y.toDp() },
+                            ).border(1.dp, MaterialTheme.colorScheme.primary),
                 ) {
                     Text(
                         "➕ ${drag.label}",
@@ -328,19 +337,25 @@ fun App() {
 }
 
 @Composable
+@Preview
+private fun AppPreview() {
+    App()
+}
+
+@Composable
 private fun ExpandedLayout(
     state: PlannerUiState,
     density: androidx.compose.ui.unit.Density,
     leftPaneWidthDp: Float,
-    onLeftPaneWidthDpChanged: (Float) -> Unit,
+    onLeftPaneWidthDpChange: (Float) -> Unit,
     darkThemeEnabled: Boolean,
     onToggleTheme: () -> Unit,
     shiftPressed: Boolean,
     dropRequest: PresetDropRequest?,
     suppressTapTemporarily: Boolean,
-    onDropHandled: () -> Unit,
+    onDropHandle: () -> Unit,
     onTool: (PlannerToolMode) -> Unit,
-    onPresetSelected: (String) -> Unit,
+    onPresetSelect: (String) -> Unit,
     onPresetDragStart: (String, String, Offset) -> Unit,
     onPresetDrag: (Offset) -> Unit,
     onPresetDragEnd: (String, Offset) -> Unit,
@@ -349,9 +364,9 @@ private fun ExpandedLayout(
     onPlacePresetAt: (String, de.voculupo.historicalcamplayout.Vec2) -> Unit,
     onSelection: (Set<String>) -> Unit,
     onSelectionToggle: (String?) -> Unit,
-    onRopeSelected: (Int?) -> Unit,
-    onRopeStakeDragged: (Int, de.voculupo.historicalcamplayout.Vec2) -> Unit,
-    onRopeAnchorDragged: (Int, de.voculupo.historicalcamplayout.Vec2) -> Unit,
+    onRopeSelect: (Int?) -> Unit,
+    onRopeStakeDrag: (Int, de.voculupo.historicalcamplayout.Vec2) -> Unit,
+    onRopeAnchorDrag: (Int, de.voculupo.historicalcamplayout.Vec2) -> Unit,
     onMeasureTap: (de.voculupo.historicalcamplayout.Vec2) -> Unit,
     onBlockZoneTap: (de.voculupo.historicalcamplayout.Vec2) -> Unit,
     onZoomIn: () -> Unit,
@@ -364,7 +379,7 @@ private fun ExpandedLayout(
     onParcelUpdate: (Float, Float) -> Unit,
     onZoomReset: () -> Unit,
     onClearZones: () -> Unit,
-    onProjectNameChanged: (String) -> Unit,
+    onProjectNameChange: (String) -> Unit,
     onSave: () -> Unit,
     onLoad: () -> Unit,
     onExportProjectFile: () -> Unit,
@@ -372,17 +387,17 @@ private fun ExpandedLayout(
     onExportPng: () -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
-    onLabelChanged: (String) -> Unit,
+    onLabelChange: (String) -> Unit,
     onRotate: (Float) -> Unit,
     onToggleRopes: () -> Unit,
     onAddRope: () -> Unit,
     onRemoveRope: () -> Unit,
     onRestoreDefaultRopes: () -> Unit,
     onSelectRopeIndex: (Int?) -> Unit,
-    onRopeScaleChanged: (Float) -> Unit,
-    onRopeAngleChanged: (Float) -> Unit,
-    onRopeAnchorXChanged: (Float) -> Unit,
-    onRopeAnchorYChanged: (Float) -> Unit,
+    onRopeScaleChange: (Float) -> Unit,
+    onRopeAngleChange: (Float) -> Unit,
+    onRopeAnchorXChange: (Float) -> Unit,
+    onRopeAnchorYChange: (Float) -> Unit,
     onGroup: () -> Unit,
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
@@ -393,10 +408,10 @@ private fun ExpandedLayout(
         Row(modifier = Modifier.fillMaxSize()) {
             InventoryPane(
                 modifier = Modifier.width(leftPaneWidthDp.dp),
-            enableFullScroll = true,
+                enableFullScroll = true,
                 state = state,
                 onTool = onTool,
-                onPresetSelected = onPresetSelected,
+                onPresetSelect = onPresetSelect,
                 onPresetDragStart = onPresetDragStart,
                 onPresetDrag = onPresetDrag,
                 onPresetDragEnd = onPresetDragEnd,
@@ -408,16 +423,17 @@ private fun ExpandedLayout(
                 onClearZones = onClearZones,
             )
             Box(
-                modifier = Modifier
-                    .width(8.dp)
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
-                    .pointerInput(Unit) {
-                        detectHorizontalDragGestures { _, dragAmount ->
-                            val dragDp = with(density) { dragAmount.toDp().value }
-                            onLeftPaneWidthDpChanged((leftPaneWidthDp + dragDp).coerceIn(280f, 520f))
-                        }
-                    },
+                modifier =
+                    Modifier
+                        .width(8.dp)
+                        .fillMaxSize()
+                        .background(MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f))
+                        .pointerInput(Unit) {
+                            detectHorizontalDragGestures { _, dragAmount ->
+                                val dragDp = with(density) { dragAmount.toDp().value }
+                                onLeftPaneWidthDpChange((leftPaneWidthDp + dragDp).coerceIn(280f, 520f))
+                            }
+                        },
             )
             PlannerCanvas(
                 modifier = Modifier.weight(1f),
@@ -426,15 +442,15 @@ private fun ExpandedLayout(
                 allowSingleFingerCanvasPan = true,
                 allowMultiTouchCanvasPan = true,
                 dropRequest = dropRequest,
-                onDropHandled = onDropHandled,
+                onDropHandle = onDropHandle,
                 suppressTapTemporarily = suppressTapTemporarily,
                 onPlace = onPlace,
                 onPlacePresetAt = onPlacePresetAt,
                 onSelection = onSelection,
                 onSelectionToggle = onSelectionToggle,
-                onRopeSelected = onRopeSelected,
-                onRopeStakeDragged = onRopeStakeDragged,
-                onRopeAnchorDragged = onRopeAnchorDragged,
+                onRopeSelect = onRopeSelect,
+                onRopeStakeDrag = onRopeStakeDrag,
+                onRopeAnchorDrag = onRopeAnchorDrag,
                 onMeasureTap = onMeasureTap,
                 onBlockZoneTap = onBlockZoneTap,
                 onZoomIn = onZoomIn,
@@ -447,7 +463,7 @@ private fun ExpandedLayout(
             PropertiesPane(
                 enableFullScroll = true,
                 state = state,
-                onProjectNameChanged = onProjectNameChanged,
+                onProjectNameChange = onProjectNameChange,
                 onSave = onSave,
                 onLoad = onLoad,
                 onResetProject = onResetProject,
@@ -456,17 +472,17 @@ private fun ExpandedLayout(
                 onExportPng = onExportPng,
                 onUndo = onUndo,
                 onRedo = onRedo,
-                onLabelChanged = onLabelChanged,
+                onLabelChange = onLabelChange,
                 onRotate = onRotate,
                 onToggleRopes = onToggleRopes,
                 onAddRope = onAddRope,
                 onRemoveRope = onRemoveRope,
                 onRestoreDefaultRopes = onRestoreDefaultRopes,
                 onSelectRopeIndex = onSelectRopeIndex,
-                onRopeScaleChanged = onRopeScaleChanged,
-                onRopeAngleChanged = onRopeAngleChanged,
-                onRopeAnchorXChanged = onRopeAnchorXChanged,
-                onRopeAnchorYChanged = onRopeAnchorYChanged,
+                onRopeScaleChange = onRopeScaleChange,
+                onRopeAngleChange = onRopeAngleChange,
+                onRopeAnchorXChange = onRopeAnchorXChange,
+                onRopeAnchorYChange = onRopeAnchorYChange,
                 onGroup = onGroup,
                 onUngroup = onUngroup,
                 onDuplicate = onDuplicate,
@@ -475,10 +491,11 @@ private fun ExpandedLayout(
         }
 
         Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .statusBarsPadding()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .statusBarsPadding()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
             Card(shape = RoundedCornerShape(14.dp)) {
                 Row(
@@ -499,12 +516,13 @@ private fun ExpandedLayout(
 
         if (state.warnings.isNotEmpty() && showWarningsPanel) {
             Card(
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 56.dp)
-                    .width(560.dp)
-                    .heightIn(max = 220.dp),
+                modifier =
+                    Modifier
+                        .align(Alignment.TopCenter)
+                        .statusBarsPadding()
+                        .padding(top = 56.dp)
+                        .width(560.dp)
+                        .heightIn(max = 220.dp),
             ) {
                 Column(
                     modifier = Modifier.padding(10.dp),
@@ -534,9 +552,9 @@ private fun CompactLayout(
     shiftPressed: Boolean,
     dropRequest: PresetDropRequest?,
     suppressTapTemporarily: Boolean,
-    onDropHandled: () -> Unit,
+    onDropHandle: () -> Unit,
     onTool: (PlannerToolMode) -> Unit,
-    onPresetSelected: (String) -> Unit,
+    onPresetSelect: (String) -> Unit,
     onPresetDragStart: (String, String, Offset) -> Unit,
     onPresetDrag: (Offset) -> Unit,
     onPresetDragEnd: (String, Offset) -> Unit,
@@ -545,9 +563,9 @@ private fun CompactLayout(
     onPlacePresetAt: (String, de.voculupo.historicalcamplayout.Vec2) -> Unit,
     onSelection: (Set<String>) -> Unit,
     onSelectionToggle: (String?) -> Unit,
-    onRopeSelected: (Int?) -> Unit,
-    onRopeStakeDragged: (Int, de.voculupo.historicalcamplayout.Vec2) -> Unit,
-    onRopeAnchorDragged: (Int, de.voculupo.historicalcamplayout.Vec2) -> Unit,
+    onRopeSelect: (Int?) -> Unit,
+    onRopeStakeDrag: (Int, de.voculupo.historicalcamplayout.Vec2) -> Unit,
+    onRopeAnchorDrag: (Int, de.voculupo.historicalcamplayout.Vec2) -> Unit,
     onMeasureTap: (de.voculupo.historicalcamplayout.Vec2) -> Unit,
     onBlockZoneTap: (de.voculupo.historicalcamplayout.Vec2) -> Unit,
     onZoomIn: () -> Unit,
@@ -560,7 +578,7 @@ private fun CompactLayout(
     onParcelUpdate: (Float, Float) -> Unit,
     onZoomReset: () -> Unit,
     onClearZones: () -> Unit,
-    onProjectNameChanged: (String) -> Unit,
+    onProjectNameChange: (String) -> Unit,
     onSave: () -> Unit,
     onLoad: () -> Unit,
     onExportProjectFile: () -> Unit,
@@ -568,17 +586,17 @@ private fun CompactLayout(
     onExportPng: () -> Unit,
     onUndo: () -> Unit,
     onRedo: () -> Unit,
-    onLabelChanged: (String) -> Unit,
+    onLabelChange: (String) -> Unit,
     onRotate: (Float) -> Unit,
     onToggleRopes: () -> Unit,
     onAddRope: () -> Unit,
     onRemoveRope: () -> Unit,
     onRestoreDefaultRopes: () -> Unit,
     onSelectRopeIndex: (Int?) -> Unit,
-    onRopeScaleChanged: (Float) -> Unit,
-    onRopeAngleChanged: (Float) -> Unit,
-    onRopeAnchorXChanged: (Float) -> Unit,
-    onRopeAnchorYChanged: (Float) -> Unit,
+    onRopeScaleChange: (Float) -> Unit,
+    onRopeAngleChange: (Float) -> Unit,
+    onRopeAnchorXChange: (Float) -> Unit,
+    onRopeAnchorYChange: (Float) -> Unit,
     onGroup: () -> Unit,
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
@@ -597,15 +615,15 @@ private fun CompactLayout(
             allowSingleFingerCanvasPan = true,
             allowMultiTouchCanvasPan = true,
             dropRequest = dropRequest,
-            onDropHandled = onDropHandled,
+            onDropHandle = onDropHandle,
             suppressTapTemporarily = suppressTapTemporarily,
             onPlace = onPlace,
             onPlacePresetAt = onPlacePresetAt,
             onSelection = onSelection,
             onSelectionToggle = onSelectionToggle,
-            onRopeSelected = onRopeSelected,
-            onRopeStakeDragged = onRopeStakeDragged,
-            onRopeAnchorDragged = onRopeAnchorDragged,
+            onRopeSelect = onRopeSelect,
+            onRopeStakeDrag = onRopeStakeDrag,
+            onRopeAnchorDrag = onRopeAnchorDrag,
             onMeasureTap = onMeasureTap,
             onBlockZoneTap = onBlockZoneTap,
             onZoomIn = onZoomIn,
@@ -617,10 +635,11 @@ private fun CompactLayout(
         )
 
         Box(
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .statusBarsPadding()
-                .padding(horizontal = 8.dp, vertical = 6.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
         ) {
             Card(
                 shape = RoundedCornerShape(14.dp),
@@ -650,13 +669,14 @@ private fun CompactLayout(
 
         if (state.warnings.isNotEmpty() && showWarningsPanel && !showPropertiesSidebar) {
             Card(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .statusBarsPadding()
-                    .padding(top = 56.dp, end = 8.dp)
-                    .width(340.dp)
-                    .heightIn(max = 220.dp)
-                    .zIndex(2.5f),
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .statusBarsPadding()
+                        .padding(top = 56.dp, end = 8.dp)
+                        .width(340.dp)
+                        .heightIn(max = 220.dp)
+                        .zIndex(2.5f),
             ) {
                 Column(
                     modifier = Modifier.padding(10.dp),
@@ -679,26 +699,28 @@ private fun CompactLayout(
 
         if (showInventorySidebar || showPropertiesSidebar) {
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .zIndex(2f)
-                    .pointerInput(showInventorySidebar, showPropertiesSidebar) {
-                        detectTapGestures {
-                            showInventorySidebar = false
-                            showPropertiesSidebar = false
-                        }
-                    },
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .zIndex(2f)
+                        .pointerInput(showInventorySidebar, showPropertiesSidebar) {
+                            detectTapGestures {
+                                showInventorySidebar = false
+                                showPropertiesSidebar = false
+                            }
+                        },
             )
         }
 
         if (showInventorySidebar) {
             Card(
-                modifier = Modifier
-                    .align(Alignment.CenterStart)
-                    .statusBarsPadding()
-                    .fillMaxHeight()
-                    .width(320.dp)
-                    .zIndex(3f),
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .statusBarsPadding()
+                        .fillMaxHeight()
+                        .width(320.dp)
+                        .zIndex(3f),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -713,7 +735,7 @@ private fun CompactLayout(
                     enableFullScroll = true,
                     state = state,
                     onTool = onTool,
-                    onPresetSelected = onPresetSelected,
+                    onPresetSelect = onPresetSelect,
                     onPresetDragStart = onPresetDragStart,
                     onPresetDrag = onPresetDrag,
                     onPresetDragEnd = { id, rootPosition ->
@@ -735,12 +757,13 @@ private fun CompactLayout(
 
         if (showPropertiesSidebar) {
             Card(
-                modifier = Modifier
-                    .align(Alignment.CenterEnd)
-                    .statusBarsPadding()
-                    .fillMaxHeight()
-                    .width(320.dp)
-                    .zIndex(3f),
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterEnd)
+                        .statusBarsPadding()
+                        .fillMaxHeight()
+                        .width(320.dp)
+                        .zIndex(3f),
             ) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
@@ -754,7 +777,7 @@ private fun CompactLayout(
                     modifier = Modifier.padding(horizontal = 12.dp),
                     enableFullScroll = true,
                     state = state,
-                    onProjectNameChanged = onProjectNameChanged,
+                    onProjectNameChange = onProjectNameChange,
                     onSave = onSave,
                     onLoad = onLoad,
                     onResetProject = onResetProject,
@@ -763,17 +786,17 @@ private fun CompactLayout(
                     onExportPng = onExportPng,
                     onUndo = onUndo,
                     onRedo = onRedo,
-                    onLabelChanged = onLabelChanged,
+                    onLabelChange = onLabelChange,
                     onRotate = onRotate,
                     onToggleRopes = onToggleRopes,
                     onAddRope = onAddRope,
                     onRemoveRope = onRemoveRope,
                     onRestoreDefaultRopes = onRestoreDefaultRopes,
                     onSelectRopeIndex = onSelectRopeIndex,
-                    onRopeScaleChanged = onRopeScaleChanged,
-                    onRopeAngleChanged = onRopeAngleChanged,
-                    onRopeAnchorXChanged = onRopeAnchorXChanged,
-                    onRopeAnchorYChanged = onRopeAnchorYChanged,
+                    onRopeScaleChange = onRopeScaleChange,
+                    onRopeAngleChange = onRopeAngleChange,
+                    onRopeAnchorXChange = onRopeAnchorXChange,
+                    onRopeAnchorYChange = onRopeAnchorYChange,
                     onGroup = onGroup,
                     onUngroup = onUngroup,
                     onDuplicate = onDuplicate,
@@ -783,10 +806,11 @@ private fun CompactLayout(
         }
 
         ExtendedFloatingActionButton(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .navigationBarsPadding()
-                .padding(end = 16.dp, bottom = 104.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomEnd)
+                    .navigationBarsPadding()
+                    .padding(end = 16.dp, bottom = 104.dp),
             text = { Text("Inventory") },
             icon = { Text("📦") },
             shape = RoundedCornerShape(16.dp),
@@ -799,16 +823,18 @@ private fun CompactLayout(
         )
 
         Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .navigationBarsPadding()
-                .fillMaxWidth()
-                .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .navigationBarsPadding()
+                    .fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
         ) {
             Card(
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .widthIn(max = 400.dp),
+                modifier =
+                    Modifier
+                        .align(Alignment.CenterHorizontally)
+                        .widthIn(max = 400.dp),
                 shape = RoundedCornerShape(18.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)),
                 elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
@@ -840,5 +866,3 @@ private fun CompactLayout(
         }
     }
 }
-
-

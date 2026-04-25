@@ -3,4 +3,3 @@
 typealias GeometryEngine = de.voculupo.historicalcamplayout.GeometryEngine
 typealias CollisionEngine = de.voculupo.historicalcamplayout.CollisionEngine
 typealias GeometryHelper = de.voculupo.historicalcamplayout.GeometryHelper
-

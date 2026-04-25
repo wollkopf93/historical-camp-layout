@@ -1,12 +1,12 @@
 ﻿package de.voculupo.historicalcamplayout
 
-import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import java.awt.BasicStroke
 import java.awt.Color
 import java.awt.FileDialog
-import java.awt.Frame
 import java.awt.Font
+import java.awt.Frame
 import java.awt.RenderingHints
 import java.awt.geom.Path2D
 import java.awt.image.BufferedImage
@@ -38,18 +38,20 @@ private class JvmProjectStorage : ProjectStorage {
     }
 
     override fun exportProjectFile(project: PlannerProject) {
-        val target = chooseSaveFile(
-            title = "Projektdatei exportieren",
-            defaultName = PROJECT_EXCHANGE_FILE,
-        ) ?: File(baseDir, PROJECT_EXCHANGE_FILE)
+        val target =
+            chooseSaveFile(
+                title = "Projektdatei exportieren",
+                defaultName = PROJECT_EXCHANGE_FILE,
+            ) ?: File(baseDir, PROJECT_EXCHANGE_FILE)
         target.writeText(PlannerJson.json.encodeToString(project))
     }
 
     override fun importProjectFile(): PlannerProject? {
-        val file = chooseOpenFile(
-            title = "Projektdatei importieren",
-            defaultName = PROJECT_EXCHANGE_FILE,
-        ) ?: File(baseDir, PROJECT_EXCHANGE_FILE)
+        val file =
+            chooseOpenFile(
+                title = "Projektdatei importieren",
+                defaultName = PROJECT_EXCHANGE_FILE,
+            ) ?: File(baseDir, PROJECT_EXCHANGE_FILE)
         if (!file.exists()) return null
         return runCatching { PlannerJson.json.decodeFromString<PlannerProject>(file.readText()) }.getOrNull()
     }
@@ -64,7 +66,10 @@ private class JvmProjectStorage : ProjectStorage {
         return runCatching { PlannerJson.json.decodeFromString<List<TentPreset>>(file.readText()) }.getOrNull()
     }
 
-    override fun exportProjectPng(project: PlannerProject, presets: List<TentPreset>) {
+    override fun exportProjectPng(
+        project: PlannerProject,
+        presets: List<TentPreset>,
+    ) {
         val presetsById = presets.associateBy { it.id }
         val meterBounds = exportBoundsMeters(project, presetsById, paddingMeters = 1.0f)
         val ppm = project.pixelsPerMeter.coerceAtLeast(20f)
@@ -175,30 +180,39 @@ private class JvmProjectStorage : ProjectStorage {
         }
 
         g.dispose()
-        val target = chooseSaveFile(
-            title = "PNG exportieren",
-            defaultName = PNG_FILE,
-        ) ?: File(baseDir, PNG_FILE)
+        val target =
+            chooseSaveFile(
+                title = "PNG exportieren",
+                defaultName = PNG_FILE,
+            ) ?: File(baseDir, PNG_FILE)
         ImageIO.write(image, "png", target)
     }
 }
 
-private fun chooseSaveFile(title: String, defaultName: String): File? {
-    val dialog = FileDialog(null as Frame?, title, FileDialog.SAVE).apply {
-        directory = File(System.getProperty("user.home"), "Lagerplaner").absolutePath
-        file = defaultName
-        isVisible = true
-    }
+private fun chooseSaveFile(
+    title: String,
+    defaultName: String,
+): File? {
+    val dialog =
+        FileDialog(null as Frame?, title, FileDialog.SAVE).apply {
+            directory = File(System.getProperty("user.home"), "Lagerplaner").absolutePath
+            file = defaultName
+            isVisible = true
+        }
     val chosen = dialog.file ?: return null
     return File(dialog.directory ?: "", chosen)
 }
 
-private fun chooseOpenFile(title: String, defaultName: String): File? {
-    val dialog = FileDialog(null as Frame?, title, FileDialog.LOAD).apply {
-        directory = File(System.getProperty("user.home"), "Lagerplaner").absolutePath
-        file = defaultName
-        isVisible = true
-    }
+private fun chooseOpenFile(
+    title: String,
+    defaultName: String,
+): File? {
+    val dialog =
+        FileDialog(null as Frame?, title, FileDialog.LOAD).apply {
+            directory = File(System.getProperty("user.home"), "Lagerplaner").absolutePath
+            file = defaultName
+            isVisible = true
+        }
     val chosen = dialog.file ?: return null
     return File(dialog.directory ?: "", chosen)
 }
@@ -248,15 +262,16 @@ private fun worldAssetPath(
     bounds: BoundsMeters,
     pixelsPerMeter: Float,
 ): Path2D.Float {
-    val points = if (preset.polygonPoints.isNotEmpty()) {
-        preset.polygonPoints
-    } else {
-        GeometryHelper.generatePoints(preset.shape, preset.widthMeters, preset.heightMeters).ifEmpty {
-            val hw = preset.widthMeters / 2f
-            val hh = preset.heightMeters / 2f
-            listOf(Vec2(-hw, -hh), Vec2(hw, -hh), Vec2(hw, hh), Vec2(-hw, hh))
+    val points =
+        if (preset.polygonPoints.isNotEmpty()) {
+            preset.polygonPoints
+        } else {
+            GeometryHelper.generatePoints(preset.shape, preset.widthMeters, preset.heightMeters).ifEmpty {
+                val hw = preset.widthMeters / 2f
+                val hh = preset.heightMeters / 2f
+                listOf(Vec2(-hw, -hh), Vec2(hw, -hh), Vec2(hw, hh), Vec2(-hw, hh))
+            }
         }
-    }
     val path = Path2D.Float()
     if (points.isEmpty()) return path
     val firstWorld = GeometryEngine.worldPoint(asset, points.first())
@@ -274,4 +289,3 @@ private fun worldAssetPath(
     path.closePath()
     return path
 }
-

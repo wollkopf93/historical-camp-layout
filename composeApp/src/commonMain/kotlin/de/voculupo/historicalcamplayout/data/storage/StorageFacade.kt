@@ -11,8 +11,10 @@ object StorageProvider {
     fun create(): ProjectStorage = ProjectStorageProvider.create()
 }
 
-fun PlannerProject.toJsonString(): String = PlannerJson.json.encodeToString(
-    serializer = de.voculupo.historicalcamplayout.domain.model.PlannerProject.serializer(),
-    value = this,
-)
-
+fun PlannerProject.toJsonString(): String =
+    PlannerJson.json.encodeToString(
+        serializer =
+            de.voculupo.historicalcamplayout.domain.model.PlannerProject
+                .serializer(),
+        value = this,
+    )

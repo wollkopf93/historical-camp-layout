@@ -6,4 +6,3 @@ actual fun Modifier.platformScrollZoom(
     onZoomIn: () -> Unit,
     onZoomOut: () -> Unit,
 ): Modifier = this
-

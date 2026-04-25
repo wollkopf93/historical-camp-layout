@@ -1,0 +1,55 @@
+---
+description: Core coding standards for Tent Planner (KMP + Compose)
+alwaysApply: true
+---
+
+# Tent Planner Coding Standards (Detailed)
+
+## 1) Source-set boundaries (KMP)
+- Keep shared domain/state/UI logic in `composeApp/src/commonMain/kotlin`.
+- Use `androidMain` and `jvmMain` only for platform adapters (`actual` implementations, Android/JVM I/O, export integrations).
+- Never move Android/JVM-only APIs into `commonMain`.
+- New cross-platform abstractions should use `expect/actual` (same pattern as `Platform` and `ProjectStorageProvider`).
+
+## 2) Domain model rules (`PlannerModels` + aliases)
+- Treat model types (`PlannerProject`, `PlacedAsset`, `TentPreset`, `Vec2`, etc.) as immutable value objects.
+- Prefer `copy(...)`-based updates; avoid mutable state inside model classes.
+- Keep serialization compatibility (`@Serializable`, stable field names/defaults) for project and inventory persistence.
+- New model fields must have safe defaults to avoid breaking load/import of older JSON.
+- Keep geometric units explicit and consistent: distances in meters, angles in degrees, pixel conversion only at render/export boundaries.
+
+## 3) State and logic split (`PlannerViewModel`, `PlannerDomainOps`, `AppUiLogic`)
+- Keep `PlannerViewModel` as orchestration/state holder; pure calculation logic belongs in `PlannerDomainOps` (or other pure helpers).
+- Maintain the mutate pipeline: project change -> history update -> warning recomputation.
+- Guard invalid user input early (bounds/coercion/null checks) and return fast.
+- Preserve undo/redo behavior when adding write operations.
+- Keep deterministic helper methods pure/testable where possible.
+
+## 4) Geometry and collision engine conventions
+- Reuse `GeometryEngine`/`CollisionEngine` helpers before introducing new math utilities.
+- Keep collision checks height-aware and shape-aware; avoid regressions that ignore `HeightRange`.
+- Preserve existing precision behavior (epsilon checks, normalized angles, clamping ranges).
+- Any new rope/anchor behavior must remain consistent with local/world transform workflow.
+
+## 5) Storage and I/O conventions
+- `ProjectStorage` remains the single contract; implementations stay platform-specific.
+- JSON parsing must stay fault-tolerant (`runCatching`, `ignoreUnknownKeys`) and fail safely.
+- Do not introduce storage behavior in UI Composables.
+- Keep export logic deterministic and side-effect scope clear (file writing only in storage layer).
+
+## 6) Compose and UI rules
+- Keep Composables focused on presentation + event dispatch; move non-trivial business logic out of Composables.
+- Use descriptive function names and keep existing naming style (especially for planner features).
+- Avoid hidden state duplication between UI and `PlannerUiState`; derive UI from state where possible.
+
+## 7) Editing behavior for contributors/agents
+- Apply minimal, localized changes; avoid unrelated refactors.
+- Match local style of the touched file (imports, formatting, naming).
+- Add short comments only when logic is non-obvious (especially geometry/collision edge cases).
+- If changing shared behavior (geometry, history, storage), validate both Android and JVM impact.
+
+## 8) Verification checklist before completion
+- Compile/lint sanity for touched files.
+- If logic changed, add/update tests in `commonTest` (prefer pure logic tests around `PlannerDomainOps`/`AppUiLogic`).
+- Re-check key flows after state logic changes: place/move/rotate assets, rope edits, undo/redo, save/load/import/export.
+- Summarize behavior impact and mention any residual risk/TODO.

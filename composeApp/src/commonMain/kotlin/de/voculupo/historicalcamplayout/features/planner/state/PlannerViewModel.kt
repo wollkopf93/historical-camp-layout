@@ -1,5 +1,22 @@
 ﻿package de.voculupo.historicalcamplayout.features.planner.state
 
+import de.voculupo.historicalcamplayout.AssetRope
+import de.voculupo.historicalcamplayout.BlockZone
+import de.voculupo.historicalcamplayout.GeometryEngine
+import de.voculupo.historicalcamplayout.Parcel
+import de.voculupo.historicalcamplayout.PlacedAsset
+import de.voculupo.historicalcamplayout.PlannerProject
+import de.voculupo.historicalcamplayout.PlannerToolMode
+import de.voculupo.historicalcamplayout.PlannerUiState
+import de.voculupo.historicalcamplayout.TentPreset
+import de.voculupo.historicalcamplayout.Vec2
+import de.voculupo.historicalcamplayout.data.storage.ProjectStorage
+import de.voculupo.historicalcamplayout.data.storage.StorageProvider
+import de.voculupo.historicalcamplayout.defaultPresets
+import de.voculupo.historicalcamplayout.getPlatform
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -8,14 +25,6 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
-import de.voculupo.historicalcamplayout.*
-import de.voculupo.historicalcamplayout.data.storage.ProjectStorage
-import de.voculupo.historicalcamplayout.data.storage.StorageProvider
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.atan2
@@ -32,25 +41,27 @@ class PlannerViewModel(
     private val redoStack = ArrayDeque<PlannerProject>()
     private val historyLimit = 100
 
-    private val _uiState = MutableStateFlow(
-        PlannerUiState(
-            canUndo = false,
-            canRedo = false,
-        ),
-    )
+    private val _uiState =
+        MutableStateFlow(
+            PlannerUiState(
+                canUndo = false,
+                canRedo = false,
+            ),
+        )
     val uiState: StateFlow<PlannerUiState> = _uiState.asStateFlow()
 
     init {
         val loadedPresets = mergePresets(storage.loadInventory(), defaultPresets())
         val loadedProject = storage.loadProject()
         _uiState.update { state ->
-            val hydratedProject = if (loadedProject != null) {
-                val presetsById = loadedPresets.associateBy { it.id }
-                val hydrated = hydrateProjectRopes(loadedProject, loadedPresets)
-                clampAssetsToParcel(hydrated, presetsById)
-            } else {
-                hydrateProjectRopes(state.project, loadedPresets)
-            }
+            val hydratedProject =
+                if (loadedProject != null) {
+                    val presetsById = loadedPresets.associateBy { it.id }
+                    val hydrated = hydrateProjectRopes(loadedProject, loadedPresets)
+                    clampAssetsToParcel(hydrated, presetsById)
+                } else {
+                    hydrateProjectRopes(state.project, loadedPresets)
+                }
             state.copy(
                 presets = loadedPresets,
                 project = hydratedProject,
@@ -75,12 +86,13 @@ class PlannerViewModel(
 
     fun setTool(tool: PlannerToolMode) = _uiState.update { it.copy(currentTool = tool, pendingBlockZoneStart = null) }
 
-    fun selectPreset(id: String) = _uiState.update {
-        it.copy(
-            activePresetId = id,
-            recentPresetIds = rememberRecentPreset(it.recentPresetIds, id),
-        )
-    }
+    fun selectPreset(id: String) =
+        _uiState.update {
+            it.copy(
+                activePresetId = id,
+                recentPresetIds = rememberRecentPreset(it.recentPresetIds, id),
+            )
+        }
 
     fun placeAssetAt(position: Vec2) {
         val state = _uiState.value
@@ -88,7 +100,10 @@ class PlannerViewModel(
         placeFromPreset(preset, position)
     }
 
-    fun placePresetAt(presetId: String, position: Vec2) {
+    fun placePresetAt(
+        presetId: String,
+        position: Vec2,
+    ) {
         val state = _uiState.value
         val preset = state.presets.firstOrNull { it.id == presetId } ?: return
         placeFromPreset(preset, position)
@@ -100,30 +115,36 @@ class PlannerViewModel(
         }
     }
 
-    private fun placeFromPreset(preset: TentPreset, position: Vec2) {
+    private fun placeFromPreset(
+        preset: TentPreset,
+        position: Vec2,
+    ) {
         val state = _uiState.value
         val snapped = GeometryEngine.snapToGrid(position, state.project.gridMeters)
-        val constrained = constrainAssetCenterToParcel(
-            position = snapped,
-            preset = preset,
-            parcel = state.project.parcel,
-        )
-        val newAsset = PlacedAsset(
-            id = Random.nextLong().toString(),
-            presetId = preset.id,
-            label = preset.name,
-            position = constrained,
-            safetyMarginMeters = preset.defaultSafetyMarginMeters,
-            heightRange = preset.defaultHeightRange,
-            ropes = preset.ropeAnchors.map {
-                AssetRope(
-                    localX = it.localX,
-                    localY = it.localY,
-                    lengthMeters = it.lengthMeters,
-                    outwardAngleDeg = it.outwardAngleDeg ?: 0f,
-                )
-            },
-        )
+        val constrained =
+            constrainAssetCenterToParcel(
+                position = snapped,
+                preset = preset,
+                parcel = state.project.parcel,
+            )
+        val newAsset =
+            PlacedAsset(
+                id = Random.nextLong().toString(),
+                presetId = preset.id,
+                label = preset.name,
+                position = constrained,
+                safetyMarginMeters = preset.defaultSafetyMarginMeters,
+                heightRange = preset.defaultHeightRange,
+                ropes =
+                    preset.ropeAnchors.map {
+                        AssetRope(
+                            localX = it.localX,
+                            localY = it.localY,
+                            lengthMeters = it.lengthMeters,
+                            outwardAngleDeg = it.outwardAngleDeg ?: 0f,
+                        )
+                    },
+            )
         mutateProject {
             copy(assets = assets + newAsset)
         }
@@ -147,9 +168,17 @@ class PlannerViewModel(
         }
         _uiState.update { state ->
             if (assetId in state.selectedAssetIds) {
-                state.copy(selectedAssetIds = state.selectedAssetIds - assetId, selectedRopeIndex = null, currentTool = PlannerToolMode.Select)
+                state.copy(
+                    selectedAssetIds = state.selectedAssetIds - assetId,
+                    selectedRopeIndex = null,
+                    currentTool = PlannerToolMode.Select,
+                )
             } else {
-                state.copy(selectedAssetIds = state.selectedAssetIds + assetId, selectedRopeIndex = null, currentTool = PlannerToolMode.Select)
+                state.copy(
+                    selectedAssetIds = state.selectedAssetIds + assetId,
+                    selectedRopeIndex = null,
+                    currentTool = PlannerToolMode.Select,
+                )
             }
         }
     }
@@ -181,15 +210,17 @@ class PlannerViewModel(
             return
         }
 
-        val zone = BlockZone(
-            id = "zone-${Random.nextInt(100000)}",
-            points = listOf(
-                Vec2(minX, minY),
-                Vec2(maxX, minY),
-                Vec2(maxX, maxY),
-                Vec2(minX, maxY),
-            ),
-        )
+        val zone =
+            BlockZone(
+                id = "zone-${Random.nextInt(100000)}",
+                points =
+                    listOf(
+                        Vec2(minX, minY),
+                        Vec2(maxX, minY),
+                        Vec2(maxX, maxY),
+                        Vec2(minX, maxY),
+                    ),
+            )
         mutateProject { copy(blockZones = blockZones + zone) }
         _uiState.update { it.copy(pendingBlockZoneStart = null, currentTool = PlannerToolMode.Select) }
     }
@@ -198,7 +229,10 @@ class PlannerViewModel(
         mutateProject { copy(blockZones = emptyList()) }
     }
 
-    fun updateParcel(widthMeters: Float, heightMeters: Float) {
+    fun updateParcel(
+        widthMeters: Float,
+        heightMeters: Float,
+    ) {
         if (widthMeters <= 0.5f || heightMeters <= 0.5f) return
         val presetsById = _uiState.value.presets.associateBy { it.id }
         mutateProject {
@@ -262,33 +296,42 @@ class PlannerViewModel(
         val selected = snapshot.selectedAssetIds
         if (selected.isEmpty()) return
         val presetsById = snapshot.presets.associateBy { it.id }
-        val selectedGroups = snapshot.project.assets.filter { it.id in selected }.mapNotNull { it.groupId }.toSet()
-        val movableIds = snapshot.project.assets
-            .filter { asset ->
-                val isGroupedMove = asset.groupId != null && asset.groupId in selectedGroups
-                (asset.id in selected || isGroupedMove) && !asset.isLocked
-            }
-            .map { it.id }
-            .toSet()
-        val clampedDelta = clampDeltaForAssetsInParcel(
-            project = snapshot.project,
-            presetsById = presetsById,
-            assetIds = movableIds,
-            requestedDelta = deltaMeters,
-        )
+        val selectedGroups =
+            snapshot.project.assets
+                .filter { it.id in selected }
+                .mapNotNull { it.groupId }
+                .toSet()
+        val movableIds =
+            snapshot.project.assets
+                .filter { asset ->
+                    val isGroupedMove = asset.groupId != null && asset.groupId in selectedGroups
+                    (asset.id in selected || isGroupedMove) && !asset.isLocked
+                }.map { it.id }
+                .toSet()
+        val clampedDelta =
+            clampDeltaForAssetsInParcel(
+                project = snapshot.project,
+                presetsById = presetsById,
+                assetIds = movableIds,
+                requestedDelta = deltaMeters,
+            )
         _uiState.update { state ->
             state.copy(
-                project = state.project.copy(
-                    assets = state.project.assets.map { asset ->
-                        val isGroupedMove = asset.groupId != null && asset.groupId in selectedGroups
-                        if ((asset.id !in selected && !isGroupedMove) || asset.isLocked) asset else {
-                            val target = Vec2(asset.position.x + clampedDelta.x, asset.position.y + clampedDelta.y)
-                            val preset = state.presets.firstOrNull { it.id == asset.presetId } ?: return@map asset
-                            val constrained = constrainAssetCenterToParcel(target, preset, state.project.parcel)
-                            asset.copy(position = constrained)
-                        }
-                    },
-                ),
+                project =
+                    state.project.copy(
+                        assets =
+                            state.project.assets.map { asset ->
+                                val isGroupedMove = asset.groupId != null && asset.groupId in selectedGroups
+                                if ((asset.id !in selected && !isGroupedMove) || asset.isLocked) {
+                                    asset
+                                } else {
+                                    val target = Vec2(asset.position.x + clampedDelta.x, asset.position.y + clampedDelta.y)
+                                    val preset = state.presets.firstOrNull { it.id == asset.presetId } ?: return@map asset
+                                    val constrained = constrainAssetCenterToParcel(target, preset, state.project.parcel)
+                                    asset.copy(position = constrained)
+                                }
+                            },
+                    ),
             )
         }
         recomputeWarnings()
@@ -300,14 +343,17 @@ class PlannerViewModel(
         val presetsById = state.presets.associateBy { it.id }
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected) asset else {
-                        val snapped = GeometryEngine.snapToGrid(asset.position, gridMeters)
-                        val preset = presetsById[asset.presetId] ?: return@map asset
-                        val constrained = constrainAssetCenterToParcel(snapped, preset, parcel)
-                        asset.copy(position = constrained)
-                    }
-                },
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected) {
+                            asset
+                        } else {
+                            val snapped = GeometryEngine.snapToGrid(asset.position, gridMeters)
+                            val preset = presetsById[asset.presetId] ?: return@map asset
+                            val constrained = constrainAssetCenterToParcel(snapped, preset, parcel)
+                            asset.copy(position = constrained)
+                        }
+                    },
             )
         }
     }
@@ -317,10 +363,14 @@ class PlannerViewModel(
         if (selected.isEmpty()) return
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected || asset.isLocked) asset
-                    else asset.copy(rotationDeg = (asset.rotationDeg + deltaDeg + 360f) % 360f)
-                },
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected || asset.isLocked) {
+                            asset
+                        } else {
+                            asset.copy(rotationDeg = (asset.rotationDeg + deltaDeg + 360f) % 360f)
+                        }
+                    },
             )
         }
     }
@@ -330,10 +380,14 @@ class PlannerViewModel(
         if (selected.isEmpty()) return
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected || asset.isLocked) asset
-                    else asset.copy(rotationDeg = value)
-                },
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected || asset.isLocked) {
+                            asset
+                        } else {
+                            asset.copy(rotationDeg = value)
+                        }
+                    },
             )
         }
     }
@@ -344,10 +398,14 @@ class PlannerViewModel(
         val sanitized = value.trim().take(60)
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected || asset.isLocked) asset
-                    else asset.copy(label = sanitized)
-                },
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected || asset.isLocked) {
+                            asset
+                        } else {
+                            asset.copy(label = sanitized)
+                        }
+                    },
             )
         }
     }
@@ -356,9 +414,10 @@ class PlannerViewModel(
         val selected = _uiState.value.selectedAssetIds
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected) asset else asset.copy(showRopes = !asset.showRopes)
-                },
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected) asset else asset.copy(showRopes = !asset.showRopes)
+                    },
             )
         }
     }
@@ -368,25 +427,30 @@ class PlannerViewModel(
         val presetsById = _uiState.value.presets.associateBy { it.id }
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected) asset
-                    else {
-                        val preset = presetsById[asset.presetId]
-                        val slots = preset?.let { GeometryEngine.anchorSlotsForPreset(it) }.orEmpty()
-                        val next = asset.ropes.size
-                        val slot = if (slots.isNotEmpty()) slots[next % slots.size] else Vec2(0f, 0f)
-                        val rope = AssetRope(
-                            localX = slot.x,
-                            localY = slot.y,
-                            lengthMeters = 1.8f,
-                            outwardAngleDeg = 0f,
-                        )
-                        asset.copy(ropes = asset.ropes + rope, showRopes = true)
-                    }
-                },
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected) {
+                            asset
+                        } else {
+                            val preset = presetsById[asset.presetId]
+                            val slots = preset?.let { GeometryEngine.anchorSlotsForPreset(it) }.orEmpty()
+                            val next = asset.ropes.size
+                            val slot = if (slots.isNotEmpty()) slots[next % slots.size] else Vec2(0f, 0f)
+                            val rope =
+                                AssetRope(
+                                    localX = slot.x,
+                                    localY = slot.y,
+                                    lengthMeters = 1.8f,
+                                    outwardAngleDeg = 0f,
+                                )
+                            asset.copy(ropes = asset.ropes + rope, showRopes = true)
+                        }
+                    },
             )
         }
-        val selectedAsset = _uiState.value.project.assets.firstOrNull { it.id in selected }
+        val selectedAsset =
+            _uiState.value.project.assets
+                .firstOrNull { it.id in selected }
         _uiState.update { it.copy(selectedRopeIndex = selectedAsset?.ropes?.lastIndex) }
     }
 
@@ -394,10 +458,14 @@ class PlannerViewModel(
         val selected = _uiState.value.selectedAssetIds
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected || asset.ropes.isEmpty()) asset
-                    else asset.copy(ropes = asset.ropes.dropLast(1))
-                },
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected || asset.ropes.isEmpty()) {
+                            asset
+                        } else {
+                            asset.copy(ropes = asset.ropes.dropLast(1))
+                        }
+                    },
             )
         }
         _uiState.update { it.copy(selectedRopeIndex = null) }
@@ -409,24 +477,28 @@ class PlannerViewModel(
         val presetsById = _uiState.value.presets.associateBy { it.id }
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected) asset
-                    else {
-                        val preset = presetsById[asset.presetId]
-                        if (preset == null) asset
-                        else {
-                            val restored = preset.ropeAnchors.map { anchor ->
-                                AssetRope(
-                                    localX = anchor.localX,
-                                    localY = anchor.localY,
-                                    lengthMeters = anchor.lengthMeters,
-                                    outwardAngleDeg = anchor.outwardAngleDeg ?: 0f,
-                                )
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected) {
+                            asset
+                        } else {
+                            val preset = presetsById[asset.presetId]
+                            if (preset == null) {
+                                asset
+                            } else {
+                                val restored =
+                                    preset.ropeAnchors.map { anchor ->
+                                        AssetRope(
+                                            localX = anchor.localX,
+                                            localY = anchor.localY,
+                                            lengthMeters = anchor.lengthMeters,
+                                            outwardAngleDeg = anchor.outwardAngleDeg ?: 0f,
+                                        )
+                                    }
+                                asset.copy(ropes = restored, showRopes = true)
                             }
-                            asset.copy(ropes = restored, showRopes = true)
                         }
-                    }
-                },
+                    },
             )
         }
         _uiState.update { state ->
@@ -446,16 +518,18 @@ class PlannerViewModel(
         val ropeIndex = _uiState.value.selectedRopeIndex ?: return
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected) asset
-                    else {
-                        val ropes = asset.ropes.toMutableList()
-                        if (ropeIndex in ropes.indices) {
-                            ropes[ropeIndex] = ropes[ropeIndex].copy(lengthMeters = value.coerceIn(0.3f, 6.0f))
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected) {
+                            asset
+                        } else {
+                            val ropes = asset.ropes.toMutableList()
+                            if (ropeIndex in ropes.indices) {
+                                ropes[ropeIndex] = ropes[ropeIndex].copy(lengthMeters = value.coerceIn(0.3f, 6.0f))
+                            }
+                            asset.copy(ropes = ropes)
                         }
-                        asset.copy(ropes = ropes)
-                    }
-                },
+                    },
             )
         }
     }
@@ -465,16 +539,18 @@ class PlannerViewModel(
         val ropeIndex = _uiState.value.selectedRopeIndex ?: return
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected) asset
-                    else {
-                        val ropes = asset.ropes.toMutableList()
-                        if (ropeIndex in ropes.indices) {
-                            ropes[ropeIndex] = ropes[ropeIndex].copy(outwardAngleDeg = value.coerceIn(-180f, 180f))
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected) {
+                            asset
+                        } else {
+                            val ropes = asset.ropes.toMutableList()
+                            if (ropeIndex in ropes.indices) {
+                                ropes[ropeIndex] = ropes[ropeIndex].copy(outwardAngleDeg = value.coerceIn(-180f, 180f))
+                            }
+                            asset.copy(ropes = ropes)
                         }
-                        asset.copy(ropes = ropes)
-                    }
-                },
+                    },
             )
         }
     }
@@ -484,15 +560,18 @@ class PlannerViewModel(
         val ropeIndex = _uiState.value.selectedRopeIndex ?: return
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected) asset else {
-                        val ropes = asset.ropes.toMutableList()
-                        if (ropeIndex in ropes.indices) {
-                            ropes[ropeIndex] = ropes[ropeIndex].copy(localX = value)
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected) {
+                            asset
+                        } else {
+                            val ropes = asset.ropes.toMutableList()
+                            if (ropeIndex in ropes.indices) {
+                                ropes[ropeIndex] = ropes[ropeIndex].copy(localX = value)
+                            }
+                            asset.copy(ropes = ropes)
                         }
-                        asset.copy(ropes = ropes)
-                    }
-                },
+                    },
             )
         }
     }
@@ -502,77 +581,97 @@ class PlannerViewModel(
         val ropeIndex = _uiState.value.selectedRopeIndex ?: return
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected) asset else {
-                        val ropes = asset.ropes.toMutableList()
-                        if (ropeIndex in ropes.indices) {
-                            ropes[ropeIndex] = ropes[ropeIndex].copy(localY = value)
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected) {
+                            asset
+                        } else {
+                            val ropes = asset.ropes.toMutableList()
+                            if (ropeIndex in ropes.indices) {
+                                ropes[ropeIndex] = ropes[ropeIndex].copy(localY = value)
+                            }
+                            asset.copy(ropes = ropes)
                         }
-                        asset.copy(ropes = ropes)
-                    }
-                },
+                    },
             )
         }
     }
 
-    fun updateRopeStakeWorld(ropeIndex: Int, world: Vec2) {
+    fun updateRopeStakeWorld(
+        ropeIndex: Int,
+        world: Vec2,
+    ) {
         val selected = _uiState.value.selectedAssetIds
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected) asset else {
-                        val ropes = asset.ropes.toMutableList()
-                        if (ropeIndex in ropes.indices) {
-                            val rope = ropes[ropeIndex]
-                            val anchorWorld = GeometryEngine.worldPoint(asset, Vec2(rope.localX, rope.localY))
-                            val dx = world.x - anchorWorld.x
-                            val dy = world.y - anchorWorld.y
-                            val len = sqrt(dx * dx + dy * dy).coerceIn(0.3f, 8.0f)
-                            val absoluteDeg = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
-                            val relativeDeg = normalizeDegrees(absoluteDeg - asset.rotationDeg)
-                            ropes[ropeIndex] = rope.copy(
-                                lengthMeters = len,
-                                outwardAngleDeg = relativeDeg,
-                            )
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected) {
+                            asset
+                        } else {
+                            val ropes = asset.ropes.toMutableList()
+                            if (ropeIndex in ropes.indices) {
+                                val rope = ropes[ropeIndex]
+                                val anchorWorld = GeometryEngine.worldPoint(asset, Vec2(rope.localX, rope.localY))
+                                val dx = world.x - anchorWorld.x
+                                val dy = world.y - anchorWorld.y
+                                val len = sqrt(dx * dx + dy * dy).coerceIn(0.3f, 8.0f)
+                                val absoluteDeg = Math.toDegrees(atan2(dy.toDouble(), dx.toDouble())).toFloat()
+                                val relativeDeg = normalizeDegrees(absoluteDeg - asset.rotationDeg)
+                                ropes[ropeIndex] =
+                                    rope.copy(
+                                        lengthMeters = len,
+                                        outwardAngleDeg = relativeDeg,
+                                    )
+                            }
+                            asset.copy(ropes = ropes)
                         }
-                        asset.copy(ropes = ropes)
-                    }
-                },
+                    },
             )
         }
         _uiState.update { it.copy(selectedRopeIndex = ropeIndex) }
     }
 
-    fun updateRopeAnchorWorld(ropeIndex: Int, world: Vec2) {
+    fun updateRopeAnchorWorld(
+        ropeIndex: Int,
+        world: Vec2,
+    ) {
         val selected = _uiState.value.selectedAssetIds
         val presetsById = _uiState.value.presets.associateBy { it.id }
         mutateProject {
             copy(
-                assets = assets.map { asset ->
-                    if (asset.id !in selected) asset else {
-                        val ropes = asset.ropes.toMutableList()
-                        if (ropeIndex in ropes.indices) {
-                            val rope = ropes[ropeIndex]
-                            // Convert world anchor position into asset-local coordinates
-                            val dx = world.x - asset.position.x
-                            val dy = world.y - asset.position.y
-                            val rad = Math.toRadians((-asset.rotationDeg).toDouble())
-                            val cos = kotlin.math.cos(rad).toFloat()
-                            val sin = kotlin.math.sin(rad).toFloat()
-                            val localX = dx * cos - dy * sin
-                            val localY = dx * sin + dy * cos
-                            val preset = presetsById[asset.presetId]
-                            val snapped = if (preset != null) {
-                                GeometryEngine.snapLocalAnchorToPreset(Vec2(localX, localY), preset)
-                            } else Vec2(localX, localY)
-                            ropes[ropeIndex] = rope.copy(
-                                localX = snapped.x,
-                                localY = snapped.y,
-                            )
+                assets =
+                    assets.map { asset ->
+                        if (asset.id !in selected) {
+                            asset
+                        } else {
+                            val ropes = asset.ropes.toMutableList()
+                            if (ropeIndex in ropes.indices) {
+                                val rope = ropes[ropeIndex]
+                                // Convert world anchor position into asset-local coordinates
+                                val dx = world.x - asset.position.x
+                                val dy = world.y - asset.position.y
+                                val rad = Math.toRadians((-asset.rotationDeg).toDouble())
+                                val cos = kotlin.math.cos(rad).toFloat()
+                                val sin = kotlin.math.sin(rad).toFloat()
+                                val localX = dx * cos - dy * sin
+                                val localY = dx * sin + dy * cos
+                                val preset = presetsById[asset.presetId]
+                                val snapped =
+                                    if (preset != null) {
+                                        GeometryEngine.snapLocalAnchorToPreset(Vec2(localX, localY), preset)
+                                    } else {
+                                        Vec2(localX, localY)
+                                    }
+                                ropes[ropeIndex] =
+                                    rope.copy(
+                                        localX = snapped.x,
+                                        localY = snapped.y,
+                                    )
+                            }
+                            asset.copy(ropes = ropes)
                         }
-                        asset.copy(ropes = ropes)
-                    }
-                },
+                    },
             )
         }
         _uiState.update { it.copy(selectedRopeIndex = ropeIndex) }
@@ -605,18 +704,22 @@ class PlannerViewModel(
         val selected = state.project.assets.filter { it.id in state.selectedAssetIds }
         if (selected.isEmpty()) return
         val step = maxOf(state.project.gridMeters, 0.5f)
-        val duplicates = selected.map { asset ->
-            val preset = state.presets.firstOrNull { it.id == asset.presetId }
-            val target = Vec2(asset.position.x + step, asset.position.y + step)
-            val constrained = if (preset != null) {
-                constrainAssetCenterToParcel(target, preset, state.project.parcel)
-            } else target
-            asset.copy(
-                id = Random.nextLong().toString(),
-                label = if (asset.label.isBlank()) asset.label else "${asset.label} (Kopie)",
-                position = constrained,
-            )
-        }
+        val duplicates =
+            selected.map { asset ->
+                val preset = state.presets.firstOrNull { it.id == asset.presetId }
+                val target = Vec2(asset.position.x + step, asset.position.y + step)
+                val constrained =
+                    if (preset != null) {
+                        constrainAssetCenterToParcel(target, preset, state.project.parcel)
+                    } else {
+                        target
+                    }
+                asset.copy(
+                    id = Random.nextLong().toString(),
+                    label = if (asset.label.isBlank()) asset.label else "${asset.label} (Kopie)",
+                    position = constrained,
+                )
+            }
         mutateProject { copy(assets = assets + duplicates) }
         _uiState.update { it.copy(selectedAssetIds = duplicates.map { asset -> asset.id }.toSet()) }
     }
@@ -733,29 +836,33 @@ class PlannerViewModel(
         }
     }
 
-    private fun rememberRecentPreset(current: List<String>, id: String): List<String> {
-        return PlannerDomainOps.rememberRecentPreset(current, id)
-    }
+    private fun rememberRecentPreset(
+        current: List<String>,
+        id: String,
+    ): List<String> = PlannerDomainOps.rememberRecentPreset(current, id)
 
-    private fun mergePresets(stored: List<TentPreset>?, defaults: List<TentPreset>): List<TentPreset> {
-        return PlannerDomainOps.mergePresets(stored, defaults)
-    }
+    private fun mergePresets(
+        stored: List<TentPreset>?,
+        defaults: List<TentPreset>,
+    ): List<TentPreset> = PlannerDomainOps.mergePresets(stored, defaults)
 
-    private fun normalizeDegrees(value: Float): Float {
-        return PlannerDomainOps.normalizeDegrees(value)
-    }
+    private fun normalizeDegrees(value: Float): Float = PlannerDomainOps.normalizeDegrees(value)
 
-    private fun hydrateProjectRopes(project: PlannerProject, presets: List<TentPreset>): PlannerProject {
-        return PlannerDomainOps.hydrateProjectRopes(project, presets)
-    }
+    private fun hydrateProjectRopes(
+        project: PlannerProject,
+        presets: List<TentPreset>,
+    ): PlannerProject = PlannerDomainOps.hydrateProjectRopes(project, presets)
 
-    private fun clampAssetsToParcel(project: PlannerProject, presetsById: Map<String, TentPreset>): PlannerProject {
-        return PlannerDomainOps.clampAssetsToParcel(project, presetsById)
-    }
+    private fun clampAssetsToParcel(
+        project: PlannerProject,
+        presetsById: Map<String, TentPreset>,
+    ): PlannerProject = PlannerDomainOps.clampAssetsToParcel(project, presetsById)
 
-    private fun constrainAssetCenterToParcel(position: Vec2, preset: TentPreset, parcel: Parcel): Vec2 {
-        return PlannerDomainOps.constrainAssetCenterToParcel(position, preset, parcel)
-    }
+    private fun constrainAssetCenterToParcel(
+        position: Vec2,
+        preset: TentPreset,
+        parcel: Parcel,
+    ): Vec2 = PlannerDomainOps.constrainAssetCenterToParcel(position, preset, parcel)
 
     private fun adjustZoom(factor: Float) {
         val current = _uiState.value.project.pixelsPerMeter
@@ -769,8 +876,5 @@ class PlannerViewModel(
         presetsById: Map<String, TentPreset>,
         assetIds: Set<String>,
         requestedDelta: Vec2,
-    ): Vec2 {
-        return PlannerDomainOps.clampDeltaForAssetsInParcel(project, presetsById, assetIds, requestedDelta)
-    }
+    ): Vec2 = PlannerDomainOps.clampDeltaForAssetsInParcel(project, presetsById, assetIds, requestedDelta)
 }
-
