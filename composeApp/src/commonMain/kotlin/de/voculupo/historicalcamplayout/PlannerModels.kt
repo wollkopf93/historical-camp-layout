@@ -257,76 +257,60 @@ fun defaultPresets(): List<TentPreset> =
             defaultHeightRange = HeightRange(0f, 2.2f),
         ),
         // ==========================================
-        // KEILZELTE (A-FRAME)
+        // KEILZELTE (A-FRAME) - RECHTECKIGE FORM
         // ==========================================
-        // 1. Kleines Keilzelt (2x3m) - Nur Hauptstangen
         TentPreset(
             id = "a_tent_2x3_basic",
             name = "Keilzelt 2x3 (Minimal)",
             shape = TentShapeType.A_FRAME,
             widthMeters = 2.0f,
             heightMeters = 3.0f,
-            ropeAnchors =
-                listOf(
-                    // Zug nach vorne und hinten
-                    RopeAnchor(localX = 0f, localY = -1.5f, lengthMeters = 1.8f, outwardAngleDeg = -90f),
-                    RopeAnchor(localX = 0f, localY = 1.5f, lengthMeters = 1.8f, outwardAngleDeg = 90f),
-                ),
+            ropeAnchors = listOf(
+                RopeAnchor(localX = 0f, localY = -1.5f, lengthMeters = 1.8f, outwardAngleDeg = -90f),
+                RopeAnchor(localX = 0f, localY = 1.5f, lengthMeters = 1.8f, outwardAngleDeg = 90f)
+            ),
             defaultHeightRange = HeightRange(0f, 1.8f),
-            defaultSafetyMarginMeters = 0.3f,
+            defaultSafetyMarginMeters = 0.3f
         ),
-        // 2. Standard Keilzelt (2.5x3m) - Mit Seitenabspannung
-        // (Viele Keilzelte haben kleine Schlaufen an den Seiten, um die Plane zu straffen)
         TentPreset(
             id = "a_tent_2_5x3_full",
             name = "Keilzelt 2.5x3 (Sturm-Setup)",
             shape = TentShapeType.A_FRAME,
             widthMeters = 2.5f,
             heightMeters = 3.0f,
-            ropeAnchors =
-                listOf(
-                    // Hauptmasten
-                    RopeAnchor(localX = 0f, localY = -1.5f, lengthMeters = 2.0f, outwardAngleDeg = -90f),
-                    RopeAnchor(localX = 0f, localY = 1.5f, lengthMeters = 2.0f, outwardAngleDeg = 90f),
-                    // Seiten-Heringe (kurze Seile direkt am Boden)
-                    RopeAnchor(localX = -1.25f, localY = 0f, lengthMeters = 0.6f, outwardAngleDeg = 180f),
-                    RopeAnchor(localX = 1.25f, localY = 0f, lengthMeters = 0.6f, outwardAngleDeg = 0f),
-                ),
+            ropeAnchors = listOf(
+                RopeAnchor(localX = 0f, localY = -1.5f, lengthMeters = 2.0f, outwardAngleDeg = -90f),
+                RopeAnchor(localX = 0f, localY = 1.5f, lengthMeters = 2.0f, outwardAngleDeg = 90f),
+                RopeAnchor(localX = -1.25f, localY = 0f, lengthMeters = 0.6f, outwardAngleDeg = 180f),
+                RopeAnchor(localX = 1.25f, localY = 0f, lengthMeters = 0.6f, outwardAngleDeg = 0f)
+            ),
             defaultHeightRange = HeightRange(0f, 2.0f),
-            defaultSafetyMarginMeters = 0.5f,
+            defaultSafetyMarginMeters = 0.5f
         ),
-        // 3. Großes Keilzelt (3x4m) - Ohne Seile (Self-Standing / Holzgestell)
-        // Manche Keilzelte haben ein komplettes Außen- oder Innengestell aus Holz
-        // und brauchen theoretisch gar keine Seile nach außen.
         TentPreset(
             id = "a_tent_3x4_frame",
-            name = "Keilzelt 3x4 (Holzgestell/Keine Seile)",
+            name = "Keilzelt 3x4 (Holzgestell)",
             shape = TentShapeType.A_FRAME,
             widthMeters = 3.0f,
             heightMeters = 4.0f,
-            ropeAnchors = emptyList(), // Komplett ohne Seile
+            ropeAnchors = emptyList(),
             defaultHeightRange = HeightRange(0f, 2.3f),
-            defaultSafetyMarginMeters = 0.2f,
+            defaultSafetyMarginMeters = 0.2f
         ),
-        // 4. XL Keilzelt (4x5m) - V-Abspannung an den Masten
-        // Bei sehr großen Keilen nutzt man oft 2 Seile pro Mast für die Stabilität
         TentPreset(
             id = "a_tent_4x5_pro",
             name = "Keilzelt 4x5 (V-Abspannung)",
             shape = TentShapeType.A_FRAME,
             widthMeters = 4.0f,
             heightMeters = 5.0f,
-            ropeAnchors =
-                listOf(
-                    // V-Zug Vorne
-                    RopeAnchor(localX = 0f, localY = -2.5f, lengthMeters = 2.5f, outwardAngleDeg = -75f),
-                    RopeAnchor(localX = 0f, localY = -2.5f, lengthMeters = 2.5f, outwardAngleDeg = -105f),
-                    // V-Zug Hinten
-                    RopeAnchor(localX = 0f, localY = 2.5f, lengthMeters = 2.5f, outwardAngleDeg = 75f),
-                    RopeAnchor(localX = 0f, localY = 2.5f, lengthMeters = 2.5f, outwardAngleDeg = 105f),
-                ),
+            ropeAnchors = listOf(
+                RopeAnchor(localX = 0f, localY = -2.5f, lengthMeters = 2.5f, outwardAngleDeg = -75f),
+                RopeAnchor(localX = 0f, localY = -2.5f, lengthMeters = 2.5f, outwardAngleDeg = -105f),
+                RopeAnchor(localX = 0f, localY = 2.5f, lengthMeters = 2.5f, outwardAngleDeg = 75f),
+                RopeAnchor(localX = 0f, localY = 2.5f, lengthMeters = 2.5f, outwardAngleDeg = 105f)
+            ),
             defaultHeightRange = HeightRange(0f, 2.5f),
-            defaultSafetyMarginMeters = 0.8f,
+            defaultSafetyMarginMeters = 0.8f
         ),
         // ==========================================
         // RUNDZELTE & SPEICHENRADZELTE (Kapseln)

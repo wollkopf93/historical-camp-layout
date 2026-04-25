@@ -687,7 +687,6 @@ private fun DrawScope.drawSelectionHighlightRing(
                 drawCircle(color = ring, radius = radius, center = Offset(center.x + halfBody, center.y), style = Stroke(width = sw))
             }
         }
-
         TentShapeType.A_FRAME -> {
             val halfW = preset.widthMeters * pixelsPerMeter / 2f
             val halfH = preset.heightMeters * pixelsPerMeter / 2f
@@ -701,6 +700,7 @@ private fun DrawScope.drawSelectionHighlightRing(
                 }
             drawPath(path, color = ring, style = Stroke(width = sw))
         }
+
 
         TentShapeType.POLYGON -> {
             val points = preset.polygonPoints.ifEmpty { listOf(Vec2(-2f, -2f), Vec2(2f, -2f), Vec2(2f, 2f), Vec2(-2f, 2f)) }
@@ -806,16 +806,39 @@ private fun DrawScope.drawAsset(
             TentShapeType.A_FRAME -> {
                 val halfW = preset.widthMeters * pixelsPerMeter / 2f
                 val halfH = preset.heightMeters * pixelsPerMeter / 2f
-                val path =
-                    Path().apply {
-                        moveTo(center.x - halfW, center.y - halfH * 0.9f)
-                        lineTo(center.x + halfW, center.y - halfH * 0.55f)
-                        lineTo(center.x + halfW, center.y + halfH * 0.55f)
-                        lineTo(center.x - halfW, center.y + halfH * 0.9f)
-                        close()
-                    }
-                drawPath(path, bodyColor, style = Fill)
-                drawPath(path, outlineColor, style = Stroke(2f))
+
+                // 1. Die Plane (Rechteck) - benutzt die lokale Variable bodyColor
+                drawRect(
+                    color = bodyColor,
+                    topLeft = Offset(center.x - halfW, center.y - halfH),
+                    size = Size(halfW * 2f, halfH * 2f)
+                )
+
+                // 2. Die Firstlinie (Giebel) - benutzt die lokale Variable outlineColor
+                drawLine(
+                    color = outlineColor,
+                    start = Offset(center.x, center.y - halfH),
+                    end = Offset(center.x, center.y + halfH),
+                    strokeWidth = 2.5f
+                )
+
+                // 3. Die Outline (Rahmen)
+                drawRect(
+                    color = outlineColor,
+                    topLeft = Offset(center.x - halfW, center.y - halfH),
+                    size = Size(halfW * 2f, halfH * 2f),
+                    style = Stroke(2f)
+                )
+
+                // 4. Auswahl-Highlight (Direkt hier integriert)
+                if (selectionHighlighted) {
+                    drawRect(
+                        color = Color(0xFF4A9EFF),
+                        topLeft = Offset(center.x - halfW, center.y - halfH),
+                        size = Size(halfW * 2f, halfH * 2f),
+                        style = Stroke(width = 3.5f)
+                    )
+                }
             }
 
             TentShapeType.POLYGON -> {
@@ -829,9 +852,6 @@ private fun DrawScope.drawAsset(
                 drawPath(path, bodyColor, style = Fill)
                 drawPath(path, outlineColor, style = Stroke(2f))
             }
-        }
-        if (selectionHighlighted) {
-            drawSelectionHighlightRing(preset, center, pixelsPerMeter)
         }
     }
     if (asset.showRopes) {
