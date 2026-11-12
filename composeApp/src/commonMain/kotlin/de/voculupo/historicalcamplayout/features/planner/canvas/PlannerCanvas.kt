@@ -20,7 +20,11 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageShader
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
@@ -31,6 +35,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextMeasurer
@@ -50,6 +55,9 @@ import de.voculupo.historicalcamplayout.TentShapeType
 import de.voculupo.historicalcamplayout.Vec2
 import de.voculupo.historicalcamplayout.app.PresetDropRequest
 import de.voculupo.historicalcamplayout.platform.platformScrollZoom
+import lagerplaner.composeapp.generated.resources.Res
+import lagerplaner.composeapp.generated.resources.parchment
+import org.jetbrains.compose.resources.imageResource
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
@@ -82,12 +90,18 @@ internal fun PlannerCanvas(
 ) {
     val presetsById = remember(state.presets) { state.presets.associateBy { it.id } }
     val currentTool by rememberUpdatedState(state.currentTool)
-    val currentSelectedAssetIds by rememberUpdatedState(state.selectedAssetIds)
     val currentParcel by rememberUpdatedState(state.project.parcel)
     val currentHiddenRopes by rememberUpdatedState(state.hiddenRopeIndices)
     val currentDropHandle by rememberUpdatedState(onDropHandle)
     val currentPlacePresetAt by rememberUpdatedState(onPlacePresetAt)
+    // Gesture coroutines outlive recompositions; read everything through these so hit tests use the current plan and zoom.
+    val currentState by rememberUpdatedState(state)
+    val currentPresetsById by rememberUpdatedState(presetsById)
+    val currentShiftPressed by rememberUpdatedState(shiftPressed)
+    val currentSuppressTap by rememberUpdatedState(suppressTapTemporarily)
     val isDarkTheme = false
+    val parchment = imageResource(Res.drawable.parchment)
+    val parchmentBrush = remember(parchment) { ShaderBrush(ImageShader(parchment, TileMode.Repeated, TileMode.Repeated)) }
     val textMeasurer = rememberTextMeasurer()
     var canvasRootRect by remember { mutableStateOf(Rect.Zero) }
     var activeRopeDrag by remember { mutableStateOf<Pair<Int, RopeDragPart>?>(null) }
@@ -98,9 +112,10 @@ internal fun PlannerCanvas(
     var pinchZoomPpm by remember { mutableStateOf(state.project.pixelsPerMeter) }
     var lastCommittedZoomPpm by remember { mutableStateOf(state.project.pixelsPerMeter) }
     val ropeUiScale = (state.project.pixelsPerMeter / 50f).coerceIn(1f, 2.4f)
-    val ropeHandleGrabRadiusPx = 28f * ropeUiScale
-    val ropeHandleGuardRadiusPx = 40f * ropeUiScale
-    val touchAssetHitSlopPx = 36f
+    val density = LocalDensity.current.density
+    val ropeHandleGrabRadiusPx = 28f * ropeUiScale * density
+    val ropeHandleGuardRadiusPx = 40f * ropeUiScale * density
+    val touchAssetHitSlopPx = 36f * density
     Box(
         modifier =
             modifier
@@ -143,77 +158,89 @@ internal fun PlannerCanvas(
                                 right = p.x + coords.size.width,
                                 bottom = p.y + coords.size.height,
                             )
-                    }.background(Color(0xFFEAE1CF))
+                    }.background(Color(0xFFE9DCBF))
                     .platformScrollZoom(onZoomIn = onZoomIn, onZoomOut = onZoomOut)
                     .pointerInput(Unit) {
                         awaitPointerEventScope {
                             var prevDistance: Float? = null
                             var prevCentroid: Offset? = null
                             var prevAngleDeg: Float? = null
+                            // Decided when the second finger lands: fingers on the selected tent rotate it,
+                            // anywhere else zoom/pan the map. Never both at once.
+                            var rotateMode = false
                             while (true) {
                                 val event = awaitPointerEvent()
                                 val pressed = event.changes.filter { it.pressed }
                                 if (pressed.size < 2) {
+                                    if (multiTouchActive && rotateMode) onDragEnd()
                                     multiTouchActive = false
+                                    rotateMode = false
                                     prevDistance = null
                                     prevCentroid = null
                                     prevAngleDeg = null
                                     continue
                                 }
-                                multiTouchActive = true
-
+                                val live = currentState
+                                val canvasSize = Size(size.width.toFloat(), size.height.toFloat())
                                 val p1 = pressed[0].position
                                 val p2 = pressed[1].position
                                 val centroid = Offset((p1.x + p2.x) / 2f, (p1.y + p2.y) / 2f)
+                                if (!multiTouchActive) {
+                                    val origin = centeredParcelOriginPx(canvasSize, parcelSizePx(live.project)) + canvasPanOffsetPx
+                                    rotateMode = live.currentTool == PlannerToolMode.Select &&
+                                        listOf(p1, p2, centroid).any { point ->
+                                            val hit = hitAssetAtPx(point, origin, live, currentPresetsById, touchAssetHitSlopPx)
+                                            hit != null && hit.id in live.selectedAssetIds
+                                        }
+                                }
+                                multiTouchActive = true
+
                                 val distance = (p1 - p2).getDistance().coerceAtLeast(0.001f)
                                 val angleDeg = GeometryEngine.radToDeg(atan2((p2.y - p1.y).toDouble(), (p2.x - p1.x).toDouble()))
                                 val lastDistance = prevDistance
                                 val lastCentroid = prevCentroid
                                 val lastAngleDeg = prevAngleDeg
                                 if (lastDistance != null && lastCentroid != null && lastAngleDeg != null) {
-                                    val pan = centroid - lastCentroid
-                                    val zoom = (distance / lastDistance).coerceIn(0.9f, 1.1f)
-                                    val rawDelta = angleDeg - lastAngleDeg
-                                    val normalizedDelta =
-                                        when {
-                                            rawDelta > 180f -> rawDelta - 360f
-                                            rawDelta < -180f -> rawDelta + 360f
-                                            else -> rawDelta
+                                    if (rotateMode) {
+                                        val rawDelta = angleDeg - lastAngleDeg
+                                        val normalizedDelta =
+                                            when {
+                                                rawDelta > 180f -> rawDelta - 360f
+                                                rawDelta < -180f -> rawDelta + 360f
+                                                else -> rawDelta
+                                            }
+                                        if (kotlin.math.abs(normalizedDelta) > 0.05f) onRotateSelectedBy(normalizedDelta)
+                                    } else {
+                                        val pan = centroid - lastCentroid
+                                        val zoom = (distance / lastDistance).coerceIn(0.9f, 1.1f)
+                                        val oldPpm = pinchZoomPpm
+                                        val newPpm = (oldPpm * zoom).coerceIn(20f, 180f)
+
+                                        // Keep the world point under fingers stable while zooming to avoid jumpy map motion.
+                                        val oldParcelSize =
+                                            Size(
+                                                width = currentParcel.widthMeters * oldPpm,
+                                                height = currentParcel.heightMeters * oldPpm,
+                                            )
+                                        val oldOrigin = centeredParcelOriginPx(canvasSize, oldParcelSize) + canvasPanOffsetPx
+                                        val worldAtCentroid = GeometryEngine.offsetToMeters(centroid - oldOrigin, oldPpm)
+                                        val newParcelSize =
+                                            Size(
+                                                width = currentParcel.widthMeters * newPpm,
+                                                height = currentParcel.heightMeters * newPpm,
+                                            )
+                                        val newCenteredOrigin = centeredParcelOriginPx(canvasSize, newParcelSize)
+                                        val anchoredPan = centroid - GeometryEngine.metersToOffset(worldAtCentroid, newPpm) - newCenteredOrigin
+
+                                        canvasPanOffsetPx = if (allowMultiTouchCanvasPan) anchoredPan + pan else anchoredPan
+
+                                        if (kotlin.math.abs(zoom - 1f) > 0.001f) {
+                                            pinchZoomPpm = newPpm
+                                            if (kotlin.math.abs(newPpm - lastCommittedZoomPpm) > 0.08f) {
+                                                onZoomContinuous(newPpm)
+                                                lastCommittedZoomPpm = newPpm
+                                            }
                                         }
-
-                                    val oldPpm = pinchZoomPpm
-                                    val newPpm = (oldPpm * zoom).coerceIn(20f, 180f)
-
-                                    // Keep the world point under fingers stable while zooming to avoid jumpy map motion.
-                                    val canvasSize = Size(size.width.toFloat(), size.height.toFloat())
-                                    val oldParcelSize =
-                                        Size(
-                                            width = currentParcel.widthMeters * oldPpm,
-                                            height = currentParcel.heightMeters * oldPpm,
-                                        )
-                                    val oldOrigin = centeredParcelOriginPx(canvasSize, oldParcelSize) + canvasPanOffsetPx
-                                    val worldAtCentroid = GeometryEngine.offsetToMeters(centroid - oldOrigin, oldPpm)
-                                    val newParcelSize =
-                                        Size(
-                                            width = currentParcel.widthMeters * newPpm,
-                                            height = currentParcel.heightMeters * newPpm,
-                                        )
-                                    val newCenteredOrigin = centeredParcelOriginPx(canvasSize, newParcelSize)
-                                    val anchoredPan = centroid - GeometryEngine.metersToOffset(worldAtCentroid, newPpm) - newCenteredOrigin
-
-                                    canvasPanOffsetPx = if (allowMultiTouchCanvasPan) anchoredPan + pan else anchoredPan
-
-                                    if (kotlin.math.abs(zoom - 1f) > 0.001f) {
-                                        pinchZoomPpm = newPpm
-                                        if (kotlin.math.abs(newPpm - lastCommittedZoomPpm) > 0.08f) {
-                                            onZoomContinuous(newPpm)
-                                            lastCommittedZoomPpm = newPpm
-                                        }
-                                    }
-
-                                    val hasSelectedAsset = currentTool == PlannerToolMode.Select && currentSelectedAssetIds.isNotEmpty()
-                                    if (hasSelectedAsset && kotlin.math.abs(normalizedDelta) > 0.15f) {
-                                        onRotateSelectedBy(normalizedDelta)
                                     }
                                     event.changes.forEach { it.consume() }
                                 }
@@ -222,23 +249,23 @@ internal fun PlannerCanvas(
                                 prevAngleDeg = angleDeg
                             }
                         }
-                    }.pointerInput(state.currentTool, state.selectedAssetIds, state.selectedRopeIndex) {
+                    }.pointerInput(Unit) {
                         fun currentCanvasSize() = Size(size.width.toFloat(), size.height.toFloat())
 
-                        fun currentParcelSizePx() = parcelSizePx(state.project)
+                        fun currentParcelSizePx() = parcelSizePx(currentState.project)
 
                         fun parcelOriginPx() = centeredParcelOriginPx(currentCanvasSize(), currentParcelSizePx()) + canvasPanOffsetPx
 
                         fun metersAt(point: Offset): Vec2 =
                             GeometryEngine.offsetToMeters(
                                 point - parcelOriginPx(),
-                                state.project.pixelsPerMeter,
+                                currentState.project.pixelsPerMeter,
                             )
 
                         fun activeRopeHandlesForSelectedAsset(selectedAsset: PlacedAsset): List<RopeHandleHit> =
                             ropeHandleHits(
                                 asset = selectedAsset,
-                                pixelsPerMeter = state.project.pixelsPerMeter,
+                                pixelsPerMeter = currentState.project.pixelsPerMeter,
                                 parcelOriginPx = parcelOriginPx(),
                                 hiddenRopeIndices = currentHiddenRopes[selectedAsset.id].orEmpty(),
                             )
@@ -267,37 +294,29 @@ internal fun PlannerCanvas(
                                 GeometryEngine
                                     .ropeSegments(selectedAsset)
                                     .mapIndexed { index, seg ->
-                                        val startPx = seg.start.toOffsetPx(state.project.pixelsPerMeter, parcelOrigin)
-                                        val endPx = seg.end.toOffsetPx(state.project.pixelsPerMeter, parcelOrigin)
+                                        val startPx = seg.start.toOffsetPx(currentState.project.pixelsPerMeter, parcelOrigin)
+                                        val endPx = seg.end.toOffsetPx(currentState.project.pixelsPerMeter, parcelOrigin)
                                         index to distancePointToSegmentPx(tapPx, startPx, endPx)
                                     }.minByOrNull { it.second }
                             val (index, distance) = nearest ?: return null
                             return if (distance <= lineHitRadiusPx) index else null
                         }
 
-                        fun hitAssetAt(pointMeters: Vec2): PlacedAsset? {
-                            val marginMeters = touchAssetHitSlopPx / state.project.pixelsPerMeter
-                            return state.project.assets.lastOrNull { asset ->
-                                val preset = presetsById[asset.presetId] ?: return@lastOrNull false
-                                if (GeometryEngine.isPointInAsset(pointMeters, asset, preset)) return@lastOrNull true
-                                val body = GeometryEngine.assetBodyAabb(asset, preset)
-                                pointMeters.x in (body.left - marginMeters)..(body.right + marginMeters) &&
-                                    pointMeters.y in (body.top - marginMeters)..(body.bottom + marginMeters)
-                            }
-                        }
+                        fun hitAssetAt(pointMeters: Vec2): PlacedAsset? =
+                            hitAssetAtMeters(pointMeters, currentState, currentPresetsById, touchAssetHitSlopPx)
                         detectTapGestures(
                             onTap = { tap ->
-                                if (suppressTapTemporarily) return@detectTapGestures
+                                if (currentSuppressTap) return@detectTapGestures
                                 val tapMeters = metersAt(tap)
-                                when (state.currentTool) {
+                                when (currentState.currentTool) {
                                     PlannerToolMode.PlaceTent -> {
                                         onPlace(tapMeters)
                                     }
 
                                     PlannerToolMode.Select -> {
-                                        val selectedAsset = state.project.assets.firstOrNull { it.id in state.selectedAssetIds }
+                                        val selectedAsset = currentState.project.assets.firstOrNull { it.id in currentState.selectedAssetIds }
                                         if (selectedAsset != null) {
-                                            val preset = presetsById[selectedAsset.presetId]
+                                            val preset = currentPresetsById[selectedAsset.presetId]
                                             if (preset != null) {
                                                 val ropeHandles = activeRopeHandlesForSelectedAsset(selectedAsset)
                                                 // Tap selection should be more forgiving than drag grab,
@@ -315,7 +334,7 @@ internal fun PlannerCanvas(
                                             }
                                         }
                                         val hit = hitAssetAt(tapMeters)
-                                        if (shiftPressed) {
+                                        if (currentShiftPressed) {
                                             onSelectionToggle(hit?.id)
                                         } else {
                                             onSelection(
@@ -334,46 +353,38 @@ internal fun PlannerCanvas(
                                 }
                             },
                             onDoubleTap = { tap ->
-                                if (state.currentTool == PlannerToolMode.Select) {
+                                if (currentState.currentTool == PlannerToolMode.Select) {
                                     val tapMeters = metersAt(tap)
                                     val hit = hitAssetAt(tapMeters)
                                     onSelectionToggle(hit?.id)
                                 }
                             },
                         )
-                    }.pointerInput(state.selectedAssetIds) {
+                    }.pointerInput(Unit) {
                         fun currentCanvasSize() = Size(size.width.toFloat(), size.height.toFloat())
 
-                        fun parcelOriginPx() = centeredParcelOriginPx(currentCanvasSize(), parcelSizePx(state.project)) + canvasPanOffsetPx
+                        fun parcelOriginPx() = centeredParcelOriginPx(currentCanvasSize(), parcelSizePx(currentState.project)) + canvasPanOffsetPx
 
                         fun activeRopeHandlesForSelectedAsset(selectedAsset: PlacedAsset): List<RopeHandleHit> =
                             ropeHandleHits(
                                 selectedAsset,
-                                state.project.pixelsPerMeter,
+                                currentState.project.pixelsPerMeter,
                                 parcelOriginPx(),
                                 currentHiddenRopes[selectedAsset.id].orEmpty(),
                             )
 
-                        fun hitAssetAt(pointMeters: Vec2): PlacedAsset? {
-                            val marginMeters = touchAssetHitSlopPx / state.project.pixelsPerMeter
-                            return state.project.assets.lastOrNull { asset ->
-                                val preset = presetsById[asset.presetId] ?: return@lastOrNull false
-                                if (GeometryEngine.isPointInAsset(pointMeters, asset, preset)) return@lastOrNull true
-                                val body = GeometryEngine.assetBodyAabb(asset, preset)
-                                pointMeters.x in (body.left - marginMeters)..(body.right + marginMeters) &&
-                                    pointMeters.y in (body.top - marginMeters)..(body.bottom + marginMeters)
-                            }
-                        }
+                        fun hitAssetAt(pointMeters: Vec2): PlacedAsset? =
+                            hitAssetAtMeters(pointMeters, currentState, currentPresetsById, touchAssetHitSlopPx)
                         detectDragGestures(
                             onDragStart = { start ->
-                                if (state.currentTool != PlannerToolMode.Select) return@detectDragGestures
+                                if (currentState.currentTool != PlannerToolMode.Select) return@detectDragGestures
                                 if (multiTouchActive) return@detectDragGestures
                                 activeAssetDrag = false
                                 activeCanvasPan = false
-                                val startMeters = GeometryEngine.offsetToMeters(start - parcelOriginPx(), state.project.pixelsPerMeter)
-                                val selectedAsset = state.project.assets.firstOrNull { it.id in state.selectedAssetIds }
+                                val startMeters = GeometryEngine.offsetToMeters(start - parcelOriginPx(), currentState.project.pixelsPerMeter)
+                                val selectedAsset = currentState.project.assets.firstOrNull { it.id in currentState.selectedAssetIds }
                                 if (selectedAsset != null) {
-                                    val selectedPreset = presetsById[selectedAsset.presetId]
+                                    val selectedPreset = currentPresetsById[selectedAsset.presetId]
                                     if (selectedPreset != null) {
                                         val ropeHandles = activeRopeHandlesForSelectedAsset(selectedAsset)
                                         val ropeHit = pickRopeHandleHit(ropeHandles, start, ropeHandleGrabRadiusPx)
@@ -386,19 +397,21 @@ internal fun PlannerCanvas(
                                 }
                                 val hitAsset = hitAssetAt(startMeters)
                                 if (hitAsset != null) {
-                                    if (hitAsset.id !in state.selectedAssetIds) onSelection(setOf(hitAsset.id))
+                                    if (hitAsset.id !in currentState.selectedAssetIds) onSelection(setOf(hitAsset.id))
                                     activeAssetDrag = true
                                 } else {
                                     activeCanvasPan = allowSingleFingerCanvasPan
                                 }
                             },
                             onDrag = { change, dragAmount ->
+                                // Two fingers down: rotate/pinch owns the gesture, the first finger must not also move things.
+                                if (multiTouchActive) return@detectDragGestures
                                 val ropeDrag = activeRopeDrag
-                                if (ropeDrag != null && state.currentTool == PlannerToolMode.Select) {
+                                if (ropeDrag != null && currentState.currentTool == PlannerToolMode.Select) {
                                     val meters =
                                         GeometryEngine.offsetToMeters(
                                             change.position - parcelOriginPx(),
-                                            state.project.pixelsPerMeter,
+                                            currentState.project.pixelsPerMeter,
                                         )
                                     if (ropeDrag.second ==
                                         RopeDragPart.Stake
@@ -408,13 +421,10 @@ internal fun PlannerCanvas(
                                         onRopeAnchorDrag(ropeDrag.first, meters)
                                     }
                                     change.consume()
-                                } else if (state.currentTool == PlannerToolMode.Select &&
-                                    state.selectedAssetIds.isNotEmpty() &&
-                                    activeAssetDrag
-                                ) {
-                                    onDrag(GeometryEngine.offsetToMeters(dragAmount, state.project.pixelsPerMeter))
+                                } else if (currentState.currentTool == PlannerToolMode.Select && activeAssetDrag) {
+                                    onDrag(GeometryEngine.offsetToMeters(dragAmount, currentState.project.pixelsPerMeter))
                                     change.consume()
-                                } else if (state.currentTool == PlannerToolMode.Select && activeCanvasPan) {
+                                } else if (currentState.currentTool == PlannerToolMode.Select && activeCanvasPan) {
                                     canvasPanOffsetPx += dragAmount
                                     change.consume()
                                 }
@@ -435,6 +445,7 @@ internal fun PlannerCanvas(
         ) {
             val parcelSizePx = parcelSizePx(state.project)
             val parcelOrigin = centeredParcelOriginPx(Size(size.width, size.height), parcelSizePx) + canvasPanOffsetPx
+            drawParchment(parchmentBrush)
             drawGrid(state.project, parcelOrigin, size)
             drawParcelBounds(state.project, parcelOrigin)
             state.project.blockZones.forEach { drawBlockZone(it, state.project.pixelsPerMeter, parcelOrigin) }
@@ -529,12 +540,12 @@ private fun DrawScope.drawAssetLabel(
     val meta = "${preset.shape.name} • ${"%.1f".format(preset.widthMeters)} x ${"%.1f".format(preset.heightMeters)} m"
     val center = GeometryEngine.metersToOffset(asset.position, pixelsPerMeter) + origin
     val normalText = if (darkMode) Color(0xFFE6DCC9) else Color(0xFF1F2933)
-    val selectedText = if (darkMode) Color(0xFFCFE5FF) else Color(0xFF102A43)
+    val selectedText = if (darkMode) Color(0xFFCFE5FF) else Color(0xFF3A0E05)
     val metaText = if (darkMode) Color(0xBFD8CCB8) else Color(0xAA1F2933)
     val labelBg =
         when {
             selected && darkMode -> Color(0xCC253447)
-            selected -> Color(0xFFE7F0FF)
+            selected -> Color(0xFFF6DACB)
             darkMode -> Color(0xCC3A3329)
             else -> Color(0xDDEFE7D2)
         }
@@ -573,7 +584,7 @@ private fun DrawScope.drawAnchorSlots(
     rotate(asset.rotationDeg, center) {
         GeometryEngine.anchorSlotsForPreset(preset).forEach { slot ->
             drawCircle(
-                color = Color(0xFF2C5E91).copy(alpha = 0.55f),
+                color = Color(0xFF8C2F1E).copy(alpha = 0.55f),
                 center =
                     Offset(
                         center.x + slot.x * pixelsPerMeter,
@@ -594,12 +605,12 @@ private fun DrawScope.drawGrid(
     if (spacing < 8f) return
     var x = ((origin.x % spacing) + spacing) % spacing
     while (x <= canvasSizePx.width) {
-        drawLine(Color(0x1A000000), Offset(x, 0f), Offset(x, canvasSizePx.height), 1f)
+        drawLine(GRID_INK, Offset(x, 0f), Offset(x, canvasSizePx.height), 1f)
         x += spacing
     }
     var y = ((origin.y % spacing) + spacing) % spacing
     while (y <= canvasSizePx.height) {
-        drawLine(Color(0x1A000000), Offset(0f, y), Offset(canvasSizePx.width, y), 1f)
+        drawLine(GRID_INK, Offset(0f, y), Offset(canvasSizePx.width, y), 1f)
         y += spacing
     }
 }
@@ -610,8 +621,34 @@ private fun DrawScope.drawParcelBounds(
 ) {
     val w = project.parcel.widthMeters * project.pixelsPerMeter
     val h = project.parcel.heightMeters * project.pixelsPerMeter
-    drawRect(color = Color(0x114A5A4A), topLeft = origin, size = Size(w, h), style = Fill)
-    drawRect(color = Color(0xFF4A5A4A), topLeft = origin, size = Size(w, h), style = Stroke(width = 3f))
+    // Meadow tint + double ink border, like a field drawn on an old map.
+    drawRect(color = Color(0x1F6B7F3A), topLeft = origin, size = Size(w, h), style = Fill)
+    drawRect(color = PARCEL_INK, topLeft = origin, size = Size(w, h), style = Stroke(width = 3f))
+    val inset = 6f
+    if (w > inset * 4 && h > inset * 4) {
+        drawRect(
+            color = PARCEL_INK.copy(alpha = 0.55f),
+            topLeft = origin + Offset(inset, inset),
+            size = Size(w - inset * 2, h - inset * 2),
+            style = Stroke(width = 1f),
+        )
+    }
+}
+
+private val GRID_INK = Color(0x225A3E1B)
+private val PARCEL_INK = Color(0xFF4A3220)
+
+/** Tiled parchment fixed to the screen (the grid and plan move over it), plus darkened edges for an aged-paper look. */
+private fun DrawScope.drawParchment(brush: Brush) {
+    drawRect(brush)
+    drawRect(
+        Brush.radialGradient(
+            0.55f to Color.Transparent,
+            1f to Color(0x4A4A2C10),
+            center = center,
+            radius = maxOf(size.width, size.height) * 0.75f,
+        ),
+    )
 }
 
 private fun DrawScope.drawBlockZone(
@@ -635,7 +672,7 @@ private fun DrawScope.drawSelectionHighlightRing(
     center: Offset,
     pixelsPerMeter: Float,
 ) {
-    val ring = Color(0xFF4A9EFF)
+    val ring = Color(0xFFC9962B)
     val sw = 3.5f
     when (preset.shape) {
         TentShapeType.CIRCLE -> {
@@ -733,7 +770,7 @@ private fun DrawScope.drawAsset(
         when {
             hardCollision -> Color(0xAADD2C2C)
             warning -> Color(0xAAD89A2B)
-            selectionHighlighted -> Color(0xFF2F4F4F)
+            selectionHighlighted -> Color(0xDD8C2F1E)
             preset.shape == TentShapeType.POLYGON -> Color(0xAA725F45)
             else -> Color(0xCC6D5B44)
         }
@@ -741,7 +778,7 @@ private fun DrawScope.drawAsset(
         when {
             hardCollision -> Color(0xFF8A0000)
             warning -> Color(0xFF8A6B00)
-            selectionHighlighted -> Color(0xFF1C2626)
+            selectionHighlighted -> Color(0xFF3A0E05)
             else -> Color(0xFF3E3E3E)
         }
     val center = GeometryEngine.metersToOffset(asset.position, pixelsPerMeter) + origin
@@ -1122,3 +1159,33 @@ private fun DrawScope.drawMeasurement(
         topLeft = Offset(mid.x - measureLabel.size.width / 2f, mid.y - measureLabel.size.height - 5f),
     )
 }
+
+private fun hitAssetAtMeters(
+    pointMeters: Vec2,
+    state: PlannerUiState,
+    presetsById: Map<String, TentPreset>,
+    slopPx: Float,
+): PlacedAsset? {
+    val marginMeters = slopPx / state.project.pixelsPerMeter
+    return state.project.assets.lastOrNull { asset ->
+        val preset = presetsById[asset.presetId] ?: return@lastOrNull false
+        if (GeometryEngine.isPointInAsset(pointMeters, asset, preset)) return@lastOrNull true
+        val body = GeometryEngine.assetBodyAabb(asset, preset)
+        pointMeters.x in (body.left - marginMeters)..(body.right + marginMeters) &&
+            pointMeters.y in (body.top - marginMeters)..(body.bottom + marginMeters)
+    }
+}
+
+private fun hitAssetAtPx(
+    pointPx: Offset,
+    parcelOriginPx: Offset,
+    state: PlannerUiState,
+    presetsById: Map<String, TentPreset>,
+    slopPx: Float,
+): PlacedAsset? =
+    hitAssetAtMeters(
+        GeometryEngine.offsetToMeters(pointPx - parcelOriginPx, state.project.pixelsPerMeter),
+        state,
+        presetsById,
+        slopPx,
+    )

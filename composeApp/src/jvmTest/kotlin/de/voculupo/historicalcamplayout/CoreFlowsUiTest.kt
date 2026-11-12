@@ -131,6 +131,31 @@ class CoreFlowsUiTest {
             assertEquals(Vec2(5f, 5f), vm.assets().single().position, "one undo reverts the whole drag")
         }
 
+    /** Regression: gesture handlers used to keep the plan from before the first move, so a second drag missed the tent. */
+    @Test
+    fun secondDragOfSameTent_stillGrabsItAtItsNewPosition() =
+        runApp(setup = { placePresetAt("round_4", Vec2(5f, 5f)) }) { vm, _ ->
+            val canvas = onNodeWithTag(PLANNER_CANVAS_TAG)
+            fun drag(
+                fromM: Vec2,
+                toM: Vec2,
+            ) {
+                canvas.performMouseInput {
+                    val from = canvasPx(vm, fromM)
+                    val to = canvasPx(vm, toM)
+                    moveTo(from)
+                    press()
+                    (1..20).forEach { step -> moveTo(from + (to - from) * (step / 20f)) }
+                    release()
+                }
+                settle()
+            }
+            drag(Vec2(5f, 5f), Vec2(9f, 5f))
+            assertNear(Vec2(9f, 5f), vm.assets().single().position)
+            drag(Vec2(9f, 5f), Vec2(9f, 9f))
+            assertNear(Vec2(9f, 9f), vm.assets().single().position)
+        }
+
     @Test
     fun renameTent_inPropertiesPane_undoRevertsWholeName() =
         runApp(setup = { placePresetAt("round_4", Vec2(5f, 5f)) }) { vm, _ ->

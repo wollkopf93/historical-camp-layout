@@ -61,4 +61,9 @@
     <string name="lock">Sperren</string>
     <string name="unlock">Entsperren</string>
     <string name="measurement">Messung: %1$s m</string>
+    <string name="rotate_left">Links drehen</string>
+    <string name="rotate_right">Rechts drehen</string>
+    <string name="toggle_theme">Hell/Dunkel umschalten</string>
+    <string name="warnings">Warnungen</string>
+    <string name="edit_selection">Auswahl bearbeiten</string>
 </resources>

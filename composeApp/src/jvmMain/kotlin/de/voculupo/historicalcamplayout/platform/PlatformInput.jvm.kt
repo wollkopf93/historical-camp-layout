@@ -25,3 +25,9 @@ actual fun Modifier.platformScrollZoom(
             }
         }
     }
+
+@androidx.compose.runtime.Composable
+actual fun PlatformBackHandler(
+    enabled: Boolean,
+    onBack: () -> Unit,
+) = Unit

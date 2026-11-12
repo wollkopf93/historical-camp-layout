@@ -1,4 +1,4 @@
-﻿package de.voculupo.historicalcamplayout.app
+package de.voculupo.historicalcamplayout.app
 
 import de.voculupo.historicalcamplayout.PlannerToolMode
 import kotlin.test.Test
@@ -23,5 +23,13 @@ class AppUiLogicTest {
     fun autoOpenProperties_onlyWhenSelectionExists() {
         assertFalse(AppUiLogic.shouldAutoOpenProperties(emptySet()))
         assertTrue(AppUiLogic.shouldAutoOpenProperties(setOf("asset-1")))
+    }
+
+    @Test
+    fun compactShell_onlyOnAndroidBelowExpandedWidth() {
+        assertTrue(AppUiLogic.shouldUseCompactShell(isAndroid = true, widthDp = 411f))
+        assertTrue(AppUiLogic.shouldUseCompactShell(isAndroid = true, widthDp = 839f))
+        assertFalse(AppUiLogic.shouldUseCompactShell(isAndroid = true, widthDp = 1280f))
+        assertFalse(AppUiLogic.shouldUseCompactShell(isAndroid = false, widthDp = 411f))
     }
 }

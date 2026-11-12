@@ -61,4 +61,9 @@
     <string name="lock">Lock</string>
     <string name="unlock">Unlock</string>
     <string name="measurement">Measurement: %1$s m</string>
+    <string name="rotate_left">Rotate left</string>
+    <string name="rotate_right">Rotate right</string>
+    <string name="toggle_theme">Toggle light/dark</string>
+    <string name="warnings">Warnings</string>
+    <string name="edit_selection">Edit selection</string>
 </resources>

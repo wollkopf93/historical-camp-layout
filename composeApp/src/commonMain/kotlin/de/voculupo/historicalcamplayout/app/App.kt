@@ -1,5 +1,10 @@
 ﻿package de.voculupo.historicalcamplayout.app
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -11,26 +16,30 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -46,6 +55,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.isCtrlPressed
@@ -69,16 +79,47 @@ import de.voculupo.historicalcamplayout.features.planner.canvas.PlannerCanvas
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
 import de.voculupo.historicalcamplayout.features.properties.PropertiesPane
 import de.voculupo.historicalcamplayout.getPlatform
+import de.voculupo.historicalcamplayout.platform.PlatformBackHandler
 import kotlinx.coroutines.delay
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.close
+import lagerplaner.composeapp.generated.resources.delete
+import lagerplaner.composeapp.generated.resources.duplicate
+import lagerplaner.composeapp.generated.resources.edit_selection
+import lagerplaner.composeapp.generated.resources.ic_block
+import lagerplaner.composeapp.generated.resources.ic_close
+import lagerplaner.composeapp.generated.resources.ic_copy
+import lagerplaner.composeapp.generated.resources.ic_dark_mode
+import lagerplaner.composeapp.generated.resources.ic_delete
+import lagerplaner.composeapp.generated.resources.ic_edit
+import lagerplaner.composeapp.generated.resources.ic_light_mode
+import lagerplaner.composeapp.generated.resources.ic_lock
+import lagerplaner.composeapp.generated.resources.ic_lock_open
+import lagerplaner.composeapp.generated.resources.ic_measure
+import lagerplaner.composeapp.generated.resources.ic_redo
+import lagerplaner.composeapp.generated.resources.ic_rotate_left
+import lagerplaner.composeapp.generated.resources.ic_rotate_right
+import lagerplaner.composeapp.generated.resources.ic_select
+import lagerplaner.composeapp.generated.resources.ic_settings
+import lagerplaner.composeapp.generated.resources.ic_tent
+import lagerplaner.composeapp.generated.resources.ic_undo
+import lagerplaner.composeapp.generated.resources.ic_warning
 import lagerplaner.composeapp.generated.resources.inventory
+import lagerplaner.composeapp.generated.resources.lock
 import lagerplaner.composeapp.generated.resources.more_count
 import lagerplaner.composeapp.generated.resources.properties
+import lagerplaner.composeapp.generated.resources.redo
+import lagerplaner.composeapp.generated.resources.rotate_left
+import lagerplaner.composeapp.generated.resources.rotate_right
+import lagerplaner.composeapp.generated.resources.toggle_theme
 import lagerplaner.composeapp.generated.resources.tool_block_zone
 import lagerplaner.composeapp.generated.resources.tool_measure
 import lagerplaner.composeapp.generated.resources.tool_select
+import lagerplaner.composeapp.generated.resources.undo
+import lagerplaner.composeapp.generated.resources.unlock
+import lagerplaner.composeapp.generated.resources.warnings
 import lagerplaner.composeapp.generated.resources.warnings_title
+import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
 
 private data class PresetDragState(
@@ -93,52 +134,72 @@ data class PresetDropRequest(
     val token: Long = kotlin.random.Random.nextLong(),
 )
 
+// Heraldic palette: madder red, woad blue and ochre gold on parchment; iron-gall ink for text.
 private val MedievalLightColorScheme =
     lightColorScheme(
-        primary = Color(0xFF6B4A2A),
-        onPrimary = Color(0xFFFDF6E8),
-        primaryContainer = Color(0xFFE6D5B8),
-        onPrimaryContainer = Color(0xFF3C2A19),
-        secondary = Color(0xFF8A6B3D),
-        onSecondary = Color(0xFFFDF6E8),
-        secondaryContainer = Color(0xFFEFE3CF),
-        onSecondaryContainer = Color(0xFF3E311E),
-        tertiary = Color(0xFF6A5A3C),
-        onTertiary = Color(0xFFF6EFE1),
-        background = Color(0xFFEAE1CF),
-        onBackground = Color(0xFF2F261A),
-        surface = Color(0xFFF2EADB),
-        onSurface = Color(0xFF2F261A),
-        inverseSurface = Color(0xFF5A4832),
-        inverseOnSurface = Color(0xFFF8F0E2),
-        outline = Color(0xFF8A7A62),
-        outlineVariant = Color(0xFFC4B59D),
-        error = Color(0xFF8B3A32),
+        primary = Color(0xFF8C2F1E),
+        onPrimary = Color(0xFFFFF8EC),
+        primaryContainer = Color(0xFFF6DACB),
+        onPrimaryContainer = Color(0xFF3A0E05),
+        secondary = Color(0xFF2F4A6B),
+        onSecondary = Color(0xFFF4F7FB),
+        secondaryContainer = Color(0xFFD6E1EE),
+        onSecondaryContainer = Color(0xFF0F1F33),
+        tertiary = Color(0xFF8A6417),
+        onTertiary = Color(0xFFFFF8EC),
+        tertiaryContainer = Color(0xFFF3DFAE),
+        onTertiaryContainer = Color(0xFF2C1E00),
+        background = Color(0xFFF1E6CF),
+        onBackground = Color(0xFF2B2117),
+        surface = Color(0xFFF7EEDC),
+        onSurface = Color(0xFF2B2117),
+        surfaceVariant = Color(0xFFE8DABF),
+        onSurfaceVariant = Color(0xFF4E4232),
+        surfaceContainerLowest = Color(0xFFFFF9EE),
+        surfaceContainerLow = Color(0xFFF8EEDB),
+        surfaceContainer = Color(0xFFF2E6CE),
+        surfaceContainerHigh = Color(0xFFECDFC4),
+        surfaceContainerHighest = Color(0xFFE6D7BA),
+        inverseSurface = Color(0xFF3B3026),
+        inverseOnSurface = Color(0xFFF8EEDC),
+        outline = Color(0xFF857560),
+        outlineVariant = Color(0xFFD3C4A8),
+        error = Color(0xFFA3281B),
         onError = Color(0xFFFFF5F3),
     )
 
+// Candle-lit night: warm soot browns, same heraldic accents lifted for contrast.
 private val MedievalDarkColorScheme =
     darkColorScheme(
-        primary = Color(0xFFD0B38A),
-        onPrimary = Color(0xFF3A2817),
-        primaryContainer = Color(0xFF5A4126),
-        onPrimaryContainer = Color(0xFFF0DFC5),
-        secondary = Color(0xFFC3A677),
-        onSecondary = Color(0xFF3D2E1B),
-        secondaryContainer = Color(0xFF564128),
-        onSecondaryContainer = Color(0xFFEEDFC3),
-        tertiary = Color(0xFFC4B089),
-        onTertiary = Color(0xFF362B1B),
-        background = Color(0xFF2A241C),
-        onBackground = Color(0xFFE9DEC8),
-        surface = Color(0xFF332C23),
-        onSurface = Color(0xFFE9DEC8),
-        inverseSurface = Color(0xFFE7D8BF),
+        primary = Color(0xFFF0A48F),
+        onPrimary = Color(0xFF4F1408),
+        primaryContainer = Color(0xFF6E2516),
+        onPrimaryContainer = Color(0xFFFFDAD0),
+        secondary = Color(0xFFA9C2E0),
+        onSecondary = Color(0xFF13283F),
+        secondaryContainer = Color(0xFF2C4260),
+        onSecondaryContainer = Color(0xFFD5E3F5),
+        tertiary = Color(0xFFE5C26B),
+        onTertiary = Color(0xFF3E2E00),
+        tertiaryContainer = Color(0xFF5A4300),
+        onTertiaryContainer = Color(0xFFFFE08E),
+        background = Color(0xFF1C1712),
+        onBackground = Color(0xFFEDE1CC),
+        surface = Color(0xFF1F1A14),
+        onSurface = Color(0xFFEDE1CC),
+        surfaceVariant = Color(0xFF4C4234),
+        onSurfaceVariant = Color(0xFFD3C4A8),
+        surfaceContainerLowest = Color(0xFF15110D),
+        surfaceContainerLow = Color(0xFF241E17),
+        surfaceContainer = Color(0xFF29221A),
+        surfaceContainerHigh = Color(0xFF332B22),
+        surfaceContainerHighest = Color(0xFF3E352B),
+        inverseSurface = Color(0xFFEDE1CC),
         inverseOnSurface = Color(0xFF342B21),
-        outline = Color(0xFF9B8B72),
-        outlineVariant = Color(0xFF5D5142),
-        error = Color(0xFFCF8A82),
-        onError = Color(0xFF3F1613),
+        outline = Color(0xFF9C8D76),
+        outlineVariant = Color(0xFF4C4234),
+        error = Color(0xFFFFB4A8),
+        onError = Color(0xFF690005),
     )
 
 @Composable
@@ -208,10 +269,12 @@ fun App(
                         true
                     },
         ) {
-            val useCompactShell = AppUiLogic.shouldUseCompactShell(isAndroid = isAndroid)
+            val useCompactShell = AppUiLogic.shouldUseCompactShell(isAndroid = isAndroid, widthDp = maxWidth.value)
             if (useCompactShell) {
                 CompactLayout(
                     state = state,
+                    darkThemeEnabled = darkThemeEnabled,
+                    onToggleTheme = { darkThemeEnabled = !darkThemeEnabled },
                     shiftPressed = false,
                     dropRequest = dropRequest,
                     suppressTapTemporarily = suppressTapTemporarily,
@@ -433,7 +496,7 @@ private fun ExpandedLayout(
 ) {
     var showWarningsPanel by remember { mutableStateOf(true) }
     Box(modifier = Modifier.fillMaxSize()) {
-        Row(modifier = Modifier.fillMaxSize()) {
+        Row(modifier = Modifier.fillMaxSize().safeDrawingPadding()) {
             InventoryPane(
                 modifier = Modifier.width(leftPaneWidthDp.dp),
                 enableFullScroll = true,
@@ -533,52 +596,36 @@ private fun ExpandedLayout(
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                 ) {
                     if (state.warnings.isNotEmpty()) {
-                        IconButton(onClick = { showWarningsPanel = !showWarningsPanel }) {
-                            Text("⚠")
-                        }
+                        WarningsButton(count = state.warnings.size, onClick = { showWarningsPanel = !showWarningsPanel })
                     }
-                    IconButton(onClick = onToggleTheme) {
-                        Text(if (darkThemeEnabled) "☀" else "🌙")
-                    }
+                    ThemeToggleButton(darkThemeEnabled = darkThemeEnabled, onToggleTheme = onToggleTheme)
                 }
             }
         }
 
         if (state.warnings.isNotEmpty() && showWarningsPanel) {
-            Card(
+            WarningsCard(
+                warnings = state.warnings,
+                maxShown = 8,
+                onClick = { showWarningsPanel = false },
                 modifier =
                     Modifier
                         .align(Alignment.TopCenter)
                         .statusBarsPadding()
                         .padding(top = 56.dp)
-                        .width(560.dp)
-                        .heightIn(max = 220.dp),
-            ) {
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(
-                        stringResource(Res.string.warnings_title, state.warnings.size),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                    state.warnings.take(8).forEach { msg ->
-                        Text("• $msg", style = MaterialTheme.typography.bodySmall)
-                    }
-                    if (state.warnings.size > 8) {
-                        Text(stringResource(Res.string.more_count, state.warnings.size - 8), style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
+                        .width(560.dp),
+            )
         }
     }
 }
 
+private enum class CompactSheet { Inventory, Properties }
+
 @Composable
-@OptIn(ExperimentalMaterial3Api::class)
 private fun CompactLayout(
     state: PlannerUiState,
+    darkThemeEnabled: Boolean,
+    onToggleTheme: () -> Unit,
     shiftPressed: Boolean,
     dropRequest: PresetDropRequest?,
     suppressTapTemporarily: Boolean,
@@ -634,14 +681,27 @@ private fun CompactLayout(
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
 ) {
-    var showInventorySidebar by remember { mutableStateOf(false) }
-    var showPropertiesSidebar by remember { mutableStateOf(false) }
-    var showWarningsPanel by remember { mutableStateOf(true) }
+    var sheet by remember { mutableStateOf<CompactSheet?>(null) }
+    // Keeps the sheet's content visible while it slides out.
+    var lastSheet by remember { mutableStateOf(CompactSheet.Inventory) }
+    LaunchedEffect(sheet) { sheet?.let { lastSheet = it } }
+    // While a preset is dragged out of the sheet, hide it (without disposing the gesture) so the whole plan is a drop target.
+    var presetDragging by remember { mutableStateOf(false) }
+    var showWarningsPanel by remember { mutableStateOf(false) }
+    val hasSelection = state.selectedAssetIds.isNotEmpty()
     val currentTool = state.currentTool
+
+    PlatformBackHandler(enabled = sheet != null || showWarningsPanel || hasSelection) {
+        when {
+            sheet != null -> sheet = null
+            showWarningsPanel -> showWarningsPanel = false
+            else -> onSelection(emptySet())
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         PlannerCanvas(
-            modifier = Modifier.fillMaxSize().padding(bottom = 64.dp),
+            modifier = Modifier.fillMaxSize(),
             state = state,
             shiftPressed = shiftPressed,
             allowSingleFingerCanvasPan = true,
@@ -666,225 +726,48 @@ private fun CompactLayout(
             onDragEnd = onDragEnd,
         )
 
-        Box(
+        Row(
             modifier =
                 Modifier
-                    .align(Alignment.TopStart)
+                    .align(Alignment.TopCenter)
                     .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Card(
-                shape = RoundedCornerShape(14.dp),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    IconButton(
-                        onClick = onUndo,
-                        enabled = state.canUndo,
-                    ) {
-                        Text("↶")
-                    }
-                    IconButton(
-                        onClick = onRedo,
-                        enabled = state.canRedo,
-                    ) {
-                        Text("↷")
-                    }
+            FloatingBar {
+                IconButton(onClick = onUndo, enabled = state.canUndo) {
+                    Icon(painterResource(Res.drawable.ic_undo), stringResource(Res.string.undo))
+                }
+                IconButton(onClick = onRedo, enabled = state.canRedo) {
+                    Icon(painterResource(Res.drawable.ic_redo), stringResource(Res.string.redo))
+                }
+            }
+            FloatingBar {
+                if (state.warnings.isNotEmpty()) {
+                    WarningsButton(count = state.warnings.size, onClick = { showWarningsPanel = !showWarningsPanel })
+                }
+                ThemeToggleButton(darkThemeEnabled = darkThemeEnabled, onToggleTheme = onToggleTheme)
+                IconButton(onClick = { sheet = if (sheet == CompactSheet.Properties) null else CompactSheet.Properties }) {
+                    Icon(painterResource(Res.drawable.ic_settings), stringResource(Res.string.properties))
                 }
             }
         }
 
-        Box(
+        AnimatedVisibility(
+            visible = state.warnings.isNotEmpty() && showWarningsPanel && sheet == null,
+            enter = fadeIn() + slideInVertically { -it / 4 },
+            exit = fadeOut(),
             modifier =
                 Modifier
                     .align(Alignment.TopEnd)
                     .statusBarsPadding()
-                    .padding(horizontal = 8.dp, vertical = 6.dp),
+                    .padding(top = 68.dp, start = 12.dp, end = 12.dp)
+                    .widthIn(max = 360.dp)
+                    .zIndex(1f),
         ) {
-            Card(
-                shape = RoundedCornerShape(14.dp),
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    if (state.warnings.isNotEmpty()) {
-                        IconButton(
-                            onClick = { showWarningsPanel = !showWarningsPanel },
-                        ) {
-                            Text("⚠")
-                        }
-                    }
-                    IconButton(
-                        onClick = {
-                            showPropertiesSidebar = !showPropertiesSidebar
-                            if (showPropertiesSidebar) showInventorySidebar = false
-                        },
-                    ) {
-                        Text("⚙")
-                    }
-                }
-            }
+            WarningsCard(warnings = state.warnings, maxShown = 6, onClick = { showWarningsPanel = false })
         }
-
-        if (state.warnings.isNotEmpty() && showWarningsPanel && !showPropertiesSidebar) {
-            Card(
-                modifier =
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .statusBarsPadding()
-                        .padding(top = 56.dp, end = 8.dp)
-                        .width(340.dp)
-                        .heightIn(max = 220.dp)
-                        .zIndex(2.5f),
-            ) {
-                Column(
-                    modifier = Modifier.padding(10.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Text(
-                        stringResource(Res.string.warnings_title, state.warnings.size),
-                        style = MaterialTheme.typography.titleSmall,
-                        color = Color(0xFF8A6B00),
-                    )
-                    state.warnings.take(6).forEach { msg ->
-                        Text("• $msg", style = MaterialTheme.typography.bodySmall)
-                    }
-                    if (state.warnings.size > 6) {
-                        Text(stringResource(Res.string.more_count, state.warnings.size - 6), style = MaterialTheme.typography.bodySmall)
-                    }
-                }
-            }
-        }
-
-        if (showInventorySidebar || showPropertiesSidebar) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .zIndex(2f)
-                        .pointerInput(showInventorySidebar, showPropertiesSidebar) {
-                            detectTapGestures {
-                                showInventorySidebar = false
-                                showPropertiesSidebar = false
-                            }
-                        },
-            )
-        }
-
-        if (showInventorySidebar) {
-            Card(
-                modifier =
-                    Modifier
-                        .align(Alignment.CenterStart)
-                        .statusBarsPadding()
-                        .fillMaxHeight()
-                        .width(320.dp)
-                        .zIndex(3f),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(stringResource(Res.string.inventory), style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = { showInventorySidebar = false }) { Text(stringResource(Res.string.close)) }
-                }
-                InventoryPane(
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    enableFullScroll = true,
-                    state = state,
-                    onTool = onTool,
-                    onPresetSelect = onPresetSelect,
-                    onPresetDragStart = onPresetDragStart,
-                    onPresetDrag = onPresetDrag,
-                    onPresetDragEnd = { id, rootPosition ->
-                        showInventorySidebar = false
-                        onPresetDragEnd(id, rootPosition)
-                    },
-                    onPresetDragCancel = {
-                        showInventorySidebar = false
-                        onPresetDragCancel()
-                    },
-                    onParcelUpdate = onParcelUpdate,
-                    onZoomIn = onZoomIn,
-                    onZoomOut = onZoomOut,
-                    onZoomReset = onZoomReset,
-                    onClearZones = onClearZones,
-                )
-            }
-        }
-
-        if (showPropertiesSidebar) {
-            Card(
-                modifier =
-                    Modifier
-                        .align(Alignment.CenterEnd)
-                        .statusBarsPadding()
-                        .fillMaxHeight()
-                        .width(320.dp)
-                        .zIndex(3f),
-            ) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(stringResource(Res.string.properties), style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = { showPropertiesSidebar = false }) { Text(stringResource(Res.string.close)) }
-                }
-                PropertiesPane(
-                    modifier = Modifier.padding(horizontal = 12.dp),
-                    enableFullScroll = true,
-                    state = state,
-                    onProjectNameChange = onProjectNameChange,
-                    onSave = onSave,
-                    onLoad = onLoad,
-                    onResetProject = onResetProject,
-                    onExportProjectFile = onExportProjectFile,
-                    onImportProjectFile = onImportProjectFile,
-                    onExportPng = onExportPng,
-                    onUndo = onUndo,
-                    onRedo = onRedo,
-                    onLabelChange = onLabelChange,
-                    onRotate = onRotate,
-                    onToggleRopes = onToggleRopes,
-                    onToggleLock = onToggleLock,
-                    onAddRope = onAddRope,
-                    onRemoveRope = onRemoveRope,
-                    onRestoreDefaultRopes = onRestoreDefaultRopes,
-                    onSelectRopeIndex = onSelectRopeIndex,
-                    onRopeScaleChange = onRopeScaleChange,
-                    onRopeAngleChange = onRopeAngleChange,
-                    onRopeAnchorXChange = onRopeAnchorXChange,
-                    onRopeAnchorYChange = onRopeAnchorYChange,
-                    onSliderChangeFinished = onSliderChangeFinished,
-                    onGroup = onGroup,
-                    onUngroup = onUngroup,
-                    onDuplicate = onDuplicate,
-                    onDelete = onDelete,
-                )
-            }
-        }
-
-        ExtendedFloatingActionButton(
-            modifier =
-                Modifier
-                    .align(Alignment.BottomEnd)
-                    .navigationBarsPadding()
-                    .padding(end = 16.dp, bottom = 104.dp),
-            text = { Text(stringResource(Res.string.inventory)) },
-            icon = { Text("📦") },
-            shape = RoundedCornerShape(16.dp),
-            containerColor = MaterialTheme.colorScheme.primaryContainer,
-            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
-            onClick = {
-                showInventorySidebar = !showInventorySidebar
-                if (showInventorySidebar) showPropertiesSidebar = false
-            },
-        )
 
         Column(
             modifier =
@@ -892,40 +775,298 @@ private fun CompactLayout(
                     .align(Alignment.BottomCenter)
                     .navigationBarsPadding()
                     .fillMaxWidth()
-                    .padding(start = 16.dp, end = 16.dp, bottom = 12.dp),
+                    .padding(start = 12.dp, end = 12.dp, bottom = 12.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Card(
-                modifier =
-                    Modifier
-                        .align(Alignment.CenterHorizontally)
-                        .widthIn(max = 400.dp),
-                shape = RoundedCornerShape(18.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)),
-                elevation = CardDefaults.cardElevation(defaultElevation = 8.dp),
+            AnimatedVisibility(
+                visible = hasSelection && sheet == null,
+                enter = fadeIn() + slideInVertically { it / 2 },
+                exit = fadeOut() + slideOutVertically { it / 2 },
             ) {
-                NavigationBar(
-                    containerColor = Color.Transparent,
-                    tonalElevation = 0.dp,
-                ) {
+                SelectionActionBar(
+                    state = state,
+                    onRotateBy = { degrees ->
+                        onRotateSelectedBy(degrees)
+                        onSliderChangeFinished()
+                    },
+                    onDuplicate = onDuplicate,
+                    onToggleLock = onToggleLock,
+                    onEdit = { sheet = CompactSheet.Properties },
+                    onDelete = onDelete,
+                )
+            }
+            Surface(
+                modifier = Modifier.widthIn(max = 480.dp).fillMaxWidth(),
+                shape = RoundedCornerShape(24.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.97f),
+                shadowElevation = 6.dp,
+            ) {
+                NavigationBar(containerColor = Color.Transparent, tonalElevation = 0.dp) {
+                    val toolActive = { tool: PlannerToolMode -> currentTool == tool && sheet != CompactSheet.Inventory }
                     NavigationBarItem(
-                        selected = currentTool == PlannerToolMode.Select,
+                        selected = toolActive(PlannerToolMode.Select),
                         onClick = { onTool(PlannerToolMode.Select) },
-                        icon = { Text("S") },
+                        icon = { Icon(painterResource(Res.drawable.ic_select), null) },
                         label = { Text(stringResource(Res.string.tool_select)) },
                     )
                     NavigationBarItem(
-                        selected = currentTool == PlannerToolMode.Measure,
+                        selected = toolActive(PlannerToolMode.Measure),
                         onClick = { onTool(PlannerToolMode.Measure) },
-                        icon = { Text("M") },
+                        icon = { Icon(painterResource(Res.drawable.ic_measure), null) },
                         label = { Text(stringResource(Res.string.tool_measure)) },
                     )
                     NavigationBarItem(
-                        selected = currentTool == PlannerToolMode.BlockZone,
+                        selected = toolActive(PlannerToolMode.BlockZone),
                         onClick = { onTool(PlannerToolMode.BlockZone) },
-                        icon = { Text("B") },
+                        icon = { Icon(painterResource(Res.drawable.ic_block), null) },
                         label = { Text(stringResource(Res.string.tool_block_zone)) },
                     )
+                    NavigationBarItem(
+                        selected = sheet == CompactSheet.Inventory || toolActive(PlannerToolMode.PlaceTent),
+                        onClick = { sheet = if (sheet == CompactSheet.Inventory) null else CompactSheet.Inventory },
+                        icon = { Icon(painterResource(Res.drawable.ic_tent), null) },
+                        label = { Text(stringResource(Res.string.inventory)) },
+                    )
                 }
+            }
+        }
+
+        AnimatedVisibility(
+            visible = sheet != null && !presetDragging,
+            enter = fadeIn(),
+            exit = fadeOut(),
+            modifier = Modifier.zIndex(2f),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.32f))
+                        .pointerInput(Unit) { detectTapGestures { sheet = null } },
+            )
+        }
+
+        AnimatedVisibility(
+            visible = sheet != null,
+            enter = slideInVertically { it },
+            exit = slideOutVertically { it },
+            modifier = Modifier.align(Alignment.BottomCenter).zIndex(3f),
+        ) {
+            val shownSheet = sheet ?: lastSheet
+            Surface(
+                modifier =
+                    Modifier
+                        .widthIn(max = 640.dp)
+                        .fillMaxWidth()
+                        .fillMaxHeight(0.78f)
+                        .graphicsLayer { alpha = if (presetDragging) 0f else 1f },
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                shadowElevation = 12.dp,
+            ) {
+                Column(modifier = Modifier.navigationBarsPadding()) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(Alignment.CenterHorizontally)
+                                .padding(top = 10.dp)
+                                .size(width = 36.dp, height = 4.dp)
+                                .background(MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f), RoundedCornerShape(2.dp)),
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 4.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            stringResource(if (shownSheet == CompactSheet.Inventory) Res.string.inventory else Res.string.properties),
+                            style = MaterialTheme.typography.titleLarge,
+                        )
+                        IconButton(onClick = { sheet = null }) {
+                            Icon(painterResource(Res.drawable.ic_close), stringResource(Res.string.close))
+                        }
+                    }
+                    if (shownSheet == CompactSheet.Inventory) {
+                        InventoryPane(
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            enableFullScroll = true,
+                            state = state,
+                            onTool = onTool,
+                            onPresetSelect = { id ->
+                                onPresetSelect(id)
+                                sheet = null
+                            },
+                            onPresetDragStart = { id, label, rootPosition ->
+                                presetDragging = true
+                                onPresetDragStart(id, label, rootPosition)
+                            },
+                            onPresetDrag = onPresetDrag,
+                            onPresetDragEnd = { id, rootPosition ->
+                                presetDragging = false
+                                sheet = null
+                                onPresetDragEnd(id, rootPosition)
+                            },
+                            onPresetDragCancel = {
+                                presetDragging = false
+                                onPresetDragCancel()
+                            },
+                            onParcelUpdate = onParcelUpdate,
+                            onZoomIn = onZoomIn,
+                            onZoomOut = onZoomOut,
+                            onZoomReset = onZoomReset,
+                            onClearZones = onClearZones,
+                        )
+                    } else {
+                        PropertiesPane(
+                            modifier = Modifier.padding(horizontal = 12.dp),
+                            enableFullScroll = true,
+                            state = state,
+                            onProjectNameChange = onProjectNameChange,
+                            onSave = onSave,
+                            onLoad = onLoad,
+                            onResetProject = onResetProject,
+                            onExportProjectFile = onExportProjectFile,
+                            onImportProjectFile = onImportProjectFile,
+                            onExportPng = onExportPng,
+                            onUndo = onUndo,
+                            onRedo = onRedo,
+                            onLabelChange = onLabelChange,
+                            onRotate = onRotate,
+                            onToggleRopes = onToggleRopes,
+                            onToggleLock = onToggleLock,
+                            onAddRope = onAddRope,
+                            onRemoveRope = onRemoveRope,
+                            onRestoreDefaultRopes = onRestoreDefaultRopes,
+                            onSelectRopeIndex = onSelectRopeIndex,
+                            onRopeScaleChange = onRopeScaleChange,
+                            onRopeAngleChange = onRopeAngleChange,
+                            onRopeAnchorXChange = onRopeAnchorXChange,
+                            onRopeAnchorYChange = onRopeAnchorYChange,
+                            onSliderChangeFinished = onSliderChangeFinished,
+                            onGroup = onGroup,
+                            onUngroup = onUngroup,
+                            onDuplicate = onDuplicate,
+                            onDelete = onDelete,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingBar(content: @Composable RowScope.() -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(18.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.95f),
+        // Explicit: contentColorFor() can't match a color whose alpha was changed.
+        contentColor = MaterialTheme.colorScheme.onSurface,
+        shadowElevation = 4.dp,
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            content = content,
+        )
+    }
+}
+
+@Composable
+private fun SelectionActionBar(
+    state: PlannerUiState,
+    onRotateBy: (Float) -> Unit,
+    onDuplicate: () -> Unit,
+    onToggleLock: () -> Unit,
+    onEdit: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    val allLocked =
+        state.project.assets
+            .filter { it.id in state.selectedAssetIds }
+            .let { selected -> selected.isNotEmpty() && selected.all { it.isLocked } }
+    FloatingBar {
+        IconButton(onClick = { onRotateBy(-ROTATE_STEP_DEG) }) {
+            Icon(painterResource(Res.drawable.ic_rotate_left), stringResource(Res.string.rotate_left))
+        }
+        IconButton(onClick = { onRotateBy(ROTATE_STEP_DEG) }) {
+            Icon(painterResource(Res.drawable.ic_rotate_right), stringResource(Res.string.rotate_right))
+        }
+        IconButton(onClick = onDuplicate) {
+            Icon(painterResource(Res.drawable.ic_copy), stringResource(Res.string.duplicate))
+        }
+        IconButton(onClick = onToggleLock) {
+            Icon(
+                painterResource(if (allLocked) Res.drawable.ic_lock else Res.drawable.ic_lock_open),
+                stringResource(if (allLocked) Res.string.unlock else Res.string.lock),
+                tint = if (allLocked) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+            )
+        }
+        IconButton(onClick = onEdit) {
+            Icon(painterResource(Res.drawable.ic_edit), stringResource(Res.string.edit_selection))
+        }
+        IconButton(onClick = onDelete) {
+            Icon(painterResource(Res.drawable.ic_delete), stringResource(Res.string.delete), tint = MaterialTheme.colorScheme.error)
+        }
+    }
+}
+
+private const val ROTATE_STEP_DEG = 15f
+
+@Composable
+private fun WarningsButton(
+    count: Int,
+    onClick: () -> Unit,
+) {
+    IconButton(onClick = onClick) {
+        BadgedBox(badge = { Badge { Text("$count") } }) {
+            Icon(painterResource(Res.drawable.ic_warning), stringResource(Res.string.warnings), tint = MaterialTheme.colorScheme.tertiary)
+        }
+    }
+}
+
+@Composable
+private fun ThemeToggleButton(
+    darkThemeEnabled: Boolean,
+    onToggleTheme: () -> Unit,
+) {
+    IconButton(onClick = onToggleTheme) {
+        Icon(
+            painterResource(if (darkThemeEnabled) Res.drawable.ic_light_mode else Res.drawable.ic_dark_mode),
+            stringResource(Res.string.toggle_theme),
+        )
+    }
+}
+
+@Composable
+private fun WarningsCard(
+    warnings: List<String>,
+    maxShown: Int,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        onClick = onClick,
+        modifier = modifier,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(
+                stringResource(Res.string.warnings_title, warnings.size),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+            warnings.take(maxShown).forEach { msg ->
+                Text("• $msg", style = MaterialTheme.typography.bodySmall)
+            }
+            if (warnings.size > maxShown) {
+                Text(stringResource(Res.string.more_count, warnings.size - maxShown), style = MaterialTheme.typography.bodySmall)
             }
         }
     }
