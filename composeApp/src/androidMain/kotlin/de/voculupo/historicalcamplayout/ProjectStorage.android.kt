@@ -7,11 +7,10 @@ import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.Path
 import android.provider.MediaStore
+import androidx.compose.ui.geometry.Offset
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import java.io.File
-import kotlin.math.max
-import kotlin.math.min
 
 private const val PROJECT_FILE = "historical_camp_project.json"
 private const val PROJECT_EXCHANGE_FILE = "historical_camp_project_exchange.json"
@@ -33,14 +32,12 @@ private class AndroidProjectStorage : ProjectStorage {
 
     override fun saveProject(project: PlannerProject) {
         val dir = baseDir() ?: return
-        File(dir, PROJECT_FILE).writeText(PlannerJson.json.encodeToString(project))
+        SafeFiles.write(File(dir, PROJECT_FILE), PlannerJson.json.encodeToString(project))
     }
 
     override fun loadProject(): PlannerProject? {
         val dir = baseDir() ?: return null
-        val file = File(dir, PROJECT_FILE)
-        if (!file.exists()) return null
-        return runCatching { PlannerJson.json.decodeFromString<PlannerProject>(file.readText()) }.getOrNull()
+        return SafeFiles.read(File(dir, PROJECT_FILE)) { PlannerJson.json.decodeFromString<PlannerProject>(it) }
     }
 
     override fun exportProjectFile(project: PlannerProject) {
@@ -58,25 +55,21 @@ private class AndroidProjectStorage : ProjectStorage {
 
     override fun saveInventory(presets: List<TentPreset>) {
         val dir = baseDir() ?: return
-        File(dir, INVENTORY_FILE).writeText(PlannerJson.json.encodeToString(presets))
+        SafeFiles.write(File(dir, INVENTORY_FILE), PlannerJson.json.encodeToString(presets))
     }
 
     override fun loadInventory(): List<TentPreset>? {
         val dir = baseDir() ?: return null
-        val file = File(dir, INVENTORY_FILE)
-        if (!file.exists()) return null
-        return runCatching { PlannerJson.json.decodeFromString<List<TentPreset>>(file.readText()) }.getOrNull()
+        return SafeFiles.read(File(dir, INVENTORY_FILE)) { PlannerJson.json.decodeFromString<List<TentPreset>>(it) }
     }
 
     override fun exportProjectPng(
         project: PlannerProject,
         presets: List<TentPreset>,
     ) {
-        val presetsById = presets.associateBy { it.id }
-        val meterBounds = exportBoundsMeters(project, presetsById, paddingMeters = 1.0f)
-        val ppm = project.pixelsPerMeter.coerceAtLeast(20f)
-        val widthPx = ((meterBounds.maxX - meterBounds.minX) * ppm).toInt().coerceIn(800, 6000)
-        val heightPx = ((meterBounds.maxY - meterBounds.minY) * ppm).toInt().coerceIn(600, 6000)
+        val scene = buildPngExportScene(project, presets)
+        val widthPx = scene.widthPx
+        val heightPx = scene.heightPx
         val image = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(image)
 
@@ -112,24 +105,15 @@ private class AndroidProjectStorage : ProjectStorage {
         val projectTitle = project.name.ifBlank { "Projekt" }
         canvas.drawText(projectTitle, 20f, 42f, titlePaint)
 
-        val spacingPx = (project.gridMeters * ppm).coerceAtLeast(8f)
         strokePaint.color = android.graphics.Color.argb(26, 0, 0, 0)
         strokePaint.strokeWidth = 1f
-        var x = ((-meterBounds.minX * ppm) % spacingPx + spacingPx) % spacingPx
-        while (x <= widthPx) {
-            canvas.drawLine(x, 0f, x, heightPx.toFloat(), strokePaint)
-            x += spacingPx
-        }
-        var y = ((-meterBounds.minY * ppm) % spacingPx + spacingPx) % spacingPx
-        while (y <= heightPx) {
-            canvas.drawLine(0f, y, widthPx.toFloat(), y, strokePaint)
-            y += spacingPx
-        }
+        scene.gridXs.forEach { x -> canvas.drawLine(x, 0f, x, heightPx.toFloat(), strokePaint) }
+        scene.gridYs.forEach { y -> canvas.drawLine(0f, y, widthPx.toFloat(), y, strokePaint) }
 
-        val parcelLeft = ((0f - meterBounds.minX) * ppm)
-        val parcelTop = ((0f - meterBounds.minY) * ppm)
-        val parcelW = project.parcel.widthMeters * ppm
-        val parcelH = project.parcel.heightMeters * ppm
+        val parcelLeft = scene.parcel.left
+        val parcelTop = scene.parcel.top
+        val parcelW = scene.parcel.width
+        val parcelH = scene.parcel.height
         fillPaint.color = android.graphics.Color.argb(17, 0x4A, 0x5A, 0x4A)
         canvas.drawRect(parcelLeft, parcelTop, parcelLeft + parcelW, parcelTop + parcelH, fillPaint)
         strokePaint.color = android.graphics.Color.rgb(0x4A, 0x5A, 0x4A)
@@ -192,48 +176,29 @@ private class AndroidProjectStorage : ProjectStorage {
         canvas.drawRoundRect(heightBg, 6f, 6f, guideLabelBg)
         canvas.drawText(heightLabel, heightX, heightBaselineY, guideLabelPaint)
 
-        project.blockZones.forEach { zone ->
-            if (zone.points.size < 3) return@forEach
-            val p = Path()
-            val first = zone.points.first()
-            p.moveTo((first.x - meterBounds.minX) * ppm, (first.y - meterBounds.minY) * ppm)
-            for (i in 1 until zone.points.size) {
-                val pt = zone.points[i]
-                p.lineTo((pt.x - meterBounds.minX) * ppm, (pt.y - meterBounds.minY) * ppm)
-            }
-            p.close()
+        scene.zones.forEach { zone ->
             fillPaint.color = android.graphics.Color.argb(90, 170, 0, 0)
-            canvas.drawPath(p, fillPaint)
+            canvas.drawPath(zone.toAndroidPath(), fillPaint)
         }
 
-        project.assets.forEach { asset ->
-            val preset = presetsById[asset.presetId] ?: return@forEach
-            val bodyPath = worldAssetPath(asset, preset, meterBounds, ppm)
+        scene.assets.forEach { asset ->
+            val bodyPath = asset.outline.toAndroidPath()
             fillPaint.color = android.graphics.Color.argb(205, 0x6D, 0x5B, 0x44)
             canvas.drawPath(bodyPath, fillPaint)
             strokePaint.color = android.graphics.Color.rgb(0x3E, 0x3E, 0x3E)
             strokePaint.strokeWidth = 2f
             canvas.drawPath(bodyPath, strokePaint)
 
-            if (asset.showRopes) {
-                strokePaint.color = android.graphics.Color.rgb(0x44, 0x44, 0x44)
-                strokePaint.strokeWidth = 2f
-                GeometryEngine.ropeSegments(asset, preset).forEach { rope ->
-                    val x1 = (rope.start.x - meterBounds.minX) * ppm
-                    val y1 = (rope.start.y - meterBounds.minY) * ppm
-                    val x2 = (rope.end.x - meterBounds.minX) * ppm
-                    val y2 = (rope.end.y - meterBounds.minY) * ppm
-                    canvas.drawLine(x1, y1, x2, y2, strokePaint)
-                    fillPaint.color = android.graphics.Color.rgb(0x7A, 0x1F, 0x1F)
-                    canvas.drawCircle(x2, y2, 3f, fillPaint)
-                }
+            strokePaint.color = android.graphics.Color.rgb(0x44, 0x44, 0x44)
+            strokePaint.strokeWidth = 2f
+            asset.ropes.forEach { (start, end) ->
+                canvas.drawLine(start.x, start.y, end.x, end.y, strokePaint)
+                fillPaint.color = android.graphics.Color.rgb(0x7A, 0x1F, 0x1F)
+                canvas.drawCircle(end.x, end.y, 3f, fillPaint)
             }
 
-            val exportLabel = asset.label.ifBlank { preset.name }
-            if (exportLabel.isNotBlank()) {
-                val textX = (asset.position.x - meterBounds.minX) * ppm + 8f
-                val textY = (asset.position.y - meterBounds.minY) * ppm - 8f
-                canvas.drawText(exportLabel, textX, textY, labelPaint)
+            if (asset.label.isNotBlank()) {
+                canvas.drawText(asset.label, asset.center.x + 8f, asset.center.y - 8f, labelPaint)
             }
         }
 
@@ -302,75 +267,10 @@ private class AndroidProjectStorage : ProjectStorage {
     }
 }
 
-private data class BoundsMeters(
-    val minX: Float,
-    val minY: Float,
-    val maxX: Float,
-    val maxY: Float,
-)
-
-private fun exportBoundsMeters(
-    project: PlannerProject,
-    presetsById: Map<String, TentPreset>,
-    paddingMeters: Float,
-): BoundsMeters {
-    var minX = 0f
-    var minY = 0f
-    var maxX = project.parcel.widthMeters
-    var maxY = project.parcel.heightMeters
-
-    project.assets.forEach { asset ->
-        val preset = presetsById[asset.presetId] ?: return@forEach
-        val body = GeometryEngine.assetBodyAabb(asset, preset)
-        minX = min(minX, body.left)
-        minY = min(minY, body.top)
-        maxX = max(maxX, body.right)
-        maxY = max(maxY, body.bottom)
-        GeometryEngine.ropeSegments(asset, preset).forEach { rope ->
-            minX = min(minX, min(rope.start.x, rope.end.x))
-            minY = min(minY, min(rope.start.y, rope.end.y))
-            maxX = max(maxX, max(rope.start.x, rope.end.x))
-            maxY = max(maxY, max(rope.start.y, rope.end.y))
-        }
+private fun List<Offset>.toAndroidPath(): Path =
+    Path().apply {
+        if (isEmpty()) return@apply
+        moveTo(first().x, first().y)
+        for (i in 1 until size) lineTo(this@toAndroidPath[i].x, this@toAndroidPath[i].y)
+        close()
     }
-    return BoundsMeters(
-        minX = minX - paddingMeters,
-        minY = minY - paddingMeters,
-        maxX = maxX + paddingMeters,
-        maxY = maxY + paddingMeters,
-    )
-}
-
-private fun worldAssetPath(
-    asset: PlacedAsset,
-    preset: TentPreset,
-    bounds: BoundsMeters,
-    pixelsPerMeter: Float,
-): Path {
-    val points =
-        if (preset.polygonPoints.isNotEmpty()) {
-            preset.polygonPoints
-        } else {
-            GeometryHelper.generatePoints(preset.shape, preset.widthMeters, preset.heightMeters).ifEmpty {
-                val hw = preset.widthMeters / 2f
-                val hh = preset.heightMeters / 2f
-                listOf(Vec2(-hw, -hh), Vec2(hw, -hh), Vec2(hw, hh), Vec2(-hw, hh))
-            }
-        }
-    val path = Path()
-    if (points.isEmpty()) return path
-    val firstWorld = GeometryEngine.worldPoint(asset, points.first())
-    path.moveTo(
-        (firstWorld.x - bounds.minX) * pixelsPerMeter,
-        (firstWorld.y - bounds.minY) * pixelsPerMeter,
-    )
-    for (i in 1 until points.size) {
-        val world = GeometryEngine.worldPoint(asset, points[i])
-        path.lineTo(
-            (world.x - bounds.minX) * pixelsPerMeter,
-            (world.y - bounds.minY) * pixelsPerMeter,
-        )
-    }
-    path.close()
-    return path
-}

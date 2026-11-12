@@ -11,9 +11,14 @@ object CollisionEngine {
         pathB: Path,
     ): Boolean {
         if (!heightRangesOverlap(assetA.heightRange, assetB.heightRange)) return false
-        val intersection = Path.combine(PathOperation.Intersect, pathA, pathB)
-        return !intersection.isEmpty
+        return pathsIntersect(pathA, pathB)
     }
+
+    /** 2D footprint overlap only, ignoring height. */
+    fun pathsIntersect(
+        pathA: Path,
+        pathB: Path,
+    ): Boolean = !Path.combine(PathOperation.Intersect, pathA, pathB).isEmpty
 
     private fun heightRangesOverlap(
         a: HeightRange,

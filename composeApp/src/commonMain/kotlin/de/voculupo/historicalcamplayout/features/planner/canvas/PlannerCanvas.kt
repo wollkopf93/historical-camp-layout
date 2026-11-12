@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
@@ -83,6 +84,7 @@ internal fun PlannerCanvas(
     val currentTool by rememberUpdatedState(state.currentTool)
     val currentSelectedAssetIds by rememberUpdatedState(state.selectedAssetIds)
     val currentParcel by rememberUpdatedState(state.project.parcel)
+    val currentHiddenRopes by rememberUpdatedState(state.hiddenRopeIndices)
     val currentDropHandle by rememberUpdatedState(onDropHandle)
     val currentPlacePresetAt by rememberUpdatedState(onPlacePresetAt)
     val isDarkTheme = false
@@ -131,6 +133,7 @@ internal fun PlannerCanvas(
             modifier =
                 Modifier
                     .fillMaxSize()
+                    .testTag(PLANNER_CANVAS_TAG)
                     .onGloballyPositioned { coords ->
                         val p = coords.positionInRoot()
                         canvasRootRect =
@@ -163,7 +166,7 @@ internal fun PlannerCanvas(
                                 val p2 = pressed[1].position
                                 val centroid = Offset((p1.x + p2.x) / 2f, (p1.y + p2.y) / 2f)
                                 val distance = (p1 - p2).getDistance().coerceAtLeast(0.001f)
-                                val angleDeg = Math.toDegrees(atan2((p2.y - p1.y).toDouble(), (p2.x - p1.x).toDouble())).toFloat()
+                                val angleDeg = GeometryEngine.radToDeg(atan2((p2.y - p1.y).toDouble(), (p2.x - p1.x).toDouble()))
                                 val lastDistance = prevDistance
                                 val lastCentroid = prevCentroid
                                 val lastAngleDeg = prevAngleDeg
@@ -232,15 +235,12 @@ internal fun PlannerCanvas(
                                 state.project.pixelsPerMeter,
                             )
 
-                        fun activeRopeHandlesForSelectedAsset(
-                            selectedAsset: PlacedAsset,
-                            preset: TentPreset,
-                        ): List<RopeHandleHit> =
+                        fun activeRopeHandlesForSelectedAsset(selectedAsset: PlacedAsset): List<RopeHandleHit> =
                             ropeHandleHits(
                                 asset = selectedAsset,
-                                preset = preset,
                                 pixelsPerMeter = state.project.pixelsPerMeter,
                                 parcelOriginPx = parcelOriginPx(),
+                                hiddenRopeIndices = currentHiddenRopes[selectedAsset.id].orEmpty(),
                             )
 
                         fun distancePointToSegmentPx(
@@ -259,14 +259,13 @@ internal fun PlannerCanvas(
 
                         fun pickRopeByLineHit(
                             selectedAsset: PlacedAsset,
-                            preset: TentPreset,
                             tapPx: Offset,
                         ): Int? {
                             val lineHitRadiusPx = ropeHandleGuardRadiusPx.coerceAtLeast(30f)
                             val parcelOrigin = parcelOriginPx()
                             val nearest =
                                 GeometryEngine
-                                    .ropeSegments(selectedAsset, preset)
+                                    .ropeSegments(selectedAsset)
                                     .mapIndexed { index, seg ->
                                         val startPx = seg.start.toOffsetPx(state.project.pixelsPerMeter, parcelOrigin)
                                         val endPx = seg.end.toOffsetPx(state.project.pixelsPerMeter, parcelOrigin)
@@ -300,7 +299,7 @@ internal fun PlannerCanvas(
                                         if (selectedAsset != null) {
                                             val preset = presetsById[selectedAsset.presetId]
                                             if (preset != null) {
-                                                val ropeHandles = activeRopeHandlesForSelectedAsset(selectedAsset, preset)
+                                                val ropeHandles = activeRopeHandlesForSelectedAsset(selectedAsset)
                                                 // Tap selection should be more forgiving than drag grab,
                                                 // otherwise near-misses clear selection on desktop.
                                                 val ropeHit = pickRopeHandleHit(ropeHandles, tap, ropeHandleGuardRadiusPx)
@@ -308,7 +307,7 @@ internal fun PlannerCanvas(
                                                     onRopeSelect(ropeHit.ropeIndex)
                                                     return@detectTapGestures
                                                 }
-                                                val lineHitRopeIndex = pickRopeByLineHit(selectedAsset, preset, tap)
+                                                val lineHitRopeIndex = pickRopeByLineHit(selectedAsset, tap)
                                                 if (lineHitRopeIndex != null) {
                                                     onRopeSelect(lineHitRopeIndex)
                                                     return@detectTapGestures
@@ -347,10 +346,13 @@ internal fun PlannerCanvas(
 
                         fun parcelOriginPx() = centeredParcelOriginPx(currentCanvasSize(), parcelSizePx(state.project)) + canvasPanOffsetPx
 
-                        fun activeRopeHandlesForSelectedAsset(
-                            selectedAsset: PlacedAsset,
-                            preset: TentPreset,
-                        ): List<RopeHandleHit> = ropeHandleHits(selectedAsset, preset, state.project.pixelsPerMeter, parcelOriginPx())
+                        fun activeRopeHandlesForSelectedAsset(selectedAsset: PlacedAsset): List<RopeHandleHit> =
+                            ropeHandleHits(
+                                selectedAsset,
+                                state.project.pixelsPerMeter,
+                                parcelOriginPx(),
+                                currentHiddenRopes[selectedAsset.id].orEmpty(),
+                            )
 
                         fun hitAssetAt(pointMeters: Vec2): PlacedAsset? {
                             val marginMeters = touchAssetHitSlopPx / state.project.pixelsPerMeter
@@ -373,7 +375,7 @@ internal fun PlannerCanvas(
                                 if (selectedAsset != null) {
                                     val selectedPreset = presetsById[selectedAsset.presetId]
                                     if (selectedPreset != null) {
-                                        val ropeHandles = activeRopeHandlesForSelectedAsset(selectedAsset, selectedPreset)
+                                        val ropeHandles = activeRopeHandlesForSelectedAsset(selectedAsset)
                                         val ropeHit = pickRopeHandleHit(ropeHandles, start, ropeHandleGrabRadiusPx)
                                         if (ropeHit != null) {
                                             activeRopeDrag = ropeHit.ropeIndex to ropeHit.part
@@ -461,6 +463,7 @@ internal fun PlannerCanvas(
                     hard,
                     parcelOrigin,
                     state.selectedRopeIndex,
+                    state.hiddenRopeIndices[asset.id].orEmpty(),
                 )
                 if (asset.id in directSelectedIds) {
                     drawAnchorSlots(asset, preset, state.project.pixelsPerMeter, parcelOrigin)
@@ -724,6 +727,7 @@ private fun DrawScope.drawAsset(
     hardCollision: Boolean,
     origin: Offset,
     selectedRopeIndex: Int?,
+    hiddenRopeIndices: Set<Int>,
 ) {
     val bodyColor =
         when {
@@ -830,15 +834,6 @@ private fun DrawScope.drawAsset(
                     style = Stroke(2f)
                 )
 
-                // 4. Auswahl-Highlight (Direkt hier integriert)
-                if (selectionHighlighted) {
-                    drawRect(
-                        color = Color(0xFF4A9EFF),
-                        topLeft = Offset(center.x - halfW, center.y - halfH),
-                        size = Size(halfW * 2f, halfH * 2f),
-                        style = Stroke(width = 3.5f)
-                    )
-                }
             }
 
             TentShapeType.POLYGON -> {
@@ -853,10 +848,17 @@ private fun DrawScope.drawAsset(
                 drawPath(path, outlineColor, style = Stroke(2f))
             }
         }
+        if (selectionHighlighted) {
+            drawSelectionHighlightRing(
+                preset = preset,
+                center = center,
+                pixelsPerMeter = pixelsPerMeter,
+            )
+        }
     }
     if (asset.showRopes) {
         val ropeUiScale = (pixelsPerMeter / 50f).coerceIn(1f, 2.4f)
-        GeometryEngine.ropeSegments(asset, preset).forEachIndexed { idx, rope ->
+        GeometryEngine.visibleRopeSegments(asset, hiddenRopeIndices).forEach { (idx, rope) ->
             val isSelectedRope = selectedRopeIndex == idx
             drawLine(
                 color = if (isSelectedRope) Color(0xFF1B4D9B) else Color(0xFF444444),

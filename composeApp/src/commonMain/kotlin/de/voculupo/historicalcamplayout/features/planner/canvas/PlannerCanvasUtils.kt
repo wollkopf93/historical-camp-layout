@@ -8,6 +8,9 @@ import de.voculupo.historicalcamplayout.PlannerProject
 import de.voculupo.historicalcamplayout.TentPreset
 import de.voculupo.historicalcamplayout.Vec2
 
+/** Lets UI tests find the canvas to click and drag on it. */
+internal const val PLANNER_CANVAS_TAG = "planner-canvas"
+
 internal enum class RopeDragPart {
     Anchor,
     Stake,
@@ -43,13 +46,13 @@ internal fun Vec2.toOffset(): Offset = Offset(x, y)
 
 internal fun ropeHandleHits(
     asset: PlacedAsset,
-    preset: TentPreset,
     pixelsPerMeter: Float,
     parcelOriginPx: Offset,
+    hiddenRopeIndices: Set<Int> = emptySet(),
 ): List<RopeHandleHit> {
-    val segments = GeometryEngine.ropeSegments(asset, preset)
+    val segments = GeometryEngine.visibleRopeSegments(asset, hiddenRopeIndices)
     return ArrayList<RopeHandleHit>(segments.size * 2).apply {
-        segments.forEachIndexed { index, seg ->
+        segments.forEach { (index, seg) ->
             add(RopeHandleHit(index, RopeDragPart.Anchor, seg.start.toOffsetPx(pixelsPerMeter, parcelOriginPx)))
             add(RopeHandleHit(index, RopeDragPart.Stake, seg.end.toOffsetPx(pixelsPerMeter, parcelOriginPx)))
         }

@@ -48,7 +48,11 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.isCtrlPressed
+import androidx.compose.ui.input.key.isMetaPressed
+import androidx.compose.ui.input.key.isShiftPressed
 import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
@@ -57,6 +61,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.viewModel
 import de.voculupo.historicalcamplayout.PlannerToolMode
 import de.voculupo.historicalcamplayout.PlannerUiState
 import de.voculupo.historicalcamplayout.features.inventory.InventoryPane
@@ -65,6 +70,16 @@ import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
 import de.voculupo.historicalcamplayout.features.properties.PropertiesPane
 import de.voculupo.historicalcamplayout.getPlatform
 import kotlinx.coroutines.delay
+import lagerplaner.composeapp.generated.resources.Res
+import lagerplaner.composeapp.generated.resources.close
+import lagerplaner.composeapp.generated.resources.inventory
+import lagerplaner.composeapp.generated.resources.more_count
+import lagerplaner.composeapp.generated.resources.properties
+import lagerplaner.composeapp.generated.resources.tool_block_zone
+import lagerplaner.composeapp.generated.resources.tool_measure
+import lagerplaner.composeapp.generated.resources.tool_select
+import lagerplaner.composeapp.generated.resources.warnings_title
+import org.jetbrains.compose.resources.stringResource
 
 private data class PresetDragState(
     val presetId: String,
@@ -127,8 +142,10 @@ private val MedievalDarkColorScheme =
     )
 
 @Composable
-fun App(modifier: Modifier = Modifier) {
-    val viewModel = remember { PlannerViewModel() }
+fun App(
+    modifier: Modifier = Modifier,
+    viewModel: PlannerViewModel = viewModel { PlannerViewModel() },
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val density = LocalDensity.current
     val rootFocusRequester = remember { FocusRequester() }
@@ -164,26 +181,31 @@ fun App(modifier: Modifier = Modifier) {
                     .focusRequester(rootFocusRequester)
                     .focusable()
                     .onPreviewKeyEvent { keyEvent ->
-                        when {
-                            keyEvent.key == Key.ShiftLeft || keyEvent.key == Key.ShiftRight -> {
-                                shiftPressed = keyEvent.type == KeyEventType.KeyDown
-                                false
-                            }
-
-                            keyEvent.type == KeyEventType.KeyDown &&
-                                (keyEvent.key == Key.Delete || keyEvent.key == Key.Escape) -> {
-                                if (state.selectedAssetIds.isNotEmpty()) {
-                                    viewModel.deleteSelection()
-                                    true
-                                } else {
-                                    false
-                                }
-                            }
-
-                            else -> {
-                                false
-                            }
+                        if (keyEvent.key == Key.ShiftLeft || keyEvent.key == Key.ShiftRight) {
+                            shiftPressed = keyEvent.type == KeyEventType.KeyDown
                         }
+                        false
+                    }
+                    // Not a preview handler: a focused text field must get Delete first (it deletes a character there).
+                    .onKeyEvent { keyEvent ->
+                        if (keyEvent.type != KeyEventType.KeyDown) return@onKeyEvent false
+                        val ctrl = keyEvent.isCtrlPressed || keyEvent.isMetaPressed
+                        val hasSelection = state.selectedAssetIds.isNotEmpty()
+                        val key = keyEvent.key
+                        val rotateStep = if (keyEvent.isShiftPressed) -15f else 15f
+                        when {
+                            ctrl && key == Key.Z && keyEvent.isShiftPressed -> viewModel.redo()
+                            ctrl && key == Key.Z -> viewModel.undo()
+                            ctrl && key == Key.Y -> viewModel.redo()
+                            ctrl && key == Key.D && hasSelection -> viewModel.duplicateSelection()
+                            ctrl -> return@onKeyEvent false
+                            key == Key.Delete && hasSelection -> viewModel.deleteSelection()
+                            key == Key.R && hasSelection -> viewModel.rotateSelected(rotateStep).also { viewModel.commitHistory() }
+                            key == Key.L && hasSelection -> viewModel.toggleLockSelected()
+                            key == Key.Escape -> viewModel.setSelection(emptySet())
+                            else -> return@onKeyEvent false
+                        }
+                        true
                     },
         ) {
             val useCompactShell = AppUiLogic.shouldUseCompactShell(isAndroid = isAndroid)
@@ -237,6 +259,7 @@ fun App(modifier: Modifier = Modifier) {
                     onLabelChange = viewModel::setSelectedLabel,
                     onRotate = viewModel::setSelectedRotation,
                     onToggleRopes = viewModel::toggleRopesForSelected,
+                    onToggleLock = viewModel::toggleLockSelected,
                     onAddRope = viewModel::addRopeToSelected,
                     onRemoveRope = viewModel::removeRopeFromSelected,
                     onRestoreDefaultRopes = viewModel::restoreDefaultRopesForSelected,
@@ -245,6 +268,7 @@ fun App(modifier: Modifier = Modifier) {
                     onRopeAngleChange = viewModel::setSelectedRopeAngleOffset,
                     onRopeAnchorXChange = viewModel::setSelectedRopeAnchorX,
                     onRopeAnchorYChange = viewModel::setSelectedRopeAnchorY,
+                    onSliderChangeFinished = viewModel::commitHistory,
                     onGroup = viewModel::groupSelection,
                     onUngroup = viewModel::ungroupSelection,
                     onDuplicate = viewModel::duplicateSelection,
@@ -302,6 +326,7 @@ fun App(modifier: Modifier = Modifier) {
                     onLabelChange = viewModel::setSelectedLabel,
                     onRotate = viewModel::setSelectedRotation,
                     onToggleRopes = viewModel::toggleRopesForSelected,
+                    onToggleLock = viewModel::toggleLockSelected,
                     onAddRope = viewModel::addRopeToSelected,
                     onRemoveRope = viewModel::removeRopeFromSelected,
                     onRestoreDefaultRopes = viewModel::restoreDefaultRopesForSelected,
@@ -310,6 +335,7 @@ fun App(modifier: Modifier = Modifier) {
                     onRopeAngleChange = viewModel::setSelectedRopeAngleOffset,
                     onRopeAnchorXChange = viewModel::setSelectedRopeAnchorX,
                     onRopeAnchorYChange = viewModel::setSelectedRopeAnchorY,
+                    onSliderChangeFinished = viewModel::commitHistory,
                     onGroup = viewModel::groupSelection,
                     onUngroup = viewModel::ungroupSelection,
                     onDuplicate = viewModel::duplicateSelection,
@@ -390,6 +416,7 @@ private fun ExpandedLayout(
     onLabelChange: (String) -> Unit,
     onRotate: (Float) -> Unit,
     onToggleRopes: () -> Unit,
+    onToggleLock: () -> Unit,
     onAddRope: () -> Unit,
     onRemoveRope: () -> Unit,
     onRestoreDefaultRopes: () -> Unit,
@@ -398,6 +425,7 @@ private fun ExpandedLayout(
     onRopeAngleChange: (Float) -> Unit,
     onRopeAnchorXChange: (Float) -> Unit,
     onRopeAnchorYChange: (Float) -> Unit,
+    onSliderChangeFinished: () -> Unit,
     onGroup: () -> Unit,
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
@@ -475,6 +503,7 @@ private fun ExpandedLayout(
                 onLabelChange = onLabelChange,
                 onRotate = onRotate,
                 onToggleRopes = onToggleRopes,
+                onToggleLock = onToggleLock,
                 onAddRope = onAddRope,
                 onRemoveRope = onRemoveRope,
                 onRestoreDefaultRopes = onRestoreDefaultRopes,
@@ -483,6 +512,7 @@ private fun ExpandedLayout(
                 onRopeAngleChange = onRopeAngleChange,
                 onRopeAnchorXChange = onRopeAnchorXChange,
                 onRopeAnchorYChange = onRopeAnchorYChange,
+                onSliderChangeFinished = onSliderChangeFinished,
                 onGroup = onGroup,
                 onUngroup = onUngroup,
                 onDuplicate = onDuplicate,
@@ -529,7 +559,7 @@ private fun ExpandedLayout(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
-                        "Warnungen (${state.warnings.size})",
+                        stringResource(Res.string.warnings_title, state.warnings.size),
                         style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -537,7 +567,7 @@ private fun ExpandedLayout(
                         Text("• $msg", style = MaterialTheme.typography.bodySmall)
                     }
                     if (state.warnings.size > 8) {
-                        Text("… ${state.warnings.size - 8} weitere", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(Res.string.more_count, state.warnings.size - 8), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -589,6 +619,7 @@ private fun CompactLayout(
     onLabelChange: (String) -> Unit,
     onRotate: (Float) -> Unit,
     onToggleRopes: () -> Unit,
+    onToggleLock: () -> Unit,
     onAddRope: () -> Unit,
     onRemoveRope: () -> Unit,
     onRestoreDefaultRopes: () -> Unit,
@@ -597,6 +628,7 @@ private fun CompactLayout(
     onRopeAngleChange: (Float) -> Unit,
     onRopeAnchorXChange: (Float) -> Unit,
     onRopeAnchorYChange: (Float) -> Unit,
+    onSliderChangeFinished: () -> Unit,
     onGroup: () -> Unit,
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
@@ -633,6 +665,36 @@ private fun CompactLayout(
             onDrag = onDrag,
             onDragEnd = onDragEnd,
         )
+
+        Box(
+            modifier =
+                Modifier
+                    .align(Alignment.TopStart)
+                    .statusBarsPadding()
+                    .padding(horizontal = 8.dp, vertical = 6.dp),
+        ) {
+            Card(
+                shape = RoundedCornerShape(14.dp),
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                ) {
+                    IconButton(
+                        onClick = onUndo,
+                        enabled = state.canUndo,
+                    ) {
+                        Text("↶")
+                    }
+                    IconButton(
+                        onClick = onRedo,
+                        enabled = state.canRedo,
+                    ) {
+                        Text("↷")
+                    }
+                }
+            }
+        }
 
         Box(
             modifier =
@@ -683,7 +745,7 @@ private fun CompactLayout(
                     verticalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
                     Text(
-                        "Warnungen (${state.warnings.size})",
+                        stringResource(Res.string.warnings_title, state.warnings.size),
                         style = MaterialTheme.typography.titleSmall,
                         color = Color(0xFF8A6B00),
                     )
@@ -691,7 +753,7 @@ private fun CompactLayout(
                         Text("• $msg", style = MaterialTheme.typography.bodySmall)
                     }
                     if (state.warnings.size > 6) {
-                        Text("… ${state.warnings.size - 6} weitere", style = MaterialTheme.typography.bodySmall)
+                        Text(stringResource(Res.string.more_count, state.warnings.size - 6), style = MaterialTheme.typography.bodySmall)
                     }
                 }
             }
@@ -727,8 +789,8 @@ private fun CompactLayout(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Inventory", style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = { showInventorySidebar = false }) { Text("Close") }
+                    Text(stringResource(Res.string.inventory), style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = { showInventorySidebar = false }) { Text(stringResource(Res.string.close)) }
                 }
                 InventoryPane(
                     modifier = Modifier.padding(horizontal = 12.dp),
@@ -770,8 +832,8 @@ private fun CompactLayout(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Properties", style = MaterialTheme.typography.titleMedium)
-                    TextButton(onClick = { showPropertiesSidebar = false }) { Text("Close") }
+                    Text(stringResource(Res.string.properties), style = MaterialTheme.typography.titleMedium)
+                    TextButton(onClick = { showPropertiesSidebar = false }) { Text(stringResource(Res.string.close)) }
                 }
                 PropertiesPane(
                     modifier = Modifier.padding(horizontal = 12.dp),
@@ -789,6 +851,7 @@ private fun CompactLayout(
                     onLabelChange = onLabelChange,
                     onRotate = onRotate,
                     onToggleRopes = onToggleRopes,
+                    onToggleLock = onToggleLock,
                     onAddRope = onAddRope,
                     onRemoveRope = onRemoveRope,
                     onRestoreDefaultRopes = onRestoreDefaultRopes,
@@ -797,6 +860,7 @@ private fun CompactLayout(
                     onRopeAngleChange = onRopeAngleChange,
                     onRopeAnchorXChange = onRopeAnchorXChange,
                     onRopeAnchorYChange = onRopeAnchorYChange,
+                    onSliderChangeFinished = onSliderChangeFinished,
                     onGroup = onGroup,
                     onUngroup = onUngroup,
                     onDuplicate = onDuplicate,
@@ -811,7 +875,7 @@ private fun CompactLayout(
                     .align(Alignment.BottomEnd)
                     .navigationBarsPadding()
                     .padding(end = 16.dp, bottom = 104.dp),
-            text = { Text("Inventory") },
+            text = { Text(stringResource(Res.string.inventory)) },
             icon = { Text("📦") },
             shape = RoundedCornerShape(16.dp),
             containerColor = MaterialTheme.colorScheme.primaryContainer,
@@ -847,19 +911,19 @@ private fun CompactLayout(
                         selected = currentTool == PlannerToolMode.Select,
                         onClick = { onTool(PlannerToolMode.Select) },
                         icon = { Text("S") },
-                        label = { Text("Select") },
+                        label = { Text(stringResource(Res.string.tool_select)) },
                     )
                     NavigationBarItem(
                         selected = currentTool == PlannerToolMode.Measure,
                         onClick = { onTool(PlannerToolMode.Measure) },
                         icon = { Text("M") },
-                        label = { Text("Measure") },
+                        label = { Text(stringResource(Res.string.tool_measure)) },
                     )
                     NavigationBarItem(
                         selected = currentTool == PlannerToolMode.BlockZone,
                         onClick = { onTool(PlannerToolMode.BlockZone) },
                         icon = { Text("B") },
-                        label = { Text("Block") },
+                        label = { Text(stringResource(Res.string.tool_block_zone)) },
                     )
                 }
             }

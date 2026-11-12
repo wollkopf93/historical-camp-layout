@@ -50,6 +50,32 @@ import de.voculupo.historicalcamplayout.TentPreset
 import de.voculupo.historicalcamplayout.TentShapeType
 import de.voculupo.historicalcamplayout.Vec2
 import de.voculupo.historicalcamplayout.getPlatform
+import lagerplaner.composeapp.generated.resources.Res
+import lagerplaner.composeapp.generated.resources.apply_area
+import lagerplaner.composeapp.generated.resources.block_zone_hint
+import lagerplaner.composeapp.generated.resources.cat_all
+import lagerplaner.composeapp.generated.resources.cat_other
+import lagerplaner.composeapp.generated.resources.cat_round
+import lagerplaner.composeapp.generated.resources.cat_saxon
+import lagerplaner.composeapp.generated.resources.cat_sun_sail
+import lagerplaner.composeapp.generated.resources.cat_wedge
+import lagerplaner.composeapp.generated.resources.clear_block_zones
+import lagerplaner.composeapp.generated.resources.drag_hint
+import lagerplaner.composeapp.generated.resources.height_m
+import lagerplaner.composeapp.generated.resources.inventory
+import lagerplaner.composeapp.generated.resources.parcel_and_zoom
+import lagerplaner.composeapp.generated.resources.presets_title
+import lagerplaner.composeapp.generated.resources.recently_used
+import lagerplaner.composeapp.generated.resources.reset
+import lagerplaner.composeapp.generated.resources.search_preset
+import lagerplaner.composeapp.generated.resources.tip_desktop
+import lagerplaner.composeapp.generated.resources.tip_touch
+import lagerplaner.composeapp.generated.resources.tool_block_zone
+import lagerplaner.composeapp.generated.resources.tool_measure
+import lagerplaner.composeapp.generated.resources.tool_select
+import lagerplaner.composeapp.generated.resources.width_m
+import lagerplaner.composeapp.generated.resources.zoom_percent
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -128,20 +154,26 @@ internal fun InventoryPane(
             modifier = paneModifier,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("Inventar", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(Res.string.inventory), style = MaterialTheme.typography.titleMedium)
             FlowRow(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                ToolChip("Auswahl", state.currentTool == PlannerToolMode.Select) { onTool(PlannerToolMode.Select) }
-                ToolChip("Messen", state.currentTool == PlannerToolMode.Measure) { onTool(PlannerToolMode.Measure) }
-                ToolChip("Sperrzone", state.currentTool == PlannerToolMode.BlockZone) { onTool(PlannerToolMode.BlockZone) }
+                ToolChip(stringResource(Res.string.tool_select), state.currentTool == PlannerToolMode.Select) {
+                    onTool(PlannerToolMode.Select)
+                }
+                ToolChip(stringResource(Res.string.tool_measure), state.currentTool == PlannerToolMode.Measure) {
+                    onTool(PlannerToolMode.Measure)
+                }
+                ToolChip(stringResource(Res.string.tool_block_zone), state.currentTool == PlannerToolMode.BlockZone) {
+                    onTool(PlannerToolMode.BlockZone)
+                }
             }
             HorizontalDivider()
 
             CollapsibleHeader(
-                title = "Parzelle & Zoom",
+                title = stringResource(Res.string.parcel_and_zoom),
                 expanded = showParcelZoom,
                 onToggle = { showParcelZoom = !showParcelZoom },
             )
@@ -151,14 +183,14 @@ internal fun InventoryPane(
                         value = widthInput,
                         onValueChange = { widthInput = it },
                         singleLine = true,
-                        label = { Text("Breite (m)") },
+                        label = { Text(stringResource(Res.string.width_m)) },
                         modifier = Modifier.weight(1f),
                     )
                     OutlinedTextField(
                         value = heightInput,
                         onValueChange = { heightInput = it },
                         singleLine = true,
-                        label = { Text("Höhe (m)") },
+                        label = { Text(stringResource(Res.string.height_m)) },
                         modifier = Modifier.weight(1f),
                     )
                 }
@@ -169,32 +201,33 @@ internal fun InventoryPane(
                         if (w != null && h != null) onParcelUpdate(w, h)
                     },
                 ) {
-                    Text("Fläche übernehmen")
+                    Text(stringResource(Res.string.apply_area))
                 }
-                Text("Zoom: ${(state.project.pixelsPerMeter / 50f * 100f).toInt()}%", style = MaterialTheme.typography.bodySmall)
+                val zoomPercent = (state.project.pixelsPerMeter / 50f * 100f).toInt()
+                Text(stringResource(Res.string.zoom_percent, zoomPercent), style = MaterialTheme.typography.bodySmall)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Button(modifier = Modifier.weight(1f), onClick = onZoomOut) { Text("Zoom -") }
-                    Button(modifier = Modifier.weight(1f), onClick = onZoomReset) { Text("Reset") }
+                    Button(modifier = Modifier.weight(1f), onClick = onZoomReset) { Text(stringResource(Res.string.reset)) }
                     Button(modifier = Modifier.weight(1f), onClick = onZoomIn) { Text("Zoom +") }
                 }
-                Text("Zeltvorlage per Drag&Drop auf die Fläche ziehen.", color = MaterialTheme.colorScheme.primary)
+                Text(stringResource(Res.string.drag_hint), color = MaterialTheme.colorScheme.primary)
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Button(
                         modifier = Modifier.fillMaxWidth().weight(1f),
                         onClick = onClearZones,
                         enabled = state.project.blockZones.isNotEmpty(),
                     ) {
-                        Text("Sperrzonen leeren")
+                        Text(stringResource(Res.string.clear_block_zones))
                     }
                 }
                 if (state.currentTool == PlannerToolMode.BlockZone) {
-                    Text("Blockzone: Ecke 1 klicken, dann Ecke 2 klicken.", color = MaterialTheme.colorScheme.primary)
+                    Text(stringResource(Res.string.block_zone_hint), color = MaterialTheme.colorScheme.primary)
                 }
             }
             HorizontalDivider()
 
             CollapsibleHeader(
-                title = "Zeltvorlagen & Filter (${visiblePresets.size})",
+                title = stringResource(Res.string.presets_title, visiblePresets.size),
                 expanded = showPresetsSection,
                 onToggle = { showPresetsSection = !showPresetsSection },
             )
@@ -204,16 +237,18 @@ internal fun InventoryPane(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
                 ) {
-                    CategoryChip("Alle", categoryFilter == "Alle") { categoryFilter = "Alle" }
-                    CategoryChip("Sonnensegel", categoryFilter == "Sonnensegel") { categoryFilter = "Sonnensegel" }
-                    CategoryChip("Sachsenzelt", categoryFilter == "Sachsenzelt") { categoryFilter = "Sachsenzelt" }
-                    CategoryChip("Rundzelt", categoryFilter == "Rundzelt") { categoryFilter = "Rundzelt" }
-                    CategoryChip("Keilzelt", categoryFilter == "Keilzelt") { categoryFilter = "Keilzelt" }
-                    CategoryChip("Andere", categoryFilter == "Andere") { categoryFilter = "Andere" }
+                    CategoryChip(stringResource(Res.string.cat_all), categoryFilter == "Alle") { categoryFilter = "Alle" }
+                    CategoryChip(stringResource(Res.string.cat_sun_sail), categoryFilter == "Sonnensegel") {
+                        categoryFilter = "Sonnensegel"
+                    }
+                    CategoryChip(stringResource(Res.string.cat_saxon), categoryFilter == "Sachsenzelt") { categoryFilter = "Sachsenzelt" }
+                    CategoryChip(stringResource(Res.string.cat_round), categoryFilter == "Rundzelt") { categoryFilter = "Rundzelt" }
+                    CategoryChip(stringResource(Res.string.cat_wedge), categoryFilter == "Keilzelt") { categoryFilter = "Keilzelt" }
+                    CategoryChip(stringResource(Res.string.cat_other), categoryFilter == "Andere") { categoryFilter = "Andere" }
                 }
                 if (recentPresets.isNotEmpty()) {
                     HorizontalDivider()
-                    Text("Zuletzt verwendet", style = MaterialTheme.typography.titleSmall)
+                    Text(stringResource(Res.string.recently_used), style = MaterialTheme.typography.titleSmall)
                     if (enableFullScroll) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             recentPresets.take(4).forEach { preset ->
@@ -254,14 +289,14 @@ internal fun InventoryPane(
                     value = presetFilter,
                     onValueChange = { presetFilter = it },
                     singleLine = true,
-                    label = { Text("Preset suchen") },
+                    label = { Text(stringResource(Res.string.search_preset)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Text(
                     if (useLongPressDrag) {
-                        "Tipp: Scrollen mit Wisch. Zelt per Long-Press ziehen."
+                        stringResource(Res.string.tip_touch)
                     } else {
-                        "Tipp: Doppelklick auf Zelt = Mehrfachauswahl umschalten"
+                        stringResource(Res.string.tip_desktop)
                     },
                     style = MaterialTheme.typography.bodySmall,
                 )

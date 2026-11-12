@@ -1,6 +1,5 @@
 ﻿package de.voculupo.historicalcamplayout.features.planner.state
 
-import de.voculupo.historicalcamplayout.AssetRope
 import de.voculupo.historicalcamplayout.GeometryEngine
 import de.voculupo.historicalcamplayout.Parcel
 import de.voculupo.historicalcamplayout.PlacedAsset
@@ -20,8 +19,10 @@ internal object PlannerDomainOps {
     ): List<TentPreset> {
         if (stored == null) return defaults
         val byId = stored.associateBy { it.id }.toMutableMap()
+        // Built-in presets win over stale stored copies so fixes reach existing installs;
+        // only presets explicitly marked as user-edited keep their stored version.
         defaults.forEach { preset ->
-            if (preset.id !in byId) byId[preset.id] = preset
+            if (byId[preset.id]?.userModified != true) byId[preset.id] = preset
         }
         return byId.values.sortedBy { it.name }
     }
@@ -33,33 +34,6 @@ internal object PlannerDomainOps {
         return d
     }
 
-    fun hydrateProjectRopes(
-        project: PlannerProject,
-        presets: List<TentPreset>,
-    ): PlannerProject {
-        val byId = presets.associateBy { it.id }
-        return project.copy(
-            assets =
-                project.assets.map { asset ->
-                    if (asset.ropes.isNotEmpty()) {
-                        asset
-                    } else {
-                        val preset = byId[asset.presetId]
-                        val ropes =
-                            preset?.ropeAnchors?.map {
-                                AssetRope(
-                                    localX = it.localX,
-                                    localY = it.localY,
-                                    lengthMeters = it.lengthMeters,
-                                    outwardAngleDeg = it.outwardAngleDeg ?: 0f,
-                                )
-                            } ?: emptyList()
-                        asset.copy(ropes = ropes)
-                    }
-                },
-        )
-    }
-
     fun clampAssetsToParcel(
         project: PlannerProject,
         presetsById: Map<String, TentPreset>,
@@ -68,7 +42,7 @@ internal object PlannerDomainOps {
             assets =
                 project.assets.map { asset ->
                     val preset = presetsById[asset.presetId] ?: return@map asset
-                    asset.copy(position = constrainAssetCenterToParcel(asset.position, preset, project.parcel))
+                    asset.copy(position = constrainAssetCenterToParcel(asset.position, preset, project.parcel, asset.rotationDeg))
                 },
         )
     }
@@ -77,17 +51,27 @@ internal object PlannerDomainOps {
         position: Vec2,
         preset: TentPreset,
         parcel: Parcel,
+        rotationDeg: Float = 0f,
     ): Vec2 {
-        val probe = PlacedAsset(id = "probe", presetId = preset.id, position = position)
+        val probe = PlacedAsset(id = "probe", presetId = preset.id, position = position, rotationDeg = rotationDeg)
         val body = GeometryEngine.assetBodyAabb(probe, preset)
-        val halfW = (body.right - body.left) / 2f
-        val halfH = (body.bottom - body.top) / 2f
-        val minX = halfW
-        val maxX = (parcel.widthMeters - halfW).coerceAtLeast(minX)
-        val minY = halfH
-        val maxY = (parcel.heightMeters - halfH).coerceAtLeast(minY)
-        return Vec2(position.x.coerceIn(minX, maxX), position.y.coerceIn(minY, maxY))
+        return Vec2(
+            position.x + shiftInside(body.left, body.right, parcel.widthMeters),
+            position.y + shiftInside(body.top, body.bottom, parcel.heightMeters),
+        )
     }
+
+    /** Shift that moves the span [low, high] into [0, size]; a span larger than size is aligned to 0. */
+    private fun shiftInside(
+        low: Float,
+        high: Float,
+        size: Float,
+    ): Float =
+        when {
+            low < 0f -> -low
+            high > size -> (size - high).coerceAtLeast(-low)
+            else -> 0f
+        }
 
     fun clampDeltaForAssetsInParcel(
         project: PlannerProject,
@@ -105,23 +89,16 @@ internal object PlannerDomainOps {
             if (asset.id !in assetIds) return@forEach
             val preset = presetsById[asset.presetId] ?: return@forEach
             val body = GeometryEngine.assetBodyAabb(asset, preset)
-            val halfW = (body.right - body.left) / 2f
-            val halfH = (body.bottom - body.top) / 2f
-
-            val localMinDx = halfW - asset.position.x
-            val localMaxDx = project.parcel.widthMeters - halfW - asset.position.x
-            val localMinDy = halfH - asset.position.y
-            val localMaxDy = project.parcel.heightMeters - halfH - asset.position.y
-
-            minDx = maxOf(minDx, localMinDx)
-            maxDx = minOf(maxDx, localMaxDx)
-            minDy = maxOf(minDy, localMinDy)
-            maxDy = minOf(maxDy, localMaxDy)
+            minDx = maxOf(minDx, 0f - body.left)
+            maxDx = minOf(maxDx, project.parcel.widthMeters - body.right)
+            minDy = maxOf(minDy, 0f - body.top)
+            maxDy = minOf(maxDy, project.parcel.heightMeters - body.bottom)
         }
 
+        // min > max when the moved set is larger than the parcel; coerceIn would throw, so align to the top-left.
         return Vec2(
-            x = requestedDelta.x.coerceIn(minDx, maxDx),
-            y = requestedDelta.y.coerceIn(minDy, maxDy),
+            x = if (minDx > maxDx) minDx else requestedDelta.x.coerceIn(minDx, maxDx),
+            y = if (minDy > maxDy) minDy else requestedDelta.y.coerceIn(minDy, maxDy),
         )
     }
 }

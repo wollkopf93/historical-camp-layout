@@ -33,6 +33,44 @@ import androidx.compose.ui.unit.dp
 import de.voculupo.historicalcamplayout.GeometryEngine
 import de.voculupo.historicalcamplayout.PlannerUiState
 import de.voculupo.historicalcamplayout.features.inventory.CollapsibleHeader
+import lagerplaner.composeapp.generated.resources.Res
+import lagerplaner.composeapp.generated.resources.active_rope
+import lagerplaner.composeapp.generated.resources.add_rope
+import lagerplaner.composeapp.generated.resources.anchor_x
+import lagerplaner.composeapp.generated.resources.anchor_y
+import lagerplaner.composeapp.generated.resources.apply_project_name
+import lagerplaner.composeapp.generated.resources.delete
+import lagerplaner.composeapp.generated.resources.duplicate
+import lagerplaner.composeapp.generated.resources.export_file
+import lagerplaner.composeapp.generated.resources.export_png
+import lagerplaner.composeapp.generated.resources.group
+import lagerplaner.composeapp.generated.resources.height_range
+import lagerplaner.composeapp.generated.resources.import_file
+import lagerplaner.composeapp.generated.resources.load
+import lagerplaner.composeapp.generated.resources.lock
+import lagerplaner.composeapp.generated.resources.measurement
+import lagerplaner.composeapp.generated.resources.no_selection
+import lagerplaner.composeapp.generated.resources.project
+import lagerplaner.composeapp.generated.resources.project_name
+import lagerplaner.composeapp.generated.resources.properties
+import lagerplaner.composeapp.generated.resources.redo
+import lagerplaner.composeapp.generated.resources.remove_rope
+import lagerplaner.composeapp.generated.resources.reset_project
+import lagerplaner.composeapp.generated.resources.restore_default_ropes
+import lagerplaner.composeapp.generated.resources.rope_angle
+import lagerplaner.composeapp.generated.resources.rope_length
+import lagerplaner.composeapp.generated.resources.ropes_total
+import lagerplaner.composeapp.generated.resources.rotation_deg
+import lagerplaner.composeapp.generated.resources.save
+import lagerplaner.composeapp.generated.resources.selection_title
+import lagerplaner.composeapp.generated.resources.tent_name
+import lagerplaner.composeapp.generated.resources.tent_name_placeholder
+import lagerplaner.composeapp.generated.resources.toggle_ropes
+import lagerplaner.composeapp.generated.resources.undo
+import lagerplaner.composeapp.generated.resources.ungroup
+import lagerplaner.composeapp.generated.resources.unlock
+import lagerplaner.composeapp.generated.resources.warnings_title
+import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun PropertiesPane(
@@ -49,6 +87,7 @@ internal fun PropertiesPane(
     onLabelChange: (String) -> Unit,
     onRotate: (Float) -> Unit,
     onToggleRopes: () -> Unit,
+    onToggleLock: () -> Unit,
     onAddRope: () -> Unit,
     onRemoveRope: () -> Unit,
     onRestoreDefaultRopes: () -> Unit,
@@ -57,6 +96,7 @@ internal fun PropertiesPane(
     onRopeAngleChange: (Float) -> Unit,
     onRopeAnchorXChange: (Float) -> Unit,
     onRopeAnchorYChange: (Float) -> Unit,
+    onSliderChangeFinished: () -> Unit,
     onGroup: () -> Unit,
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
@@ -95,9 +135,9 @@ internal fun PropertiesPane(
             modifier = paneModifier,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text("Eigenschaften", style = MaterialTheme.typography.titleMedium)
+            Text(stringResource(Res.string.properties), style = MaterialTheme.typography.titleMedium)
             CollapsibleHeader(
-                title = "Projekt",
+                title = stringResource(Res.string.project),
                 expanded = showProjectSection,
                 onToggle = { showProjectSection = !showProjectSection },
             )
@@ -106,30 +146,34 @@ internal fun PropertiesPane(
                     value = projectNameInput,
                     onValueChange = { projectNameInput = it },
                     singleLine = true,
-                    label = { Text("Projektname") },
+                    label = { Text(stringResource(Res.string.project_name)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Button(onClick = { onProjectNameChange(projectNameInput) }, modifier = Modifier.fillMaxWidth()) {
-                    Text("Projektname übernehmen")
+                    Text(stringResource(Res.string.apply_project_name))
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(modifier = Modifier.weight(1f), onClick = onUndo, enabled = state.canUndo) { Text("Rückgängig") }
-                    Button(modifier = Modifier.weight(1f), onClick = onRedo, enabled = state.canRedo) { Text("Wiederholen") }
+                    Button(modifier = Modifier.weight(1f), onClick = onUndo, enabled = state.canUndo) {
+                        Text(stringResource(Res.string.undo))
+                    }
+                    Button(modifier = Modifier.weight(1f), onClick = onRedo, enabled = state.canRedo) {
+                        Text(stringResource(Res.string.redo))
+                    }
                 }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(modifier = Modifier.weight(1f), onClick = onSave) { Text("Speichern") }
-                    Button(modifier = Modifier.weight(1f), onClick = onLoad) { Text("Laden") }
+                    Button(modifier = Modifier.weight(1f), onClick = onSave) { Text(stringResource(Res.string.save)) }
+                    Button(modifier = Modifier.weight(1f), onClick = onLoad) { Text(stringResource(Res.string.load)) }
                 }
-                Button(modifier = Modifier.fillMaxWidth(), onClick = onResetProject) { Text("Projekt zurücksetzen") }
+                Button(modifier = Modifier.fillMaxWidth(), onClick = onResetProject) { Text(stringResource(Res.string.reset_project)) }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(modifier = Modifier.weight(1f), onClick = onExportProjectFile) { Text("Export Datei") }
-                    Button(modifier = Modifier.weight(1f), onClick = onImportProjectFile) { Text("Import Datei") }
+                    Button(modifier = Modifier.weight(1f), onClick = onExportProjectFile) { Text(stringResource(Res.string.export_file)) }
+                    Button(modifier = Modifier.weight(1f), onClick = onImportProjectFile) { Text(stringResource(Res.string.import_file)) }
                 }
-                Button(modifier = Modifier.fillMaxWidth(), onClick = onExportPng) { Text("Export PNG") }
+                Button(modifier = Modifier.fillMaxWidth(), onClick = onExportPng) { Text(stringResource(Res.string.export_png)) }
             }
             HorizontalDivider()
             CollapsibleHeader(
-                title = "Auswahl (${state.selectedAssetIds.size})",
+                title = stringResource(Res.string.selection_title, state.selectedAssetIds.size),
                 expanded = showSelectionSection,
                 onToggle = { showSelectionSection = !showSelectionSection },
             )
@@ -138,24 +182,35 @@ internal fun PropertiesPane(
                     value = selectedAsset.label,
                     onValueChange = onLabelChange,
                     singleLine = true,
-                    label = { Text("Zeltname") },
-                    placeholder = { Text("z.B. Küchenzelt") },
+                    label = { Text(stringResource(Res.string.tent_name)) },
+                    placeholder = { Text(stringResource(Res.string.tent_name_placeholder)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
-                Text("Rotation: ${selectedAsset.rotationDeg.toInt()}°", color = paneTextColor)
+                Text(stringResource(Res.string.rotation_deg, selectedAsset.rotationDeg.toInt()), color = paneTextColor)
                 Slider(
                     value = selectedAsset.rotationDeg,
                     valueRange = 0f..360f,
                     onValueChange = onRotate,
+                    onValueChangeFinished = onSliderChangeFinished,
                 )
-                Text("Höhe: ${selectedAsset.heightRange.minMeters}m - ${selectedAsset.heightRange.maxMeters}m", color = paneTextColor)
-                Button(onClick = onToggleRopes) { Text("Seile an/aus") }
+                val heights = selectedAsset.heightRange
+                Text(
+                    stringResource(Res.string.height_range, heights.minMeters.toString(), heights.maxMeters.toString()),
+                    color = paneTextColor,
+                )
+                Button(onClick = onToggleRopes) { Text(stringResource(Res.string.toggle_ropes)) }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(onClick = onAddRope) { Text("Seil +") }
-                    Button(onClick = onRemoveRope, enabled = selectedAsset.ropes.isNotEmpty()) { Text("Seil -") }
+                    Button(onClick = onAddRope) { Text(stringResource(Res.string.add_rope)) }
+                    Button(onClick = onRemoveRope, enabled = selectedAsset.ropes.isNotEmpty()) {
+                        Text(stringResource(Res.string.remove_rope))
+                    }
                 }
-                Button(onClick = onRestoreDefaultRopes) { Text("Standard-Seile wiederherstellen") }
-                Text("Seile gesamt: ${selectedAsset.ropes.size}", style = MaterialTheme.typography.bodySmall, color = paneMutedTextColor)
+                Button(onClick = onRestoreDefaultRopes) { Text(stringResource(Res.string.restore_default_ropes)) }
+                Text(
+                    stringResource(Res.string.ropes_total, selectedAsset.ropes.size),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = paneMutedTextColor,
+                )
                 if (selectedAsset.ropes.isNotEmpty()) {
                     val ropeIndex = (state.selectedRopeIndex ?: 0).coerceIn(0, selectedAsset.ropes.lastIndex)
                     if (state.selectedRopeIndex == null) {
@@ -163,7 +218,7 @@ internal fun PropertiesPane(
                             currentSelectRopeIndex(ropeIndex)
                         }
                     }
-                    Text("Aktives Seil: #${ropeIndex + 1}", color = paneTextColor)
+                    Text(stringResource(Res.string.active_rope, ropeIndex + 1), color = paneTextColor)
                     Slider(
                         value = ropeIndex.toFloat(),
                         valueRange = 0f..selectedAsset.ropes.lastIndex.toFloat(),
@@ -172,7 +227,7 @@ internal fun PropertiesPane(
                 }
                 if (selectedRope != null) {
                     Text(
-                        "Länge: ${"%.2f".format(selectedRope.lengthMeters)} m",
+                        stringResource(Res.string.rope_length, "%.2f".format(selectedRope.lengthMeters)),
                         style = MaterialTheme.typography.bodySmall,
                         color = paneMutedTextColor,
                     )
@@ -180,9 +235,10 @@ internal fun PropertiesPane(
                         value = selectedRope.lengthMeters,
                         valueRange = 0.3f..6.0f,
                         onValueChange = onRopeScaleChange,
+                        onValueChangeFinished = onSliderChangeFinished,
                     )
                     Text(
-                        "Winkel: ${selectedRope.outwardAngleDeg.toInt()}°",
+                        stringResource(Res.string.rope_angle, selectedRope.outwardAngleDeg.toInt()),
                         style = MaterialTheme.typography.bodySmall,
                         color = paneMutedTextColor,
                     )
@@ -190,9 +246,10 @@ internal fun PropertiesPane(
                         value = selectedRope.outwardAngleDeg,
                         valueRange = -180f..180f,
                         onValueChange = onRopeAngleChange,
+                        onValueChangeFinished = onSliderChangeFinished,
                     )
                     Text(
-                        "Anker X: ${"%.2f".format(selectedRope.localX)} m",
+                        stringResource(Res.string.anchor_x, "%.2f".format(selectedRope.localX)),
                         style = MaterialTheme.typography.bodySmall,
                         color = paneMutedTextColor,
                     )
@@ -200,9 +257,10 @@ internal fun PropertiesPane(
                         value = selectedRope.localX,
                         valueRange = -6f..6f,
                         onValueChange = onRopeAnchorXChange,
+                        onValueChangeFinished = onSliderChangeFinished,
                     )
                     Text(
-                        "Anker Y: ${"%.2f".format(selectedRope.localY)} m",
+                        stringResource(Res.string.anchor_y, "%.2f".format(selectedRope.localY)),
                         style = MaterialTheme.typography.bodySmall,
                         color = paneMutedTextColor,
                     )
@@ -210,33 +268,41 @@ internal fun PropertiesPane(
                         value = selectedRope.localY,
                         valueRange = -6f..6f,
                         onValueChange = onRopeAnchorYChange,
+                        onValueChangeFinished = onSliderChangeFinished,
                     )
                 }
             } else if (showSelectionSection) {
                 Text(
-                    "Kein Zelt ausgewählt.\nKlicke ein Zelt an oder wähle im Place-Modus ein Preset und setze es auf die Fläche.",
+                    stringResource(Res.string.no_selection),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Button(onClick = onGroup, enabled = state.selectedAssetIds.size > 1) { Text("Gruppieren") }
-                Button(onClick = onUngroup, enabled = state.selectedAssetIds.isNotEmpty()) { Text("Ungruppieren") }
+                Button(onClick = onGroup, enabled = state.selectedAssetIds.size > 1) { Text(stringResource(Res.string.group)) }
+                Button(onClick = onUngroup, enabled = state.selectedAssetIds.isNotEmpty()) { Text(stringResource(Res.string.ungroup)) }
             }
-            Button(onClick = onDuplicate, enabled = state.selectedAssetIds.isNotEmpty()) {
-                Text("Duplizieren")
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                Button(onClick = onDuplicate, enabled = state.selectedAssetIds.isNotEmpty()) {
+                    Text(stringResource(Res.string.duplicate))
+                }
+                val selectedAssets = state.project.assets.filter { it.id in state.selectedAssetIds }
+                val allLocked = selectedAssets.isNotEmpty() && selectedAssets.all { it.isLocked }
+                Button(onClick = onToggleLock, enabled = state.selectedAssetIds.isNotEmpty()) {
+                    Text(stringResource(if (allLocked) Res.string.unlock else Res.string.lock))
+                }
             }
             Button(onClick = onDelete, enabled = state.selectedAssetIds.isNotEmpty()) {
-                Text("Löschen")
+                Text(stringResource(Res.string.delete))
             }
             if (state.measurementStart != null && state.measurementEnd != null) {
                 val dist = GeometryEngine.distance(state.measurementStart, state.measurementEnd)
-                Text("Messung: ${"%.2f".format(dist)} m", color = paneTextColor)
+                Text(stringResource(Res.string.measurement, "%.2f".format(dist)), color = paneTextColor)
             }
             if (state.warnings.isNotEmpty()) {
                 HorizontalDivider()
                 CollapsibleHeader(
-                    title = "Warnungen (${state.warnings.size})",
+                    title = stringResource(Res.string.warnings_title, state.warnings.size),
                     expanded = showWarningsSection,
                     onToggle = { showWarningsSection = !showWarningsSection },
                 )

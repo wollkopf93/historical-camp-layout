@@ -3,6 +3,7 @@
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Path
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
 import kotlin.math.max
@@ -20,9 +21,24 @@ data class CollisionReport(
     val hardCollisions: Set<String> = emptySet(),
     val warningCollisions: Set<String> = emptySet(),
     val messages: List<String> = emptyList(),
+    /** Rope indices per asset id that are hidden because two sun sails are joined along that edge. */
+    val hiddenRopeIndices: Map<String, Set<Int>> = emptyMap(),
 )
 
 object GeometryEngine {
+    private const val JOIN_MAX_EDGE_DISTANCE = 0.28f
+    private const val JOIN_MIN_OVERLAP_FRACTION = 0.28f
+
+    fun degToRad(deg: Float): Double = deg.toDouble() * PI / 180.0
+
+    fun radToDeg(rad: Double): Float = (rad * 180.0 / PI).toFloat()
+
+    private data class WorldEdge(
+        val index: Int,
+        val start: Vec2,
+        val end: Vec2,
+    )
+
     private data class AssetGeometry(
         val asset: PlacedAsset,
         val preset: TentPreset,
@@ -40,7 +56,7 @@ object GeometryEngine {
             TentShapeType.CIRCLE -> {
                 val r = preset.widthMeters / 2f
                 (0 until 8).map { i ->
-                    val a = i * (2f * Math.PI.toFloat() / 8f)
+                    val a = i * (2f * PI.toFloat() / 8f)
                     Vec2(cos(a) * r, sin(a) * r)
                 }
             }
@@ -103,25 +119,62 @@ object GeometryEngine {
         return slots.minByOrNull { slot -> distance(slot, local) } ?: local
     }
 
+    private fun buildGeometries(
+        project: PlannerProject,
+        presets: List<TentPreset>,
+    ): List<AssetGeometry> {
+        val byId = presets.associateBy { it.id }
+        return project.assets.mapNotNull { asset ->
+            val preset = byId[asset.presetId] ?: return@mapNotNull null
+            AssetGeometry(
+                asset = asset,
+                preset = preset,
+                bodyAabb = assetBodyAabb(asset, preset),
+                paddedAabb = assetAabb(asset, preset),
+                bodyPath = assetWorldPath(asset, preset),
+            )
+        }
+    }
+
+    /**
+     * Ropes that disappear because two sun sails share an edge (laced together instead of staked).
+     * Derived from current geometry on every call, so moving a sail away restores its ropes automatically.
+     */
+    fun joinHiddenRopeIndices(
+        project: PlannerProject,
+        presets: List<TentPreset>,
+    ): Map<String, Set<Int>> = joinHiddenRopeIndices(buildGeometries(project, presets))
+
+    private fun joinHiddenRopeIndices(geometries: List<AssetGeometry>): Map<String, Set<Int>> {
+        val sails = geometries.filter { isSunSailPreset(it.preset) }
+        val hidden = mutableMapOf<String, MutableSet<Int>>()
+        for (i in sails.indices) {
+            for (j in i + 1 until sails.size) {
+                val a = sails[i]
+                val b = sails[j]
+                joinedEdgePairs(a, b).forEach { (edgeA, edgeB) ->
+                    hidden.getOrPut(a.asset.id) { mutableSetOf() } += ropeIndicesNearWorldEdge(a.asset, a.preset, edgeA)
+                    hidden.getOrPut(b.asset.id) { mutableSetOf() } += ropeIndicesNearWorldEdge(b.asset, b.preset, edgeB)
+                }
+            }
+        }
+        return hidden.filterValues { it.isNotEmpty() }
+    }
+
+    /** Rope segments of [asset] without the ones listed in [hidden], keeping each rope's original index. */
+    fun visibleRopeSegments(
+        asset: PlacedAsset,
+        hidden: Set<Int>,
+    ): List<IndexedValue<RopeSegment>> = ropeSegments(asset).withIndex().filterNot { it.index in hidden }
+
     fun evaluate(
         project: PlannerProject,
         presets: List<TentPreset>,
     ): CollisionReport {
-        val byId = presets.associateBy { it.id }
         val hard = mutableSetOf<String>()
         val warn = mutableSetOf<String>()
         val messages = mutableListOf<String>()
-        val geometries =
-            project.assets.mapNotNull { asset ->
-                val preset = byId[asset.presetId] ?: return@mapNotNull null
-                AssetGeometry(
-                    asset = asset,
-                    preset = preset,
-                    bodyAabb = assetBodyAabb(asset, preset),
-                    paddedAabb = assetAabb(asset, preset),
-                    bodyPath = assetWorldPath(asset, preset),
-                )
-            }
+        val geometries = buildGeometries(project, presets)
 
         geometries.forEach { geo ->
             // Parcel border warnings should refer to the physical tent footprint,
@@ -137,16 +190,26 @@ object GeometryEngine {
             }
         }
 
+        val hiddenRopes = joinHiddenRopeIndices(geometries)
+
         for (i in geometries.indices) {
             for (j in i + 1 until geometries.size) {
                 val a = geometries[i]
                 val b = geometries[j]
+                val bothSunSails = isSunSailPreset(a.preset) && isSunSailPreset(b.preset)
+                if (bothSunSails && joinedEdgePairs(a, b).isNotEmpty()) {
+                    continue
+                }
                 val distance = aabbDistanceMeters(a.paddedAabb, b.paddedAabb)
-                if (isHardCollision(a, b)) {
+                if (bothSunSails && aabbOverlap(a.bodyAabb, b.bodyAabb) && CollisionEngine.pathsIntersect(a.bodyPath, b.bodyPath)) {
+                    warn += a.asset.id
+                    warn += b.asset.id
+                    messages += "Sonnensegel überlappen: ${a.preset.name} und ${b.preset.name}."
+                } else if (isHardCollision(a, b)) {
                     hard += a.asset.id
                     hard += b.asset.id
                     messages += "Harte Kollision zwischen ${a.preset.name} und ${b.preset.name}."
-                } else if (isRopeIntrusionCollision(a.asset, a.preset, b.asset, b.preset)) {
+                } else if (isRopeIntrusionCollision(a, b, hiddenRopes)) {
                     hard += a.asset.id
                     hard += b.asset.id
                     messages += "Seil-Kollision: Seil ragt in ${a.preset.name} oder ${b.preset.name}."
@@ -162,7 +225,7 @@ object GeometryEngine {
             if (zone.points.size < 3) return@forEach
             val zonePolygon = zone.points
             geometries.forEach { geo ->
-                val assetPolygon = assetWorldOutlinePoints(geo.asset, geo.preset)
+                val assetPolygon = assetWorldOutline(geo.asset, geo.preset)
                 if (polygonsIntersect(assetPolygon, zonePolygon)) {
                     hard += geo.asset.id
                     messages += "Sperrzone verletzt: ${geo.preset.name} liegt in einer Sperrzone."
@@ -170,7 +233,7 @@ object GeometryEngine {
             }
         }
 
-        return CollisionReport(hard, warn, messages.distinct())
+        return CollisionReport(hard, warn, messages.distinct(), hiddenRopes)
     }
 
     fun metersToOffset(
@@ -187,7 +250,7 @@ object GeometryEngine {
         local: Vec2,
         rotationDeg: Float,
     ): Vec2 {
-        val rad = Math.toRadians(rotationDeg.toDouble())
+        val rad = degToRad(rotationDeg)
         val cos = cos(rad).toFloat()
         val sin = sin(rad).toFloat()
         return Vec2(
@@ -204,6 +267,12 @@ object GeometryEngine {
         return Vec2(asset.position.x + r.x, asset.position.y + r.y)
     }
 
+    /** Inverse of [worldPoint]: world coordinates into the asset's local (unrotated) frame. */
+    fun localPoint(
+        asset: PlacedAsset,
+        world: Vec2,
+    ): Vec2 = rotatePoint(Vec2(world.x - asset.position.x, world.y - asset.position.y), -asset.rotationDeg)
+
     /**
      * Precise hit test for rotated assets.
      * Transforms world point into asset local-space, then runs point-in-polygon.
@@ -213,18 +282,7 @@ object GeometryEngine {
         asset: PlacedAsset,
         preset: TentPreset,
     ): Boolean {
-        val translatedX = worldPoint.x - asset.position.x
-        val translatedY = worldPoint.y - asset.position.y
-
-        val rad = Math.toRadians((-asset.rotationDeg).toDouble())
-        val c = cos(rad).toFloat()
-        val s = sin(rad).toFloat()
-        val localPoint =
-            Vec2(
-                x = translatedX * c - translatedY * s,
-                y = translatedX * s + translatedY * c,
-            )
-
+        val localPoint = localPoint(asset, worldPoint)
         val outline = localOutlinePoints(preset)
         if (outline.isEmpty()) return false
 
@@ -243,25 +301,10 @@ object GeometryEngine {
         return inside
     }
 
-    fun ropeSegments(
-        asset: PlacedAsset,
-        preset: TentPreset,
-    ): List<RopeSegment> {
+    fun ropeSegments(asset: PlacedAsset): List<RopeSegment> {
+        // No fallback to preset ropes: an empty list means the user removed them all.
         if (!asset.showRopes) return emptyList()
-        val ropes =
-            if (asset.ropes.isEmpty()) {
-                preset.ropeAnchors.map {
-                    AssetRope(
-                        localX = it.localX,
-                        localY = it.localY,
-                        lengthMeters = it.lengthMeters,
-                        outwardAngleDeg = it.outwardAngleDeg ?: 0f,
-                    )
-                }
-            } else {
-                asset.ropes
-            }
-        return ropes.map { rope ->
+        return asset.ropes.map { rope ->
             val localStart = Vec2(rope.localX, rope.localY)
             val start = worldPoint(asset, localStart)
             val normal = anchorDirection(asset, localStart, rope.outwardAngleDeg)
@@ -274,33 +317,61 @@ object GeometryEngine {
         }
     }
 
+    fun isSunSailPreset(preset: TentPreset): Boolean = preset.isSunSail || preset.id.startsWith("sun_sail_")
+
+    /** Position that lines [movingAsset] up edge-to-edge with [targetAsset], or null if no edge pair is close enough. */
+    fun snapSunSailToNeighbor(
+        movingAsset: PlacedAsset,
+        movingPreset: TentPreset,
+        targetAsset: PlacedAsset,
+        targetPreset: TentPreset,
+        snapDistanceMeters: Float = 0.45f,
+    ): Vec2? {
+        if (!isSunSailPreset(movingPreset) || !isSunSailPreset(targetPreset)) return null
+        val movingLocal = localOutlinePoints(movingPreset)
+        val targetLocal = localOutlinePoints(targetPreset)
+        if (movingLocal.size < 3 || targetLocal.size < 3) return null
+        val movingEdges = worldEdges(movingAsset, movingLocal)
+        val targetEdges = worldEdges(targetAsset, targetLocal)
+
+        var best: Vec2? = null
+        var bestScore = Float.POSITIVE_INFINITY
+        movingEdges.forEach { movingEdge ->
+            targetEdges.forEach { targetEdge ->
+                val candidate =
+                    edgeSnapCandidate(
+                        movingAsset = movingAsset,
+                        movingEdge = movingEdge,
+                        targetEdge = targetEdge,
+                        snapDistanceMeters = snapDistanceMeters,
+                    ) ?: return@forEach
+                if (candidate.first < bestScore) {
+                    bestScore = candidate.first
+                    best = candidate.second
+                }
+            }
+        }
+        return best
+    }
+
     fun assetBodyAabb(
         asset: PlacedAsset,
         preset: TentPreset,
     ): Rect {
-        val (halfW, halfH) = bodyHalfExtents(preset)
+        // Built from the rotated world outline: outlines can be off-center (Saxon tents) and assets rotated.
+        val points = assetWorldOutline(asset, preset)
         return Rect(
-            left = asset.position.x - halfW,
-            top = asset.position.y - halfH,
-            right = asset.position.x + halfW,
-            bottom = asset.position.y + halfH,
+            left = points.minOf { it.x },
+            top = points.minOf { it.y },
+            right = points.maxOf { it.x },
+            bottom = points.maxOf { it.y },
         )
     }
 
     fun assetAabb(
         asset: PlacedAsset,
         preset: TentPreset,
-    ): Rect {
-        val (baseHalfW, baseHalfH) = bodyHalfExtents(preset)
-        val halfW = baseHalfW + asset.safetyMarginMeters
-        val halfH = baseHalfH + asset.safetyMarginMeters
-        return Rect(
-            left = asset.position.x - halfW,
-            top = asset.position.y - halfH,
-            right = asset.position.x + halfW,
-            bottom = asset.position.y + halfH,
-        )
-    }
+    ): Rect = assetBodyAabb(asset, preset).inflate(asset.safetyMarginMeters)
 
     fun snapToGrid(
         point: Vec2,
@@ -326,9 +397,14 @@ object GeometryEngine {
         a: AssetGeometry,
         b: AssetGeometry,
     ): Boolean {
+        // Sun sails are intentionally combinable; body-body overlap between two sun sails
+        // must not be treated as hard collision.
+        if (isSunSailPreset(a.preset) && isSunSailPreset(b.preset)) return false
         if (!heightOverlaps(a.asset.heightRange, b.asset.heightRange)) return false
         if (!aabbOverlap(a.bodyAabb, b.bodyAabb)) return false
-        return CollisionEngine.isColliding(a.asset, b.asset, a.bodyPath, b.bodyPath)
+        val colliding = CollisionEngine.isColliding(a.asset, b.asset, a.bodyPath, b.bodyPath)
+        if (!colliding) return false
+        return true
     }
 
     /**
@@ -341,16 +417,24 @@ object GeometryEngine {
      *   ground ropes when heights do not overlap.
      */
     private fun isRopeIntrusionCollision(
-        a: PlacedAsset,
-        presetA: TentPreset,
-        b: PlacedAsset,
-        presetB: TentPreset,
+        geoA: AssetGeometry,
+        geoB: AssetGeometry,
+        hiddenRopes: Map<String, Set<Int>>,
     ): Boolean {
-        val ropesA = ropeSegments(a, presetA)
-        val ropesB = ropeSegments(b, presetB)
+        val a = geoA.asset
+        val presetA = geoA.preset
+        val b = geoB.asset
+        val presetB = geoB.preset
+        // Sun sails can be combined in different configurations. Their ropes should not
+        // generate hard rope-collision warnings against other sun sail bodies.
+        if (isSunSailPreset(presetA) && isSunSailPreset(presetB)) {
+            return false
+        }
+        val ropesA = visibleRopeSegments(a, hiddenRopes[a.id].orEmpty()).map { it.value }
+        val ropesB = visibleRopeSegments(b, hiddenRopes[b.id].orEmpty()).map { it.value }
 
-        val bodyPolyA = assetWorldOutlinePoints(a, presetA)
-        val bodyPolyB = assetWorldOutlinePoints(b, presetB)
+        val bodyPolyA = assetWorldOutline(a, presetA)
+        val bodyPolyB = assetWorldOutline(b, presetB)
 
         val ropeAIntoBodyB =
             ropesA.any { lineIntersectsPolygon(it, bodyPolyB) } &&
@@ -360,8 +444,6 @@ object GeometryEngine {
                 heightOverlaps(heightRangeForRopeOwnerVsOtherBody(b, presetB), a.heightRange)
         return ropeAIntoBodyB || ropeBIntoBodyA
     }
-
-    private fun isSunSailPreset(preset: TentPreset): Boolean = preset.id.startsWith("sun_sail_")
 
     /**
      * Vertical span used when this asset's *ropes* are tested against another asset's body.
@@ -440,27 +522,190 @@ object GeometryEngine {
         return Vec2(v.x / len, v.y / len)
     }
 
+    fun areSunSailsJoinedByEdge(
+        a: PlacedAsset,
+        presetA: TentPreset,
+        b: PlacedAsset,
+        presetB: TentPreset,
+    ): Boolean = joinedEdgePairs(a, presetA, b, presetB).isNotEmpty()
+
+    private fun joinedEdgePairs(
+        a: AssetGeometry,
+        b: AssetGeometry,
+    ): List<Pair<Int, Int>> {
+        // Cheap reject first: joined edges lie within the join tolerance of each other.
+        if (aabbDistanceMeters(a.bodyAabb, b.bodyAabb) > JOIN_MAX_EDGE_DISTANCE) return emptyList()
+        return joinedEdgePairs(a.asset, a.preset, b.asset, b.preset)
+    }
+
+    /** Index pairs (edge of a, edge of b) where the two sun sails touch along a shared edge. */
+    private fun joinedEdgePairs(
+        a: PlacedAsset,
+        presetA: TentPreset,
+        b: PlacedAsset,
+        presetB: TentPreset,
+    ): List<Pair<Int, Int>> {
+        val aLocal = localOutlinePoints(presetA)
+        val bLocal = localOutlinePoints(presetB)
+        if (aLocal.size < 3 || bLocal.size < 3) return emptyList()
+        val aEdges = worldEdges(a, aLocal)
+        val bEdges = worldEdges(b, bLocal)
+        return aEdges.flatMap { edgeA ->
+            bEdges
+                .filter { edgeB -> areEdgesJoined(edgeA, edgeB, JOIN_MAX_EDGE_DISTANCE, JOIN_MIN_OVERLAP_FRACTION) }
+                .map { edgeB -> edgeA.index to edgeB.index }
+        }
+    }
+
+    private fun worldEdges(
+        asset: PlacedAsset,
+        localPoints: List<Vec2>,
+    ): List<WorldEdge> =
+        localPoints.indices.map { idx ->
+            WorldEdge(
+                index = idx,
+                start = worldPoint(asset, localPoints[idx]),
+                end = worldPoint(asset, localPoints[(idx + 1) % localPoints.size]),
+            )
+        }
+
+    private fun edgeSnapCandidate(
+        movingAsset: PlacedAsset,
+        movingEdge: WorldEdge,
+        targetEdge: WorldEdge,
+        snapDistanceMeters: Float,
+    ): Pair<Float, Vec2>? {
+        if (!areEdgesDirectionCompatible(movingEdge, targetEdge)) return null
+        // Only edges that are already close may snap; otherwise any sail would jump onto any other sail's edge.
+        if (lineDistanceScore(movingEdge, targetEdge) > snapDistanceMeters) return null
+        val translateA = Vec2(targetEdge.end.x - movingEdge.start.x, targetEdge.end.y - movingEdge.start.y)
+        val translateB = Vec2(targetEdge.start.x - movingEdge.end.x, targetEdge.start.y - movingEdge.end.y)
+        val translation = Vec2((translateA.x + translateB.x) / 2f, (translateA.y + translateB.y) / 2f)
+        val movedEdge =
+            WorldEdge(
+                index = movingEdge.index,
+                start = Vec2(movingEdge.start.x + translation.x, movingEdge.start.y + translation.y),
+                end = Vec2(movingEdge.end.x + translation.x, movingEdge.end.y + translation.y),
+            )
+        if (!areEdgesJoined(movedEdge, targetEdge, snapDistanceMeters, 0.55f)) return null
+        // Prefer the snap that moves the sail least.
+        val score = sqrt(translation.x * translation.x + translation.y * translation.y)
+        return score to Vec2(movingAsset.position.x + translation.x, movingAsset.position.y + translation.y)
+    }
+
+    private fun areEdgesDirectionCompatible(
+        a: WorldEdge,
+        b: WorldEdge,
+    ): Boolean {
+        val aDir = normalize(Vec2(a.end.x - a.start.x, a.end.y - a.start.y))
+        val bDir = normalize(Vec2(b.end.x - b.start.x, b.end.y - b.start.y))
+        val dot = aDir.x * bDir.x + aDir.y * bDir.y
+        return abs(dot) > 0.94f
+    }
+
+    private fun areEdgesJoined(
+        a: WorldEdge,
+        b: WorldEdge,
+        maxEdgeDistance: Float,
+        minOverlapFraction: Float,
+    ): Boolean {
+        val distance = lineDistanceScore(a, b)
+        if (distance > maxEdgeDistance) return false
+        val midpointDistance =
+            pointToSegmentDistance(
+                point = Vec2((a.start.x + a.end.x) / 2f, (a.start.y + a.end.y) / 2f),
+                segStart = b.start,
+                segEnd = b.end,
+            )
+        if (midpointDistance > maxEdgeDistance * 1.6f) return false
+        val overlap = edgeOverlapFraction(a, b)
+        return overlap >= minOverlapFraction
+    }
+
+    private fun lineDistanceScore(
+        a: WorldEdge,
+        b: WorldEdge,
+    ): Float {
+        val d1 = distance(a.start, b.end)
+        val d2 = distance(a.end, b.start)
+        return (d1 + d2) / 2f
+    }
+
+    private fun edgeOverlapFraction(
+        a: WorldEdge,
+        b: WorldEdge,
+    ): Float {
+        val axis = normalize(Vec2(b.end.x - b.start.x, b.end.y - b.start.y))
+        val aProj = projectRangeOntoAxis(a.start, a.end, axis)
+        val bProj = projectRangeOntoAxis(b.start, b.end, axis)
+        val overlapStart = max(aProj.first, bProj.first)
+        val overlapEnd = min(aProj.second, bProj.second)
+        val overlap = (overlapEnd - overlapStart).coerceAtLeast(0f)
+        val minLength = min(aProj.second - aProj.first, bProj.second - bProj.first).coerceAtLeast(0.001f)
+        return (overlap / minLength).coerceIn(0f, 1f)
+    }
+
+    private fun projectRangeOntoAxis(
+        a: Vec2,
+        b: Vec2,
+        axis: Vec2,
+    ): Pair<Float, Float> {
+        val pa = a.x * axis.x + a.y * axis.y
+        val pb = b.x * axis.x + b.y * axis.y
+        return min(pa, pb) to max(pa, pb)
+    }
+
+    private fun pointToSegmentDistance(
+        point: Vec2,
+        segStart: Vec2,
+        segEnd: Vec2,
+    ): Float {
+        val vx = segEnd.x - segStart.x
+        val vy = segEnd.y - segStart.y
+        val wx = point.x - segStart.x
+        val wy = point.y - segStart.y
+        val vv = (vx * vx + vy * vy).coerceAtLeast(0.0001f)
+        val t = ((wx * vx + wy * vy) / vv).coerceIn(0f, 1f)
+        val projX = segStart.x + t * vx
+        val projY = segStart.y + t * vy
+        val dx = point.x - projX
+        val dy = point.y - projY
+        return sqrt(dx * dx + dy * dy)
+    }
+
+    private fun ropeIndicesNearWorldEdge(
+        asset: PlacedAsset,
+        preset: TentPreset,
+        edgeIndex: Int,
+    ): Set<Int> {
+        if (asset.ropes.isEmpty()) return emptySet()
+        val localPoints = localOutlinePoints(preset)
+        if (localPoints.size < 2) return emptySet()
+        val start = worldPoint(asset, localPoints[edgeIndex])
+        val end = worldPoint(asset, localPoints[(edgeIndex + 1) % localPoints.size])
+        val edgeVec = Vec2(end.x - start.x, end.y - start.y)
+        val edgeLength = sqrt(edgeVec.x * edgeVec.x + edgeVec.y * edgeVec.y).coerceAtLeast(0.001f)
+        return asset.ropes.indices.filterTo(mutableSetOf()) { idx ->
+            val rope = asset.ropes[idx]
+            val anchor = worldPoint(asset, Vec2(rope.localX, rope.localY))
+            val distanceToLine = abs((anchor.x - start.x) * edgeVec.y - (anchor.y - start.y) * edgeVec.x) / edgeLength
+            if (distanceToLine > 0.18f) return@filterTo false
+            val projection = ((anchor.x - start.x) * edgeVec.x + (anchor.y - start.y) * edgeVec.y) / (edgeLength * edgeLength)
+            projection in -0.1f..1.1f
+        }
+    }
+
     private fun anchorDirection(
         asset: PlacedAsset,
         localStart: Vec2,
         outwardAngleDeg: Float,
     ): Vec2 {
-        val absolute = Math.toRadians((asset.rotationDeg + outwardAngleDeg).toDouble())
+        val absolute = degToRad(asset.rotationDeg + outwardAngleDeg)
         val configured = Vec2(cos(absolute).toFloat(), sin(absolute).toFloat())
         if (configured.x == 0f && configured.y == 0f) {
             return normalize(rotatePoint(localStart, asset.rotationDeg))
         }
         return configured
-    }
-
-    private fun bodyHalfExtents(preset: TentPreset): Pair<Float, Float> {
-        val points = localOutlinePoints(preset)
-        if (points.isEmpty()) return (preset.widthMeters / 2f) to (preset.heightMeters / 2f)
-        val minX = points.minOf { it.x }
-        val maxX = points.maxOf { it.x }
-        val minY = points.minOf { it.y }
-        val maxY = points.maxOf { it.y }
-        return ((maxX - minX) / 2f) to ((maxY - minY) / 2f)
     }
 
     private fun localOutlinePoints(preset: TentPreset): List<Vec2> {
@@ -499,7 +744,7 @@ object GeometryEngine {
         }
     }
 
-    private fun assetWorldOutlinePoints(
+    fun assetWorldOutline(
         asset: PlacedAsset,
         preset: TentPreset,
     ): List<Vec2> {
