@@ -8,6 +8,9 @@ This is a Kotlin Multiplatform project targeting Android, Desktop (JVM).
     the [iosMain](./composeApp/src/iosMain/kotlin) folder would be the right place for such calls.
     Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./composeApp/src/jvmMain/kotlin)
     folder is the appropriate location.
+* [/androidApp](./androidApp/src/main) is the thin Android app shell (`MainActivity`, manifest, launcher icons, theme).
+  AGP 9 no longer allows the Android application plugin in a Kotlin Multiplatform module, so `composeApp`
+  is an Android library and `androidApp` packages it into the installable app.
 
 ### Build and Run Android Application
 
@@ -15,11 +18,11 @@ To build and run the development version of the Android app, use the run configu
 in your IDE’s toolbar or build it directly from the terminal:
 - on macOS/Linux
   ```shell
-  ./gradlew :composeApp:assembleDebug
+  ./gradlew :androidApp:assembleDebug
   ```
 - on Windows
   ```shell
-  .\gradlew.bat :composeApp:assembleDebug
+  .\gradlew.bat :androidApp:assembleDebug
   ```
 
 ### Build and Run Desktop (JVM) Application
