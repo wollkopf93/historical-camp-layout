@@ -66,4 +66,20 @@
     <string name="toggle_theme">Toggle light/dark</string>
     <string name="warnings">Warnings</string>
     <string name="edit_selection">Edit selection</string>
+    <string name="auto_setup">Auto setup camp</string>
+    <string name="auto_setup_tents">Tents</string>
+    <string name="auto_setup_sails">Sun sails</string>
+    <string name="auto_setup_visitor_side">Visitor side</string>
+    <string name="side_top">Top</string>
+    <string name="side_right">Right</string>
+    <string name="side_bottom">Bottom</string>
+    <string name="side_left">Left</string>
+    <string name="auto_setup_shape">Tent arrangement</string>
+    <string name="shape_horseshoe">Horseshoe</string>
+    <string name="shape_full_circle">Full circle</string>
+    <string name="shape_half_circle">Half circle</string>
+    <string name="auto_setup_join_sails">Join sun sails into one area</string>
+    <string name="auto_setup_replace">Replace current layout</string>
+    <string name="auto_setup_generate">Generate</string>
+    <string name="cancel">Cancel</string>
 </resources>

@@ -66,4 +66,20 @@
     <string name="toggle_theme">Hell/Dunkel umschalten</string>
     <string name="warnings">Warnungen</string>
     <string name="edit_selection">Auswahl bearbeiten</string>
+    <string name="auto_setup">Lager automatisch aufbauen</string>
+    <string name="auto_setup_tents">Zelte</string>
+    <string name="auto_setup_sails">Sonnensegel</string>
+    <string name="auto_setup_visitor_side">Besucherseite</string>
+    <string name="side_top">Oben</string>
+    <string name="side_right">Rechts</string>
+    <string name="side_bottom">Unten</string>
+    <string name="side_left">Links</string>
+    <string name="auto_setup_shape">Anordnung der Zelte</string>
+    <string name="shape_horseshoe">Hufeisen</string>
+    <string name="shape_full_circle">Vollkreis</string>
+    <string name="shape_half_circle">Halbkreis</string>
+    <string name="auto_setup_join_sails">Sonnensegel zu einer Fläche verbinden</string>
+    <string name="auto_setup_replace">Aktuelles Lager ersetzen</string>
+    <string name="auto_setup_generate">Erzeugen</string>
+    <string name="cancel">Abbrechen</string>
 </resources>

@@ -1,6 +1,8 @@
 package de.voculupo.historicalcamplayout
 
+import de.voculupo.historicalcamplayout.features.planner.state.AutoSetupRequest
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
+import de.voculupo.historicalcamplayout.features.planner.state.VisitorSide
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -115,5 +117,27 @@ class PlannerViewModelScenarioTest {
 
         val moved = assertNotNull(vm.assets().lastOrNull())
         assertEquals(Vec2(15f, 10f), moved.position)
+    }
+
+    @Test
+    fun autoSetup_replacesLayoutAsOneUndoStep() {
+        val vm = PlannerViewModel(InMemoryStorage())
+        vm.placePresetAt("round_4", Vec2(5f, 5f))
+        val request =
+            AutoSetupRequest(Parcel(60f, 50f), List(6) { "saxon_2x4" }, listOf("sun_sail_6x6_flat"), VisitorSide.BOTTOM)
+
+        vm.autoSetup(request)
+        assertEquals(7, vm.assets().size)
+        assertTrue(
+            vm.uiState.value.hardCollisionAssetIds
+                .isEmpty(),
+        )
+
+        vm.autoSetup(request.copy(replaceExisting = false))
+        assertEquals(14, vm.assets().size, "add mode keeps the previous draft")
+
+        vm.undo()
+        vm.undo()
+        assertEquals("round_4", vm.assets().single().presetId, "undo restores the hand-made layout")
     }
 }

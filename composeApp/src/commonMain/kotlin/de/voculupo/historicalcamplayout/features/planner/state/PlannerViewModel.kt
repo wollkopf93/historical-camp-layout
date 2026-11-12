@@ -248,6 +248,17 @@ class PlannerViewModel(
         setZoomLive(DEFAULT_PIXELS_PER_METER)
     }
 
+    /** Generates a camp draft (see [AutoLayout]); one undo step, block zones are kept. */
+    fun autoSetup(request: AutoSetupRequest) {
+        val presetsById = _uiState.value.presets.associateBy { it.id }
+        val generated = AutoLayout.generate(request, presetsById) { newId(it) }
+        // shortcut: "add" mode does not route around existing assets; collision warnings flag overlaps. Upgrade if "add" gets used.
+        mutateProject {
+            copy(parcel = request.parcel, assets = if (request.replaceExisting) generated else assets + generated)
+        }
+        _uiState.update { it.copy(selectedAssetIds = emptySet(), selectedRopeIndex = null) }
+    }
+
     fun resetProject() {
         val fresh = PlannerProject()
         _uiState.update {
@@ -717,15 +728,7 @@ class PlannerViewModel(
 
     private fun firstSelectedAsset(state: PlannerUiState): PlacedAsset? = state.project.assets.firstOrNull { it.id in state.selectedAssetIds }
 
-    private fun defaultRopes(preset: TentPreset): List<AssetRope> =
-        preset.ropeAnchors.map { anchor ->
-            AssetRope(
-                localX = anchor.localX,
-                localY = anchor.localY,
-                lengthMeters = anchor.lengthMeters,
-                outwardAngleDeg = anchor.outwardAngleDeg ?: 0f,
-            )
-        }
+    private fun defaultRopes(preset: TentPreset): List<AssetRope> = PlannerDomainOps.defaultRopes(preset)
 
     private fun newId(prefix: String = ""): String = prefix + Random.nextLong().toULong().toString(36)
 

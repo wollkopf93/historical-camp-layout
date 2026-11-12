@@ -76,6 +76,7 @@ import de.voculupo.historicalcamplayout.PlannerToolMode
 import de.voculupo.historicalcamplayout.PlannerUiState
 import de.voculupo.historicalcamplayout.features.inventory.InventoryPane
 import de.voculupo.historicalcamplayout.features.planner.canvas.PlannerCanvas
+import de.voculupo.historicalcamplayout.features.planner.state.AutoSetupRequest
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
 import de.voculupo.historicalcamplayout.features.properties.PropertiesPane
 import de.voculupo.historicalcamplayout.getPlatform
@@ -308,6 +309,7 @@ fun App(
                     onDrag = viewModel::dragSelection,
                     onDragEnd = viewModel::finishInteractionWithGridSnap,
                     onResetProject = viewModel::resetProject,
+                    onAutoSetup = viewModel::autoSetup,
                     onParcelUpdate = viewModel::updateParcel,
                     onZoomReset = viewModel::resetZoom,
                     onClearZones = viewModel::clearBlockZones,
@@ -375,6 +377,7 @@ fun App(
                     onDrag = viewModel::dragSelection,
                     onDragEnd = viewModel::finishInteractionWithGridSnap,
                     onResetProject = viewModel::resetProject,
+                    onAutoSetup = viewModel::autoSetup,
                     onParcelUpdate = viewModel::updateParcel,
                     onZoomReset = viewModel::resetZoom,
                     onClearZones = viewModel::clearBlockZones,
@@ -465,6 +468,7 @@ private fun ExpandedLayout(
     onDrag: (de.voculupo.historicalcamplayout.Vec2) -> Unit,
     onDragEnd: () -> Unit,
     onResetProject: () -> Unit,
+    onAutoSetup: (AutoSetupRequest) -> Unit,
     onParcelUpdate: (Float, Float) -> Unit,
     onZoomReset: () -> Unit,
     onClearZones: () -> Unit,
@@ -558,6 +562,7 @@ private fun ExpandedLayout(
                 onSave = onSave,
                 onLoad = onLoad,
                 onResetProject = onResetProject,
+                onAutoSetup = onAutoSetup,
                 onExportProjectFile = onExportProjectFile,
                 onImportProjectFile = onImportProjectFile,
                 onExportPng = onExportPng,
@@ -652,6 +657,7 @@ private fun CompactLayout(
     onDrag: (de.voculupo.historicalcamplayout.Vec2) -> Unit,
     onDragEnd: () -> Unit,
     onResetProject: () -> Unit,
+    onAutoSetup: (AutoSetupRequest) -> Unit,
     onParcelUpdate: (Float, Float) -> Unit,
     onZoomReset: () -> Unit,
     onClearZones: () -> Unit,
@@ -926,6 +932,7 @@ private fun CompactLayout(
                             onSave = onSave,
                             onLoad = onLoad,
                             onResetProject = onResetProject,
+                            onAutoSetup = onAutoSetup,
                             onExportProjectFile = onExportProjectFile,
                             onImportProjectFile = onImportProjectFile,
                             onExportPng = onExportPng,

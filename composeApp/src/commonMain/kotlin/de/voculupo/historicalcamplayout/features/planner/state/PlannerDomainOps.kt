@@ -1,5 +1,6 @@
 ﻿package de.voculupo.historicalcamplayout.features.planner.state
 
+import de.voculupo.historicalcamplayout.AssetRope
 import de.voculupo.historicalcamplayout.GeometryEngine
 import de.voculupo.historicalcamplayout.Parcel
 import de.voculupo.historicalcamplayout.PlacedAsset
@@ -26,6 +27,16 @@ internal object PlannerDomainOps {
         }
         return byId.values.sortedBy { it.name }
     }
+
+    fun defaultRopes(preset: TentPreset): List<AssetRope> =
+        preset.ropeAnchors.map { anchor ->
+            AssetRope(
+                localX = anchor.localX,
+                localY = anchor.localY,
+                lengthMeters = anchor.lengthMeters,
+                outwardAngleDeg = anchor.outwardAngleDeg ?: 0f,
+            )
+        }
 
     fun normalizeDegrees(value: Float): Float {
         var d = value % 360f

@@ -33,12 +33,14 @@ import androidx.compose.ui.unit.dp
 import de.voculupo.historicalcamplayout.GeometryEngine
 import de.voculupo.historicalcamplayout.PlannerUiState
 import de.voculupo.historicalcamplayout.features.inventory.CollapsibleHeader
+import de.voculupo.historicalcamplayout.features.planner.state.AutoSetupRequest
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.active_rope
 import lagerplaner.composeapp.generated.resources.add_rope
 import lagerplaner.composeapp.generated.resources.anchor_x
 import lagerplaner.composeapp.generated.resources.anchor_y
 import lagerplaner.composeapp.generated.resources.apply_project_name
+import lagerplaner.composeapp.generated.resources.auto_setup
 import lagerplaner.composeapp.generated.resources.delete
 import lagerplaner.composeapp.generated.resources.duplicate
 import lagerplaner.composeapp.generated.resources.export_file
@@ -79,6 +81,7 @@ internal fun PropertiesPane(
     onSave: () -> Unit,
     onLoad: () -> Unit,
     onResetProject: () -> Unit,
+    onAutoSetup: (AutoSetupRequest) -> Unit,
     onExportProjectFile: () -> Unit,
     onImportProjectFile: () -> Unit,
     onExportPng: () -> Unit,
@@ -110,6 +113,7 @@ internal fun PropertiesPane(
     var showProjectSection by remember { mutableStateOf(true) }
     var showSelectionSection by remember { mutableStateOf(true) }
     var showWarningsSection by remember { mutableStateOf(false) }
+    var showAutoSetup by remember { mutableStateOf(false) }
     val selectedAsset = state.project.assets.firstOrNull { it.id in state.selectedAssetIds }
     val selectedRope = selectedAsset?.ropes?.getOrNull(state.selectedRopeIndex ?: -1)
     val currentSelectRopeIndex by rememberUpdatedState(onSelectRopeIndex)
@@ -163,6 +167,20 @@ internal fun PropertiesPane(
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Button(modifier = Modifier.weight(1f), onClick = onSave) { Text(stringResource(Res.string.save)) }
                     Button(modifier = Modifier.weight(1f), onClick = onLoad) { Text(stringResource(Res.string.load)) }
+                }
+                Button(modifier = Modifier.fillMaxWidth(), onClick = { showAutoSetup = true }) {
+                    Text(stringResource(Res.string.auto_setup))
+                }
+                if (showAutoSetup) {
+                    AutoSetupDialog(
+                        presets = state.presets,
+                        parcel = state.project.parcel,
+                        onConfirm = {
+                            showAutoSetup = false
+                            onAutoSetup(it)
+                        },
+                        onDismiss = { showAutoSetup = false },
+                    )
                 }
                 Button(modifier = Modifier.fillMaxWidth(), onClick = onResetProject) { Text(stringResource(Res.string.reset_project)) }
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
