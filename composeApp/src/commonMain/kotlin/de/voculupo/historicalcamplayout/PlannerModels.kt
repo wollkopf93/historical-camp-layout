@@ -148,6 +148,8 @@ data class AutoSetupRequest(
     /** Parallel to [tentPresetIds]: ring index the tent must go to; null = automatic. */
     val tentRings: List<Int?> = emptyList(),
     val walkwayMeters: Float = 1.5f,
+    /** Fine-tune the rule-based draft with an optimizer (spacing, doors, staying near the sail). */
+    val optimize: Boolean = true,
 )
 
 @Serializable

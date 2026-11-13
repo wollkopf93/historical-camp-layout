@@ -30,6 +30,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -66,6 +67,8 @@ import de.voculupo.historicalcamplayout.features.planner.state.AutoLayout
 import de.voculupo.historicalcamplayout.features.planner.state.AutoLayoutResult
 import de.voculupo.historicalcamplayout.features.planner.state.BlockKey
 import de.voculupo.historicalcamplayout.features.planner.state.LayoutBlock
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.all_fits
 import lagerplaner.composeapp.generated.resources.area_arena
@@ -92,6 +95,7 @@ import lagerplaner.composeapp.generated.resources.height_m
 import lagerplaner.composeapp.generated.resources.move_down
 import lagerplaner.composeapp.generated.resources.move_up
 import lagerplaner.composeapp.generated.resources.next
+import lagerplaner.composeapp.generated.resources.optimize_layout
 import lagerplaner.composeapp.generated.resources.reset_positions
 import lagerplaner.composeapp.generated.resources.ring_auto
 import lagerplaner.composeapp.generated.resources.ring_n
@@ -149,13 +153,13 @@ private val areaLabels =
         FreeAreaKind.CUSTOM to Res.string.area_custom,
     )
 
-/** Defaults from the research: arena incl. 2 m rope gap, fire incl. distance, 3 m lane. */
+/** Defaults: arena incl. 2 m rope gap, 2 m fire pit (the app keeps 2 m around it), 3 m lane. */
 private fun newArea(
     kind: FreeAreaKind,
     label: String,
 ) = when (kind) {
     FreeAreaKind.ARENA -> FreeArea(kind, label, 12f, 10f)
-    FreeAreaKind.FIRE -> FreeArea(kind, label, 5f)
+    FreeAreaKind.FIRE -> FreeArea(kind, label, 2f)
     FreeAreaKind.LANE -> FreeArea(kind, label, 3f)
     FreeAreaKind.CUSTOM -> FreeArea(kind, label, 6f, 6f)
 }
@@ -184,11 +188,20 @@ internal fun AutoSetupDialog(
     var step by remember { mutableIntStateOf(0) }
     val userZones = remember(project) { project.blockZones.filterNot { it.id.startsWith(AutoLayout.AUTO_PREFIX) } }
     val kept = if (req.replaceExisting) emptyList() else project.assets
-    val result =
-        remember(req, presetsById, userZones, kept) {
-            var n = 0
-            AutoLayout.generate(req, presetsById, userZones, kept) { "$it${n++}" }
-        }
+    // Computed off the main thread: the optimizer needs a moment on phones, taps must stay smooth.
+    val result by produceState(
+        AutoLayoutResult(emptyList(), emptyList(), emptyList(), req.walkwayMeters, emptyList()),
+        req,
+        presetsById,
+        userZones,
+        kept,
+    ) {
+        value =
+            withContext(Dispatchers.Default) {
+                var n = 0
+                AutoLayout.generate(req, presetsById, userZones, kept) { "$it${n++}" }
+            }
+    }
 
     fun setParcel(
         w: String,
@@ -487,6 +500,7 @@ private fun StepArrange(
         ChipRow(Res.string.walkway, walkways.map { it to if (it == 0f) cloth else "${fmt(it)} m" }, req.walkwayMeters) {
             onChange(req.copy(walkwayMeters = it))
         }
+        SwitchRow(stringResource(Res.string.optimize_layout), req.optimize) { onChange(req.copy(optimize = it)) }
         SwitchRow(stringResource(Res.string.auto_setup_replace), req.replaceExisting) { onChange(req.copy(replaceExisting = it)) }
         Text(stringResource(Res.string.drag_preview_hint), style = MaterialTheme.typography.bodySmall)
         OutlinedButton(

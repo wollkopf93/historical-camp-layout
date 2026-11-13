@@ -118,4 +118,5 @@
     <string name="zoom_in">Vergrößern</string>
     <string name="zoom_out">Verkleinern</string>
     <string name="zoom_reset">Zoom zurücksetzen</string>
+    <string name="optimize_layout">Feinschliff: Abstände und Eingänge optimieren</string>
 </resources>

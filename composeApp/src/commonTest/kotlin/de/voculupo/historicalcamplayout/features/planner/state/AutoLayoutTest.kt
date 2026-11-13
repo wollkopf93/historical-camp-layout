@@ -20,6 +20,7 @@ import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AutoLayoutTest {
@@ -165,26 +166,22 @@ class AutoLayoutTest {
     }
 
     @Test
-    fun fireIsRingCentreWithEntriesFacingIt() {
-        val fire = FreeArea(FreeAreaKind.FIRE, "Feuer", 5f)
-        val result = run(AutoSetupRequest(parcel, mixedTents.take(6), emptyList(), VisitorSide.LEFT, freeAreas = listOf(fire)))
+    fun fireGoesIntoOpenGroundTwoMetresFromTents() {
+        val fire = FreeArea(FreeAreaKind.FIRE, "Feuer", 2f)
+        val result = run(AutoSetupRequest(parcel, mixedTents, listOf("sun_sail_6x6_flat"), VisitorSide.LEFT, freeAreas = listOf(fire)))
         val zone = result.zones.single()
-        val c =
-            Vec2(
-                zone.points
-                    .map { it.x }
-                    .average()
-                    .toFloat(),
-                zone.points
-                    .map { it.y }
-                    .average()
-                    .toFloat(),
-            )
+        assertTrue(result.skipped.isEmpty())
         assertTrue(report(result, parcel).hardCollisions.isEmpty())
-        result.assets.forEach { tent ->
-            val to = Vec2(c.x - tent.position.x, c.y - tent.position.y)
-            val e = entryDir(tent)
-            assertTrue((e.x * to.x + e.y * to.y) / hypot(to.x, to.y) > 0.86f, "${tent.presetId} not facing fire")
+        result.assets.forEach { a ->
+            val body = GeometryEngine.assetBodyAabb(a, presetsById.getValue(a.presetId))
+            val gap =
+                maxOf(
+                    zone.points.minOf { it.x } - body.right,
+                    body.left - zone.points.maxOf { it.x },
+                    zone.points.minOf { it.y } - body.bottom,
+                    body.top - zone.points.maxOf { it.y },
+                )
+            assertTrue(gap >= 1.99f, "${a.presetId} only $gap m from the fire")
         }
     }
 
@@ -365,5 +362,107 @@ class AutoLayoutTest {
             }
         }
         assertTrue(closest(spread.assets) > closest(u.assets), "spread ${closest(spread.assets)} vs U ${closest(u.assets)}")
+    }
+
+    @Test
+    fun noEntryFacesTheFireOrArenaEvenWhenCompressed() {
+        val small = Parcel(25f, 15f)
+        val fire = FreeArea(FreeAreaKind.FIRE, "Feuerstelle", 2f)
+        val arena = FreeArea(FreeAreaKind.ARENA, "Kampfplatz", 5f, 10f)
+        listOf(RingShape.HALF_CIRCLE, RingShape.HORSESHOE, RingShape.U_SHAPE).forEach { shape ->
+            val result =
+                run(
+                    AutoSetupRequest(
+                        small,
+                        listOf("saxon_4x6", "saxon_2x4", "saxon_2x4", "round_4", "a_tent_3x4_frame"),
+                        listOf("sun_sail_4x4_flat"),
+                        VisitorSide.BOTTOM,
+                        shape = shape,
+                        freeAreas = listOf(arena, fire),
+                    ),
+                )
+            val zones = result.zones
+            result.assets.filterNot(::isSail).forEach { tent ->
+                val preset = presetsById.getValue(tent.presetId)
+                val door = assertNotNull(GeometryEngine.entryZone(tent, preset))
+                val body = GeometryEngine.assetWorldOutline(tent, preset)
+                zones.forEach { zone ->
+                    assertTrue(
+                        !GeometryEngine.polygonsIntersect(door, zone.points),
+                        "$shape: ${tent.presetId} door opens into ${zone.label}",
+                    )
+                    val gap =
+                        maxOf(
+                            zone.points.minOf { it.x } - body.maxOf { it.x },
+                            body.minOf { it.x } - zone.points.maxOf { it.x },
+                            zone.points.minOf { it.y } - body.maxOf { it.y },
+                            body.minOf { it.y } - zone.points.maxOf { it.y },
+                        )
+                    assertTrue(gap >= 0.99f, "$shape: ${tent.presetId} only $gap m from ${zone.label}")
+                }
+            }
+        }
+    }
+
+    private fun problems(
+        result: AutoLayoutResult,
+        parcel: Parcel,
+    ): Int {
+        val r = report(result, parcel)
+        return r.hardCollisions.size + r.messages.count { "Eingang" in it || "Parzelle" in it }
+    }
+
+    @Test
+    fun optimizerNeverAddsProblems() {
+        val cases =
+            listOf(
+                AutoSetupRequest(Parcel(22f, 16f), mixedTents, listOf("sun_sail_4x4_flat"), VisitorSide.BOTTOM, shape = RingShape.U_SHAPE),
+                AutoSetupRequest(
+                    Parcel(25f, 15f),
+                    mixedTents,
+                    listOf("sun_sail_4x4_flat"),
+                    VisitorSide.BOTTOM,
+                    shape = RingShape.HALF_CIRCLE,
+                ),
+                AutoSetupRequest(Parcel(36f, 24f), mixedTents, listOf("sun_sail_6x6_flat"), VisitorSide.TOP, shape = RingShape.SPREAD),
+                AutoSetupRequest(
+                    Parcel(30f, 20f),
+                    mixedTents,
+                    listOf("sun_sail_6x6_flat"),
+                    VisitorSide.LEFT,
+                    clusterPins = listOf(Vec2(5f, 5f)),
+                ),
+            )
+        cases.forEach { req ->
+            val plain = run(req.copy(optimize = false))
+            val tuned = run(req)
+            assertTrue(problems(tuned, req.parcel) <= problems(plain, req.parcel), "${req.shape}: ${report(tuned, req.parcel).messages}")
+            assertEquals(plain.assets.size, tuned.assets.size)
+        }
+    }
+
+    @Test
+    fun optimizerPullsTentsTowardADraggedSail() {
+        val req =
+            AutoSetupRequest(
+                Parcel(30f, 20f),
+                mixedTents,
+                listOf("sun_sail_6x6_flat"),
+                VisitorSide.BOTTOM,
+                clusterPins = listOf(Vec2(6f, 6f)),
+            )
+
+        fun spread(result: AutoLayoutResult): Float {
+            val sail = result.assets.single(::isSail).position
+            return result.assets
+                .filterNot(::isSail)
+                .map { hypot(it.position.x - sail.x, it.position.y - sail.y) }
+                .average()
+                .toFloat()
+        }
+        val plain = run(req.copy(optimize = false))
+        val tuned = run(req)
+        assertTrue(spread(tuned) < spread(plain), "tuned ${spread(tuned)} vs plain ${spread(plain)}")
+        assertTrue(report(tuned, req.parcel).hardCollisions.isEmpty())
     }
 }
