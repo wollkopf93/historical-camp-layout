@@ -30,10 +30,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import de.voculupo.historicalcamplayout.AutoSetupRequest
 import de.voculupo.historicalcamplayout.GeometryEngine
 import de.voculupo.historicalcamplayout.PlannerUiState
 import de.voculupo.historicalcamplayout.features.inventory.CollapsibleHeader
-import de.voculupo.historicalcamplayout.features.planner.state.AutoSetupRequest
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.active_rope
 import lagerplaner.composeapp.generated.resources.add_rope
@@ -174,7 +174,7 @@ internal fun PropertiesPane(
                 if (showAutoSetup) {
                     AutoSetupDialog(
                         presets = state.presets,
-                        parcel = state.project.parcel,
+                        project = state.project,
                         onConfirm = {
                             showAutoSetup = false
                             onAutoSetup(it)

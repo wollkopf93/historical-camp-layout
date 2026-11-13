@@ -458,7 +458,7 @@ object GeometryEngine {
         return HeightRange(minMeters = 0f, maxMeters = upper)
     }
 
-    private fun lineIntersectsPolygon(
+    internal fun lineIntersectsPolygon(
         seg: RopeSegment,
         polygon: List<Vec2>,
     ): Boolean {
@@ -771,7 +771,7 @@ object GeometryEngine {
         return inside
     }
 
-    private fun polygonsIntersect(
+    internal fun polygonsIntersect(
         a: List<Vec2>,
         b: List<Vec2>,
     ): Boolean {

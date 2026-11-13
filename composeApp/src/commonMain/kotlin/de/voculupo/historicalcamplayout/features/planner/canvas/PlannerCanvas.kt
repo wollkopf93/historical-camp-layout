@@ -23,11 +23,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageShader
-import androidx.compose.ui.graphics.ShaderBrush
-import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -230,7 +230,8 @@ internal fun PlannerCanvas(
                                                 height = currentParcel.heightMeters * newPpm,
                                             )
                                         val newCenteredOrigin = centeredParcelOriginPx(canvasSize, newParcelSize)
-                                        val anchoredPan = centroid - GeometryEngine.metersToOffset(worldAtCentroid, newPpm) - newCenteredOrigin
+                                        val anchoredPan =
+                                            centroid - GeometryEngine.metersToOffset(worldAtCentroid, newPpm) - newCenteredOrigin
 
                                         canvasPanOffsetPx = if (allowMultiTouchCanvasPan) anchoredPan + pan else anchoredPan
 
@@ -314,7 +315,10 @@ internal fun PlannerCanvas(
                                     }
 
                                     PlannerToolMode.Select -> {
-                                        val selectedAsset = currentState.project.assets.firstOrNull { it.id in currentState.selectedAssetIds }
+                                        val selectedAsset =
+                                            currentState.project.assets.firstOrNull {
+                                                it.id in currentState.selectedAssetIds
+                                            }
                                         if (selectedAsset != null) {
                                             val preset = currentPresetsById[selectedAsset.presetId]
                                             if (preset != null) {
@@ -363,7 +367,8 @@ internal fun PlannerCanvas(
                     }.pointerInput(Unit) {
                         fun currentCanvasSize() = Size(size.width.toFloat(), size.height.toFloat())
 
-                        fun parcelOriginPx() = centeredParcelOriginPx(currentCanvasSize(), parcelSizePx(currentState.project)) + canvasPanOffsetPx
+                        fun parcelOriginPx() =
+                            centeredParcelOriginPx(currentCanvasSize(), parcelSizePx(currentState.project)) + canvasPanOffsetPx
 
                         fun activeRopeHandlesForSelectedAsset(selectedAsset: PlacedAsset): List<RopeHandleHit> =
                             ropeHandleHits(
@@ -381,7 +386,11 @@ internal fun PlannerCanvas(
                                 if (multiTouchActive) return@detectDragGestures
                                 activeAssetDrag = false
                                 activeCanvasPan = false
-                                val startMeters = GeometryEngine.offsetToMeters(start - parcelOriginPx(), currentState.project.pixelsPerMeter)
+                                val startMeters =
+                                    GeometryEngine.offsetToMeters(
+                                        start - parcelOriginPx(),
+                                        currentState.project.pixelsPerMeter,
+                                    )
                                 val selectedAsset = currentState.project.assets.firstOrNull { it.id in currentState.selectedAssetIds }
                                 if (selectedAsset != null) {
                                     val selectedPreset = currentPresetsById[selectedAsset.presetId]
@@ -448,7 +457,7 @@ internal fun PlannerCanvas(
             drawParchment(parchmentBrush)
             drawGrid(state.project, parcelOrigin, size)
             drawParcelBounds(state.project, parcelOrigin)
-            state.project.blockZones.forEach { drawBlockZone(it, state.project.pixelsPerMeter, parcelOrigin) }
+            state.project.blockZones.forEach { drawBlockZone(it, state.project.pixelsPerMeter, parcelOrigin, textMeasurer) }
             val directSelectedIds = state.selectedAssetIds
             val selectedGroupIds =
                 state.project.assets
@@ -655,6 +664,7 @@ private fun DrawScope.drawBlockZone(
     zone: BlockZone,
     pixelsPerMeter: Float,
     origin: Offset,
+    textMeasurer: TextMeasurer,
 ) {
     if (zone.points.size < 3) return
     val path =
@@ -664,6 +674,12 @@ private fun DrawScope.drawBlockZone(
             close()
         }
     drawPath(path, color = Color(0x66AA0000), style = Fill)
+    if (zone.label.isBlank()) return
+    val style = TextStyle(color = Color(0xFF3A0E05), fontSize = 12.sp, fontWeight = FontWeight.Medium)
+    val layout = textMeasurer.measure(AnnotatedString(zone.label), style = style)
+    val cx = origin.x + zone.points.sumOf { it.x.toDouble() }.toFloat() / zone.points.size * pixelsPerMeter
+    val cy = origin.y + zone.points.sumOf { it.y.toDouble() }.toFloat() / zone.points.size * pixelsPerMeter
+    drawText(layout, topLeft = Offset(cx - layout.size.width / 2f, cy - layout.size.height / 2f))
 }
 
 /** Extra outline so selection stays visible on warning/collision fills and on POLYGON presets. */
@@ -727,6 +743,7 @@ private fun DrawScope.drawSelectionHighlightRing(
                 drawCircle(color = ring, radius = radius, center = Offset(center.x + halfBody, center.y), style = Stroke(width = sw))
             }
         }
+
         TentShapeType.A_FRAME -> {
             val halfW = preset.widthMeters * pixelsPerMeter / 2f
             val halfH = preset.heightMeters * pixelsPerMeter / 2f
@@ -740,7 +757,6 @@ private fun DrawScope.drawSelectionHighlightRing(
                 }
             drawPath(path, color = ring, style = Stroke(width = sw))
         }
-
 
         TentShapeType.POLYGON -> {
             val points = preset.polygonPoints.ifEmpty { listOf(Vec2(-2f, -2f), Vec2(2f, -2f), Vec2(2f, 2f), Vec2(-2f, 2f)) }
@@ -852,7 +868,7 @@ private fun DrawScope.drawAsset(
                 drawRect(
                     color = bodyColor,
                     topLeft = Offset(center.x - halfW, center.y - halfH),
-                    size = Size(halfW * 2f, halfH * 2f)
+                    size = Size(halfW * 2f, halfH * 2f),
                 )
 
                 // 2. Die Firstlinie (Giebel) - benutzt die lokale Variable outlineColor
@@ -860,7 +876,7 @@ private fun DrawScope.drawAsset(
                     color = outlineColor,
                     start = Offset(center.x, center.y - halfH),
                     end = Offset(center.x, center.y + halfH),
-                    strokeWidth = 2.5f
+                    strokeWidth = 2.5f,
                 )
 
                 // 3. Die Outline (Rahmen)
@@ -868,9 +884,8 @@ private fun DrawScope.drawAsset(
                     color = outlineColor,
                     topLeft = Offset(center.x - halfW, center.y - halfH),
                     size = Size(halfW * 2f, halfH * 2f),
-                    style = Stroke(2f)
+                    style = Stroke(2f),
                 )
-
             }
 
             TentShapeType.POLYGON -> {

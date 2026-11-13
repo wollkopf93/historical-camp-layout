@@ -14,5 +14,10 @@ typealias PlacedAsset = de.voculupo.historicalcamplayout.domain.model.PlacedAsse
 typealias BlockZone = de.voculupo.historicalcamplayout.domain.model.BlockZone
 typealias PlannerProject = de.voculupo.historicalcamplayout.domain.model.PlannerProject
 typealias PlannerUiState = de.voculupo.historicalcamplayout.domain.model.PlannerUiState
+typealias VisitorSide = de.voculupo.historicalcamplayout.domain.model.VisitorSide
+typealias RingShape = de.voculupo.historicalcamplayout.domain.model.RingShape
+typealias FreeAreaKind = de.voculupo.historicalcamplayout.domain.model.FreeAreaKind
+typealias FreeArea = de.voculupo.historicalcamplayout.domain.model.FreeArea
+typealias AutoSetupRequest = de.voculupo.historicalcamplayout.domain.model.AutoSetupRequest
 
 fun defaultPresets(): List<TentPreset> = domainDefaultPresets()

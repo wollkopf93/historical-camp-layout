@@ -93,6 +93,55 @@ data class PlacedAsset(
 data class BlockZone(
     val id: String,
     val points: List<Vec2>,
+    val label: String = "",
+)
+
+@Serializable
+enum class VisitorSide { TOP, RIGHT, BOTTOM, LEFT }
+
+@Serializable
+enum class RingShape(
+    val arcDeg: Float,
+) {
+    HORSESHOE(240f),
+    FULL_CIRCLE(360f),
+    HALF_CIRCLE(180f),
+
+    /** Straight back row plus two side rows, square to the parcel: how most groups actually pitch. */
+    U_SHAPE(0f),
+}
+
+@Serializable
+enum class FreeAreaKind { ARENA, FIRE, LANE, CUSTOM }
+
+/** Space the auto setup keeps free. FIRE: [widthMeters] is the diameter; LANE: the width (runs the whole depth). */
+@Serializable
+data class FreeArea(
+    val kind: FreeAreaKind,
+    val label: String = "",
+    val widthMeters: Float,
+    val depthMeters: Float = widthMeters,
+    /** Centre the user dragged it to in the preview; null = placed automatically. */
+    val position: Vec2? = null,
+)
+
+/** Everything the auto setup sheet asks for; stored on the project so it can be reopened and edited. */
+@Serializable
+data class AutoSetupRequest(
+    val parcel: Parcel,
+    /** In priority order: the first tent gets the back-centre spot; the last ones are dropped first. */
+    val tentPresetIds: List<String>,
+    val sailPresetIds: List<String>,
+    val visitorSide: VisitorSide,
+    val shape: RingShape = RingShape.HORSESHOE,
+    val joinSails: Boolean = false,
+    val replaceExisting: Boolean = true,
+    val freeAreas: List<FreeArea> = emptyList(),
+    /** Per sail ring: centre the user dragged it to; null = automatic. */
+    val clusterPins: List<Vec2?> = emptyList(),
+    /** Parallel to [tentPresetIds]: ring index the tent must go to; null = automatic. */
+    val tentRings: List<Int?> = emptyList(),
+    val walkwayMeters: Float = 1.5f,
 )
 
 @Serializable
@@ -103,6 +152,7 @@ data class PlannerProject(
     val blockZones: List<BlockZone> = emptyList(),
     val pixelsPerMeter: Float = 50f,
     val gridMeters: Float = 0.5f,
+    val autoSetup: AutoSetupRequest? = null,
 )
 
 data class PlannerUiState(
@@ -231,7 +281,6 @@ fun defaultPresets(): List<TentPreset> =
         // ==========================================
         // SACHSENZELTE (GESCHLOSSEN - OHNE VORDACH)
         // ==========================================
-
         // 1. Sachsen 2x4 Geschlossen (Reine Grundfläche ca. 2x4m)
         TentPreset(
             id = "saxon_2x4_closed",
@@ -239,21 +288,28 @@ fun defaultPresets(): List<TentPreset> =
             shape = TentShapeType.SAXON,
             widthMeters = 4.0f,
             heightMeters = 2.0f,
-            polygonPoints = listOf(
-                Vec2(-1.0f, 1.0f), Vec2(1.0f, 1.0f),
-                Vec2(1.5f, 0.7f), Vec2(2.0f, 0.0f), Vec2(1.5f, -0.7f),
-                Vec2(1.0f, -1.0f), Vec2(-1.0f, -1.0f),
-                Vec2(-1.5f, -0.7f), Vec2(-2.0f, 0.0f), Vec2(-1.5f, 0.7f)
-            ),
-            ropeAnchors = listOf(
-                RopeAnchor(-1.0f, 1.0f, 1.5f, -90f),
-                RopeAnchor(1.0f, 1.0f, 1.5f, -90f),
-                RopeAnchor(1.0f, -1.0f, 1.5f, 90f),
-                RopeAnchor(-1.0f, -1.0f, 1.5f, 90f)
-            ),
-            defaultHeightRange = HeightRange(0f, 2.0f)
+            polygonPoints =
+                listOf(
+                    Vec2(-1.0f, 1.0f),
+                    Vec2(1.0f, 1.0f),
+                    Vec2(1.5f, 0.7f),
+                    Vec2(2.0f, 0.0f),
+                    Vec2(1.5f, -0.7f),
+                    Vec2(1.0f, -1.0f),
+                    Vec2(-1.0f, -1.0f),
+                    Vec2(-1.5f, -0.7f),
+                    Vec2(-2.0f, 0.0f),
+                    Vec2(-1.5f, 0.7f),
+                ),
+            ropeAnchors =
+                listOf(
+                    RopeAnchor(-1.0f, 1.0f, 1.5f, -90f),
+                    RopeAnchor(1.0f, 1.0f, 1.5f, -90f),
+                    RopeAnchor(1.0f, -1.0f, 1.5f, 90f),
+                    RopeAnchor(-1.0f, -1.0f, 1.5f, 90f),
+                ),
+            defaultHeightRange = HeightRange(0f, 2.0f),
         ),
-
         // 2. Sachsen 3x5 Geschlossen (Reine Grundfläche ca. 3x5m)
         TentPreset(
             id = "saxon_3x5_closed",
@@ -261,19 +317,26 @@ fun defaultPresets(): List<TentPreset> =
             shape = TentShapeType.SAXON,
             widthMeters = 5.0f,
             heightMeters = 3.0f,
-            polygonPoints = listOf(
-                Vec2(-1.0f, 1.5f), Vec2(1.0f, 1.5f),
-                Vec2(1.8f, 1.2f), Vec2(2.5f, 0.0f), Vec2(1.8f, -1.2f),
-                Vec2(1.0f, -1.5f), Vec2(-1.0f, -1.5f),
-                Vec2(-1.8f, -1.2f), Vec2(-2.5f, 0.0f), Vec2(-1.8f, 1.2f)
-            ),
-            ropeAnchors = listOf(
-                RopeAnchor(-1.0f, 0f, 2.5f, 180f),
-                RopeAnchor(1.0f, 0f, 2.5f, 0f)
-            ),
-            defaultHeightRange = HeightRange(0f, 2.2f)
+            polygonPoints =
+                listOf(
+                    Vec2(-1.0f, 1.5f),
+                    Vec2(1.0f, 1.5f),
+                    Vec2(1.8f, 1.2f),
+                    Vec2(2.5f, 0.0f),
+                    Vec2(1.8f, -1.2f),
+                    Vec2(1.0f, -1.5f),
+                    Vec2(-1.0f, -1.5f),
+                    Vec2(-1.8f, -1.2f),
+                    Vec2(-2.5f, 0.0f),
+                    Vec2(-1.8f, 1.2f),
+                ),
+            ropeAnchors =
+                listOf(
+                    RopeAnchor(-1.0f, 0f, 2.5f, 180f),
+                    RopeAnchor(1.0f, 0f, 2.5f, 0f),
+                ),
+            defaultHeightRange = HeightRange(0f, 2.2f),
         ),
-
         // 3. Sachsen 4x6 Geschlossen (Reine Grundfläche ca. 4x6m)
         TentPreset(
             id = "saxon_4x6_closed",
@@ -281,17 +344,25 @@ fun defaultPresets(): List<TentPreset> =
             shape = TentShapeType.SAXON,
             widthMeters = 6.0f,
             heightMeters = 4.0f,
-            polygonPoints = listOf(
-                Vec2(-1.5f, 2.0f), Vec2(1.5f, 2.0f),
-                Vec2(2.5f, 1.5f), Vec2(3.0f, 0.0f), Vec2(2.5f, -1.5f),
-                Vec2(1.5f, -2.0f), Vec2(-1.5f, -2.0f),
-                Vec2(-2.5f, -1.5f), Vec2(-3.0f, 0.0f), Vec2(-2.5f, 1.5f)
-            ),
-            ropeAnchors = listOf(
-                RopeAnchor(-1.5f, 0f, 3.0f, 180f),
-                RopeAnchor(1.5f, 0f, 3.0f, 0f)
-            ),
-            defaultHeightRange = HeightRange(0f, 2.5f)
+            polygonPoints =
+                listOf(
+                    Vec2(-1.5f, 2.0f),
+                    Vec2(1.5f, 2.0f),
+                    Vec2(2.5f, 1.5f),
+                    Vec2(3.0f, 0.0f),
+                    Vec2(2.5f, -1.5f),
+                    Vec2(1.5f, -2.0f),
+                    Vec2(-1.5f, -2.0f),
+                    Vec2(-2.5f, -1.5f),
+                    Vec2(-3.0f, 0.0f),
+                    Vec2(-2.5f, 1.5f),
+                ),
+            ropeAnchors =
+                listOf(
+                    RopeAnchor(-1.5f, 0f, 3.0f, 180f),
+                    RopeAnchor(1.5f, 0f, 3.0f, 0f),
+                ),
+            defaultHeightRange = HeightRange(0f, 2.5f),
         ),
         TentPreset(
             id = "saxon_niord_6",
@@ -335,12 +406,13 @@ fun defaultPresets(): List<TentPreset> =
             shape = TentShapeType.A_FRAME,
             widthMeters = 2.0f,
             heightMeters = 3.0f,
-            ropeAnchors = listOf(
-                RopeAnchor(localX = 0f, localY = -1.5f, lengthMeters = 1.8f, outwardAngleDeg = -90f),
-                RopeAnchor(localX = 0f, localY = 1.5f, lengthMeters = 1.8f, outwardAngleDeg = 90f)
-            ),
+            ropeAnchors =
+                listOf(
+                    RopeAnchor(localX = 0f, localY = -1.5f, lengthMeters = 1.8f, outwardAngleDeg = -90f),
+                    RopeAnchor(localX = 0f, localY = 1.5f, lengthMeters = 1.8f, outwardAngleDeg = 90f),
+                ),
             defaultHeightRange = HeightRange(0f, 1.8f),
-            defaultSafetyMarginMeters = 0.3f
+            defaultSafetyMarginMeters = 0.3f,
         ),
         TentPreset(
             id = "a_tent_2_5x3_full",
@@ -348,14 +420,15 @@ fun defaultPresets(): List<TentPreset> =
             shape = TentShapeType.A_FRAME,
             widthMeters = 2.5f,
             heightMeters = 3.0f,
-            ropeAnchors = listOf(
-                RopeAnchor(localX = 0f, localY = -1.5f, lengthMeters = 2.0f, outwardAngleDeg = -90f),
-                RopeAnchor(localX = 0f, localY = 1.5f, lengthMeters = 2.0f, outwardAngleDeg = 90f),
-                RopeAnchor(localX = -1.25f, localY = 0f, lengthMeters = 0.6f, outwardAngleDeg = 180f),
-                RopeAnchor(localX = 1.25f, localY = 0f, lengthMeters = 0.6f, outwardAngleDeg = 0f)
-            ),
+            ropeAnchors =
+                listOf(
+                    RopeAnchor(localX = 0f, localY = -1.5f, lengthMeters = 2.0f, outwardAngleDeg = -90f),
+                    RopeAnchor(localX = 0f, localY = 1.5f, lengthMeters = 2.0f, outwardAngleDeg = 90f),
+                    RopeAnchor(localX = -1.25f, localY = 0f, lengthMeters = 0.6f, outwardAngleDeg = 180f),
+                    RopeAnchor(localX = 1.25f, localY = 0f, lengthMeters = 0.6f, outwardAngleDeg = 0f),
+                ),
             defaultHeightRange = HeightRange(0f, 2.0f),
-            defaultSafetyMarginMeters = 0.5f
+            defaultSafetyMarginMeters = 0.5f,
         ),
         TentPreset(
             id = "a_tent_3x4_frame",
@@ -365,7 +438,7 @@ fun defaultPresets(): List<TentPreset> =
             heightMeters = 4.0f,
             ropeAnchors = emptyList(),
             defaultHeightRange = HeightRange(0f, 2.3f),
-            defaultSafetyMarginMeters = 0.2f
+            defaultSafetyMarginMeters = 0.2f,
         ),
         TentPreset(
             id = "a_tent_4x5_pro",
@@ -373,14 +446,15 @@ fun defaultPresets(): List<TentPreset> =
             shape = TentShapeType.A_FRAME,
             widthMeters = 4.0f,
             heightMeters = 5.0f,
-            ropeAnchors = listOf(
-                RopeAnchor(localX = 0f, localY = -2.5f, lengthMeters = 2.5f, outwardAngleDeg = -75f),
-                RopeAnchor(localX = 0f, localY = -2.5f, lengthMeters = 2.5f, outwardAngleDeg = -105f),
-                RopeAnchor(localX = 0f, localY = 2.5f, lengthMeters = 2.5f, outwardAngleDeg = 75f),
-                RopeAnchor(localX = 0f, localY = 2.5f, lengthMeters = 2.5f, outwardAngleDeg = 105f)
-            ),
+            ropeAnchors =
+                listOf(
+                    RopeAnchor(localX = 0f, localY = -2.5f, lengthMeters = 2.5f, outwardAngleDeg = -75f),
+                    RopeAnchor(localX = 0f, localY = -2.5f, lengthMeters = 2.5f, outwardAngleDeg = -105f),
+                    RopeAnchor(localX = 0f, localY = 2.5f, lengthMeters = 2.5f, outwardAngleDeg = 75f),
+                    RopeAnchor(localX = 0f, localY = 2.5f, lengthMeters = 2.5f, outwardAngleDeg = 105f),
+                ),
             defaultHeightRange = HeightRange(0f, 2.5f),
-            defaultSafetyMarginMeters = 0.8f
+            defaultSafetyMarginMeters = 0.8f,
         ),
         // ==========================================
         // RUNDZELTE & SPEICHENRADZELTE (Kapseln)

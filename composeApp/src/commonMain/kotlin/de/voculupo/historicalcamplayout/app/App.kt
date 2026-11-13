@@ -72,11 +72,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import de.voculupo.historicalcamplayout.AutoSetupRequest
 import de.voculupo.historicalcamplayout.PlannerToolMode
 import de.voculupo.historicalcamplayout.PlannerUiState
 import de.voculupo.historicalcamplayout.features.inventory.InventoryPane
 import de.voculupo.historicalcamplayout.features.planner.canvas.PlannerCanvas
-import de.voculupo.historicalcamplayout.features.planner.state.AutoSetupRequest
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
 import de.voculupo.historicalcamplayout.features.properties.PropertiesPane
 import de.voculupo.historicalcamplayout.getPlatform

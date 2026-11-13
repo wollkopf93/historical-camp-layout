@@ -1,8 +1,10 @@
 package de.voculupo.historicalcamplayout
 
-import de.voculupo.historicalcamplayout.features.planner.state.AutoSetupRequest
+import de.voculupo.historicalcamplayout.AutoSetupRequest
+import de.voculupo.historicalcamplayout.FreeArea
+import de.voculupo.historicalcamplayout.FreeAreaKind
+import de.voculupo.historicalcamplayout.VisitorSide
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
-import de.voculupo.historicalcamplayout.features.planner.state.VisitorSide
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -139,5 +141,33 @@ class PlannerViewModelScenarioTest {
         vm.undo()
         vm.undo()
         assertEquals("round_4", vm.assets().single().presetId, "undo restores the hand-made layout")
+    }
+
+    @Test
+    fun autoSetup_replacesOwnZonesKeepsDrawnOnesAndRemembersSetup() {
+        val vm = PlannerViewModel(InMemoryStorage())
+        vm.onBlockZoneTap(Vec2(1f, 1f))
+        vm.onBlockZoneTap(Vec2(4f, 4f)) // hand-drawn zone in the top-left corner
+        val arena = FreeArea(FreeAreaKind.ARENA, "Kampfplatz", 12f, 10f)
+        val request =
+            AutoSetupRequest(
+                Parcel(60f, 50f),
+                List(6) { "saxon_2x4" },
+                listOf("sun_sail_6x6_flat"),
+                VisitorSide.BOTTOM,
+                freeAreas = listOf(arena),
+            )
+
+        vm.autoSetup(request)
+        vm.autoSetup(request)
+
+        val project = vm.uiState.value.project
+        assertEquals(2, project.blockZones.size, "one drawn zone + one arena, the first arena was replaced")
+        assertEquals(listOf("", "Kampfplatz"), project.blockZones.map { it.label })
+        assertEquals(request, project.autoSetup)
+        assertTrue(
+            vm.uiState.value.hardCollisionAssetIds
+                .isEmpty(),
+        )
     }
 }

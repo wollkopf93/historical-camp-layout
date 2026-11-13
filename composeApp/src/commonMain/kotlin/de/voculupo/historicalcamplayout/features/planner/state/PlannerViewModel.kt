@@ -3,6 +3,7 @@
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.voculupo.historicalcamplayout.AssetRope
+import de.voculupo.historicalcamplayout.AutoSetupRequest
 import de.voculupo.historicalcamplayout.BlockZone
 import de.voculupo.historicalcamplayout.GeometryEngine
 import de.voculupo.historicalcamplayout.Parcel
@@ -250,11 +251,14 @@ class PlannerViewModel(
 
     /** Generates a camp draft (see [AutoLayout]); one undo step, block zones are kept. */
     fun autoSetup(request: AutoSetupRequest) {
-        val presetsById = _uiState.value.presets.associateBy { it.id }
-        val generated = AutoLayout.generate(request, presetsById) { newId(it) }
-        // shortcut: "add" mode does not route around existing assets; collision warnings flag overlaps. Upgrade if "add" gets used.
+        val state = _uiState.value
+        val presetsById = state.presets.associateBy { it.id }
+        // Hand-drawn zones stay and are avoided; zones from an earlier auto setup are replaced.
+        val userZones = state.project.blockZones.filterNot { it.id.startsWith(AutoLayout.AUTO_PREFIX) }
+        val kept = if (request.replaceExisting) emptyList() else state.project.assets
+        val result = AutoLayout.generate(request, presetsById, userZones, kept) { newId(it) }
         mutateProject {
-            copy(parcel = request.parcel, assets = if (request.replaceExisting) generated else assets + generated)
+            copy(parcel = request.parcel, assets = kept + result.assets, blockZones = userZones + result.zones, autoSetup = request)
         }
         _uiState.update { it.copy(selectedAssetIds = emptySet(), selectedRopeIndex = null) }
     }
@@ -726,7 +730,8 @@ class PlannerViewModel(
             .toSet()
     }
 
-    private fun firstSelectedAsset(state: PlannerUiState): PlacedAsset? = state.project.assets.firstOrNull { it.id in state.selectedAssetIds }
+    private fun firstSelectedAsset(state: PlannerUiState): PlacedAsset? =
+        state.project.assets.firstOrNull { it.id in state.selectedAssetIds }
 
     private fun defaultRopes(preset: TentPreset): List<AssetRope> = PlannerDomainOps.defaultRopes(preset)
 
