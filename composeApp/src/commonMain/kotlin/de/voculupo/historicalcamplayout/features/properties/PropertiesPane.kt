@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -29,8 +31,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
-import de.voculupo.historicalcamplayout.AutoSetupRequest
 import de.voculupo.historicalcamplayout.GeometryEngine
 import de.voculupo.historicalcamplayout.PlannerUiState
 import de.voculupo.historicalcamplayout.features.inventory.CollapsibleHeader
@@ -39,6 +42,7 @@ import lagerplaner.composeapp.generated.resources.active_rope
 import lagerplaner.composeapp.generated.resources.add_rope
 import lagerplaner.composeapp.generated.resources.anchor_x
 import lagerplaner.composeapp.generated.resources.anchor_y
+import lagerplaner.composeapp.generated.resources.apply_area
 import lagerplaner.composeapp.generated.resources.apply_project_name
 import lagerplaner.composeapp.generated.resources.auto_setup
 import lagerplaner.composeapp.generated.resources.delete
@@ -46,6 +50,7 @@ import lagerplaner.composeapp.generated.resources.duplicate
 import lagerplaner.composeapp.generated.resources.export_file
 import lagerplaner.composeapp.generated.resources.export_png
 import lagerplaner.composeapp.generated.resources.group
+import lagerplaner.composeapp.generated.resources.height_m
 import lagerplaner.composeapp.generated.resources.height_range
 import lagerplaner.composeapp.generated.resources.import_file
 import lagerplaner.composeapp.generated.resources.load
@@ -72,21 +77,18 @@ import lagerplaner.composeapp.generated.resources.undo
 import lagerplaner.composeapp.generated.resources.ungroup
 import lagerplaner.composeapp.generated.resources.unlock
 import lagerplaner.composeapp.generated.resources.warnings_title
+import lagerplaner.composeapp.generated.resources.width_m
 import org.jetbrains.compose.resources.stringResource
 
 @Composable
 internal fun PropertiesPane(
     state: PlannerUiState,
     onProjectNameChange: (String) -> Unit,
-    onSave: () -> Unit,
-    onLoad: () -> Unit,
+    onParcelUpdate: (Float, Float) -> Unit,
     onResetProject: () -> Unit,
-    onAutoSetup: (AutoSetupRequest) -> Unit,
     onExportProjectFile: () -> Unit,
     onImportProjectFile: () -> Unit,
     onExportPng: () -> Unit,
-    onUndo: () -> Unit,
-    onRedo: () -> Unit,
     onLabelChange: (String) -> Unit,
     onRotate: (Float) -> Unit,
     onToggleRopes: () -> Unit,
@@ -106,21 +108,35 @@ internal fun PropertiesPane(
     onDelete: () -> Unit,
     modifier: Modifier = Modifier,
     enableFullScroll: Boolean = false,
+    /** Phones have no top bar with a file menu: export/import/reset live here. */
+    showFileActions: Boolean = true,
+    fillWidth: Boolean = false,
 ) {
     val paneTextColor = MaterialTheme.colorScheme.onSurface
     val paneMutedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
     var projectNameInput by remember(state.project.name) { mutableStateOf(state.project.name) }
+    var widthInput by remember(state.project.parcel.widthMeters) {
+        mutableStateOf(
+            state.project.parcel.widthMeters
+                .toString(),
+        )
+    }
+    var heightInput by remember(state.project.parcel.heightMeters) {
+        mutableStateOf(
+            state.project.parcel.heightMeters
+                .toString(),
+        )
+    }
     var showProjectSection by remember { mutableStateOf(true) }
     var showSelectionSection by remember { mutableStateOf(true) }
     var showWarningsSection by remember { mutableStateOf(false) }
-    var showAutoSetup by remember { mutableStateOf(false) }
     val selectedAsset = state.project.assets.firstOrNull { it.id in state.selectedAssetIds }
     val selectedRope = selectedAsset?.ropes?.getOrNull(state.selectedRopeIndex ?: -1)
     val currentSelectRopeIndex by rememberUpdatedState(onSelectRopeIndex)
     val paneModifier =
         if (enableFullScroll) {
             modifier
-                .width(320.dp)
+                .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier.width(320.dp))
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -128,7 +144,7 @@ internal fun PropertiesPane(
                 .verticalScroll(rememberScrollState())
         } else {
             modifier
-                .width(320.dp)
+                .then(if (fillWidth) Modifier.fillMaxWidth() else Modifier.width(320.dp))
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.96f))
                 .border(1.dp, MaterialTheme.colorScheme.outlineVariant)
@@ -139,57 +155,7 @@ internal fun PropertiesPane(
             modifier = paneModifier,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Text(stringResource(Res.string.properties), style = MaterialTheme.typography.titleMedium)
-            CollapsibleHeader(
-                title = stringResource(Res.string.project),
-                expanded = showProjectSection,
-                onToggle = { showProjectSection = !showProjectSection },
-            )
-            if (showProjectSection) {
-                OutlinedTextField(
-                    value = projectNameInput,
-                    onValueChange = { projectNameInput = it },
-                    singleLine = true,
-                    label = { Text(stringResource(Res.string.project_name)) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                Button(onClick = { onProjectNameChange(projectNameInput) }, modifier = Modifier.fillMaxWidth()) {
-                    Text(stringResource(Res.string.apply_project_name))
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(modifier = Modifier.weight(1f), onClick = onUndo, enabled = state.canUndo) {
-                        Text(stringResource(Res.string.undo))
-                    }
-                    Button(modifier = Modifier.weight(1f), onClick = onRedo, enabled = state.canRedo) {
-                        Text(stringResource(Res.string.redo))
-                    }
-                }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(modifier = Modifier.weight(1f), onClick = onSave) { Text(stringResource(Res.string.save)) }
-                    Button(modifier = Modifier.weight(1f), onClick = onLoad) { Text(stringResource(Res.string.load)) }
-                }
-                Button(modifier = Modifier.fillMaxWidth(), onClick = { showAutoSetup = true }) {
-                    Text(stringResource(Res.string.auto_setup))
-                }
-                if (showAutoSetup) {
-                    AutoSetupDialog(
-                        presets = state.presets,
-                        project = state.project,
-                        onConfirm = {
-                            showAutoSetup = false
-                            onAutoSetup(it)
-                        },
-                        onDismiss = { showAutoSetup = false },
-                    )
-                }
-                Button(modifier = Modifier.fillMaxWidth(), onClick = onResetProject) { Text(stringResource(Res.string.reset_project)) }
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(modifier = Modifier.weight(1f), onClick = onExportProjectFile) { Text(stringResource(Res.string.export_file)) }
-                    Button(modifier = Modifier.weight(1f), onClick = onImportProjectFile) { Text(stringResource(Res.string.import_file)) }
-                }
-                Button(modifier = Modifier.fillMaxWidth(), onClick = onExportPng) { Text(stringResource(Res.string.export_png)) }
-            }
-            HorizontalDivider()
+            if (!fillWidth) Text(stringResource(Res.string.properties), style = MaterialTheme.typography.titleMedium)
             CollapsibleHeader(
                 title = stringResource(Res.string.selection_title, state.selectedAssetIds.size),
                 expanded = showSelectionSection,
@@ -316,6 +282,65 @@ internal fun PropertiesPane(
             if (state.measurementStart != null && state.measurementEnd != null) {
                 val dist = GeometryEngine.distance(state.measurementStart, state.measurementEnd)
                 Text(stringResource(Res.string.measurement, "%.2f".format(dist)), color = paneTextColor)
+            }
+            HorizontalDivider()
+            CollapsibleHeader(
+                title = stringResource(Res.string.project),
+                expanded = showProjectSection,
+                onToggle = { showProjectSection = !showProjectSection },
+            )
+            if (showProjectSection) {
+                // Applied on Enter or when leaving the field: no extra button, one undo step per rename.
+                OutlinedTextField(
+                    value = projectNameInput,
+                    onValueChange = { projectNameInput = it },
+                    singleLine = true,
+                    label = { Text(stringResource(Res.string.project_name)) },
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { onProjectNameChange(projectNameInput) }),
+                    modifier =
+                        Modifier.fillMaxWidth().onFocusChanged {
+                            if (!it.isFocused && projectNameInput != state.project.name) onProjectNameChange(projectNameInput)
+                        },
+                )
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    OutlinedTextField(
+                        value = widthInput,
+                        onValueChange = { widthInput = it },
+                        singleLine = true,
+                        label = { Text(stringResource(Res.string.width_m)) },
+                        modifier = Modifier.weight(1f),
+                    )
+                    OutlinedTextField(
+                        value = heightInput,
+                        onValueChange = { heightInput = it },
+                        singleLine = true,
+                        label = { Text(stringResource(Res.string.height_m)) },
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = {
+                        val w = widthInput.replace(',', '.').toFloatOrNull()
+                        val h = heightInput.replace(',', '.').toFloatOrNull()
+                        if (w != null && h != null) onParcelUpdate(w, h)
+                    },
+                ) { Text(stringResource(Res.string.apply_area)) }
+                if (showFileActions) {
+                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Button(
+                            modifier = Modifier.weight(1f),
+                            onClick = onExportProjectFile,
+                        ) { Text(stringResource(Res.string.export_file)) }
+                        Button(
+                            modifier = Modifier.weight(1f),
+                            onClick = onImportProjectFile,
+                        ) { Text(stringResource(Res.string.import_file)) }
+                    }
+                    Button(modifier = Modifier.fillMaxWidth(), onClick = onExportPng) { Text(stringResource(Res.string.export_png)) }
+                    Button(modifier = Modifier.fillMaxWidth(), onClick = onResetProject) { Text(stringResource(Res.string.reset_project)) }
+                }
             }
             if (state.warnings.isNotEmpty()) {
                 HorizontalDivider()

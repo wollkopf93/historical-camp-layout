@@ -488,6 +488,7 @@ internal fun PlannerCanvas(
                 if (asset.id in directSelectedIds) {
                     drawAnchorSlots(asset, preset, state.project.pixelsPerMeter, parcelOrigin)
                 }
+                drawEntryArrow(asset, preset, state.project.pixelsPerMeter, parcelOrigin)
                 drawAssetLabel(
                     asset,
                     preset,
@@ -581,6 +582,33 @@ private fun DrawScope.drawAssetLabel(
     drawText(titleLayout, topLeft = topLeft)
     drawText(metaLayout, topLeft = Offset(metaTop.x + 1f, metaTop.y + 1f), color = Color(0x66000000))
     drawText(metaLayout, topLeft = metaTop)
+}
+
+/** Small arrow just outside the entry, pointing out of the tent. */
+private fun DrawScope.drawEntryArrow(
+    asset: PlacedAsset,
+    preset: TentPreset,
+    pixelsPerMeter: Float,
+    origin: Offset,
+) {
+    val (entry, out) = GeometryEngine.entryWorld(asset, preset) ?: return
+    val side = Vec2(-out.y, out.x)
+
+    fun px(
+        along: Float,
+        across: Float,
+    ) = Offset(
+        origin.x + (entry.x + out.x * along + side.x * across) * pixelsPerMeter,
+        origin.y + (entry.y + out.y * along + side.y * across) * pixelsPerMeter,
+    )
+    val arrow =
+        Path().apply {
+            moveTo(px(0.75f, 0f).x, px(0.75f, 0f).y)
+            lineTo(px(0.2f, 0.35f).x, px(0.2f, 0.35f).y)
+            lineTo(px(0.2f, -0.35f).x, px(0.2f, -0.35f).y)
+            close()
+        }
+    drawPath(arrow, color = Color(0xDD3A0E05), style = Fill)
 }
 
 private fun DrawScope.drawAnchorSlots(

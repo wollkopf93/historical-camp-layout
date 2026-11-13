@@ -17,9 +17,11 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
@@ -32,6 +34,9 @@ import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
@@ -40,6 +45,8 @@ import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
@@ -67,26 +74,36 @@ import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import de.voculupo.historicalcamplayout.AutoSetupRequest
 import de.voculupo.historicalcamplayout.PlannerToolMode
 import de.voculupo.historicalcamplayout.PlannerUiState
 import de.voculupo.historicalcamplayout.features.inventory.InventoryPane
 import de.voculupo.historicalcamplayout.features.planner.canvas.PlannerCanvas
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
+import de.voculupo.historicalcamplayout.features.properties.AutoSetupDialog
 import de.voculupo.historicalcamplayout.features.properties.PropertiesPane
 import de.voculupo.historicalcamplayout.getPlatform
 import de.voculupo.historicalcamplayout.platform.PlatformBackHandler
 import kotlinx.coroutines.delay
 import lagerplaner.composeapp.generated.resources.Res
+import lagerplaner.composeapp.generated.resources.auto_setup_short
+import lagerplaner.composeapp.generated.resources.block_zone_hint
+import lagerplaner.composeapp.generated.resources.clear_block_zones
 import lagerplaner.composeapp.generated.resources.close
 import lagerplaner.composeapp.generated.resources.delete
 import lagerplaner.composeapp.generated.resources.duplicate
 import lagerplaner.composeapp.generated.resources.edit_selection
+import lagerplaner.composeapp.generated.resources.export_file
+import lagerplaner.composeapp.generated.resources.export_png
+import lagerplaner.composeapp.generated.resources.file_menu
+import lagerplaner.composeapp.generated.resources.ic_auto_setup
 import lagerplaner.composeapp.generated.resources.ic_block
 import lagerplaner.composeapp.generated.resources.ic_close
 import lagerplaner.composeapp.generated.resources.ic_copy
@@ -97,6 +114,7 @@ import lagerplaner.composeapp.generated.resources.ic_light_mode
 import lagerplaner.composeapp.generated.resources.ic_lock
 import lagerplaner.composeapp.generated.resources.ic_lock_open
 import lagerplaner.composeapp.generated.resources.ic_measure
+import lagerplaner.composeapp.generated.resources.ic_more
 import lagerplaner.composeapp.generated.resources.ic_redo
 import lagerplaner.composeapp.generated.resources.ic_rotate_left
 import lagerplaner.composeapp.generated.resources.ic_rotate_right
@@ -105,11 +123,15 @@ import lagerplaner.composeapp.generated.resources.ic_settings
 import lagerplaner.composeapp.generated.resources.ic_tent
 import lagerplaner.composeapp.generated.resources.ic_undo
 import lagerplaner.composeapp.generated.resources.ic_warning
+import lagerplaner.composeapp.generated.resources.import_file
 import lagerplaner.composeapp.generated.resources.inventory
 import lagerplaner.composeapp.generated.resources.lock
+import lagerplaner.composeapp.generated.resources.more
 import lagerplaner.composeapp.generated.resources.more_count
 import lagerplaner.composeapp.generated.resources.properties
 import lagerplaner.composeapp.generated.resources.redo
+import lagerplaner.composeapp.generated.resources.reset
+import lagerplaner.composeapp.generated.resources.reset_project
 import lagerplaner.composeapp.generated.resources.rotate_left
 import lagerplaner.composeapp.generated.resources.rotate_right
 import lagerplaner.composeapp.generated.resources.toggle_theme
@@ -120,8 +142,14 @@ import lagerplaner.composeapp.generated.resources.undo
 import lagerplaner.composeapp.generated.resources.unlock
 import lagerplaner.composeapp.generated.resources.warnings
 import lagerplaner.composeapp.generated.resources.warnings_title
+import lagerplaner.composeapp.generated.resources.zoom_in
+import lagerplaner.composeapp.generated.resources.zoom_out
+import lagerplaner.composeapp.generated.resources.zoom_reset
+import org.jetbrains.compose.resources.DrawableResource
+import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.painterResource
 import org.jetbrains.compose.resources.stringResource
+import kotlin.math.roundToInt
 
 private data class PresetDragState(
     val presetId: String,
@@ -217,6 +245,10 @@ fun App(
     var dropRequest by remember { mutableStateOf<PresetDropRequest?>(null) }
     var suppressTapTemporarily by remember { mutableStateOf(false) }
 
+    // Lives here, not in the properties pane: on phones that pane is a bottom sheet that closes when
+    // the dialog takes focus, which would take the dialog down with it.
+    var showAutoSetup by remember { mutableStateOf(false) }
+
     LaunchedEffect(suppressTapTemporarily) {
         if (suppressTapTemporarily) {
             delay(180)
@@ -274,7 +306,6 @@ fun App(
             if (useCompactShell) {
                 CompactLayout(
                     state = state,
-                    darkThemeEnabled = darkThemeEnabled,
                     onToggleTheme = { darkThemeEnabled = !darkThemeEnabled },
                     shiftPressed = false,
                     dropRequest = dropRequest,
@@ -309,13 +340,11 @@ fun App(
                     onDrag = viewModel::dragSelection,
                     onDragEnd = viewModel::finishInteractionWithGridSnap,
                     onResetProject = viewModel::resetProject,
-                    onAutoSetup = viewModel::autoSetup,
+                    onOpenAutoSetup = { showAutoSetup = true },
                     onParcelUpdate = viewModel::updateParcel,
                     onZoomReset = viewModel::resetZoom,
                     onClearZones = viewModel::clearBlockZones,
                     onProjectNameChange = viewModel::setProjectName,
-                    onSave = viewModel::saveProject,
-                    onLoad = viewModel::loadProject,
                     onExportProjectFile = viewModel::exportProjectFile,
                     onImportProjectFile = viewModel::importProjectFile,
                     onExportPng = viewModel::exportPng,
@@ -377,13 +406,11 @@ fun App(
                     onDrag = viewModel::dragSelection,
                     onDragEnd = viewModel::finishInteractionWithGridSnap,
                     onResetProject = viewModel::resetProject,
-                    onAutoSetup = viewModel::autoSetup,
+                    onOpenAutoSetup = { showAutoSetup = true },
                     onParcelUpdate = viewModel::updateParcel,
                     onZoomReset = viewModel::resetZoom,
                     onClearZones = viewModel::clearBlockZones,
                     onProjectNameChange = viewModel::setProjectName,
-                    onSave = viewModel::saveProject,
-                    onLoad = viewModel::loadProject,
                     onExportProjectFile = viewModel::exportProjectFile,
                     onImportProjectFile = viewModel::importProjectFile,
                     onExportPng = viewModel::exportPng,
@@ -424,6 +451,17 @@ fun App(
                     )
                 }
             }
+        }
+        if (showAutoSetup) {
+            AutoSetupDialog(
+                presets = state.presets,
+                project = state.project,
+                onConfirm = {
+                    showAutoSetup = false
+                    viewModel.autoSetup(it)
+                },
+                onDismiss = { showAutoSetup = false },
+            )
         }
     }
 }
@@ -468,13 +506,11 @@ private fun ExpandedLayout(
     onDrag: (de.voculupo.historicalcamplayout.Vec2) -> Unit,
     onDragEnd: () -> Unit,
     onResetProject: () -> Unit,
-    onAutoSetup: (AutoSetupRequest) -> Unit,
+    onOpenAutoSetup: () -> Unit,
     onParcelUpdate: (Float, Float) -> Unit,
     onZoomReset: () -> Unit,
     onClearZones: () -> Unit,
     onProjectNameChange: (String) -> Unit,
-    onSave: () -> Unit,
-    onLoad: () -> Unit,
     onExportProjectFile: () -> Unit,
     onImportProjectFile: () -> Unit,
     onExportPng: () -> Unit,
@@ -505,17 +541,11 @@ private fun ExpandedLayout(
                 modifier = Modifier.width(leftPaneWidthDp.dp),
                 enableFullScroll = true,
                 state = state,
-                onTool = onTool,
                 onPresetSelect = onPresetSelect,
                 onPresetDragStart = onPresetDragStart,
                 onPresetDrag = onPresetDrag,
                 onPresetDragEnd = onPresetDragEnd,
                 onPresetDragCancel = onPresetDragCancel,
-                onParcelUpdate = onParcelUpdate,
-                onZoomIn = onZoomIn,
-                onZoomOut = onZoomOut,
-                onZoomReset = onZoomReset,
-                onClearZones = onClearZones,
             )
             Box(
                 modifier =
@@ -559,15 +589,12 @@ private fun ExpandedLayout(
                 enableFullScroll = true,
                 state = state,
                 onProjectNameChange = onProjectNameChange,
-                onSave = onSave,
-                onLoad = onLoad,
+                onParcelUpdate = onParcelUpdate,
+                showFileActions = false,
                 onResetProject = onResetProject,
-                onAutoSetup = onAutoSetup,
                 onExportProjectFile = onExportProjectFile,
                 onImportProjectFile = onImportProjectFile,
                 onExportPng = onExportPng,
-                onUndo = onUndo,
-                onRedo = onRedo,
                 onLabelChange = onLabelChange,
                 onRotate = onRotate,
                 onToggleRopes = onToggleRopes,
@@ -595,17 +622,49 @@ private fun ExpandedLayout(
                     .statusBarsPadding()
                     .padding(horizontal = 12.dp, vertical = 8.dp),
         ) {
-            Card(shape = RoundedCornerShape(14.dp)) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
-                ) {
-                    if (state.warnings.isNotEmpty()) {
-                        WarningsButton(count = state.warnings.size, onClick = { showWarningsPanel = !showWarningsPanel })
-                    }
-                    ThemeToggleButton(darkThemeEnabled = darkThemeEnabled, onToggleTheme = onToggleTheme)
+            FloatingBar {
+                IconButton(onClick = onUndo, enabled = state.canUndo) {
+                    Icon(painterResource(Res.drawable.ic_undo), stringResource(Res.string.undo))
                 }
+                IconButton(onClick = onRedo, enabled = state.canRedo) {
+                    Icon(painterResource(Res.drawable.ic_redo), stringResource(Res.string.redo))
+                }
+                BarDivider()
+                ToolButton(Res.drawable.ic_select, Res.string.tool_select, state.currentTool == PlannerToolMode.Select) {
+                    onTool(PlannerToolMode.Select)
+                }
+                ToolButton(Res.drawable.ic_measure, Res.string.tool_measure, state.currentTool == PlannerToolMode.Measure) {
+                    onTool(PlannerToolMode.Measure)
+                }
+                ToolButton(Res.drawable.ic_block, Res.string.tool_block_zone, state.currentTool == PlannerToolMode.BlockZone) {
+                    onTool(PlannerToolMode.BlockZone)
+                }
+                BarDivider()
+                val zoomOut = stringResource(Res.string.zoom_out)
+                val zoomIn = stringResource(Res.string.zoom_in)
+                IconButton(onClick = onZoomOut, modifier = Modifier.semantics { contentDescription = zoomOut }) { Text("−") }
+                TextButton(onClick = onZoomReset) { Text("${(state.project.pixelsPerMeter / 50f * 100f).roundToInt()} %") }
+                IconButton(onClick = onZoomIn, modifier = Modifier.semantics { contentDescription = zoomIn }) { Text("+") }
+                BarDivider()
+                FilledTonalButton(onClick = onOpenAutoSetup, modifier = Modifier.padding(horizontal = 4.dp)) {
+                    Icon(painterResource(Res.drawable.ic_auto_setup), null, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(6.dp))
+                    Text(stringResource(Res.string.auto_setup_short))
+                }
+                FileMenu(onExportProjectFile, onImportProjectFile, onExportPng, onResetProject)
+                if (state.warnings.isNotEmpty()) {
+                    WarningsButton(count = state.warnings.size, onClick = { showWarningsPanel = !showWarningsPanel })
+                }
+                ThemeToggleButton(darkThemeEnabled = darkThemeEnabled, onToggleTheme = onToggleTheme)
             }
+        }
+
+        if (state.currentTool == PlannerToolMode.BlockZone) {
+            BlockZoneHint(
+                state = state,
+                onClearZones = onClearZones,
+                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 72.dp),
+            )
         }
 
         if (state.warnings.isNotEmpty() && showWarningsPanel) {
@@ -629,7 +688,6 @@ private enum class CompactSheet { Inventory, Properties }
 @Composable
 private fun CompactLayout(
     state: PlannerUiState,
-    darkThemeEnabled: Boolean,
     onToggleTheme: () -> Unit,
     shiftPressed: Boolean,
     dropRequest: PresetDropRequest?,
@@ -657,13 +715,11 @@ private fun CompactLayout(
     onDrag: (de.voculupo.historicalcamplayout.Vec2) -> Unit,
     onDragEnd: () -> Unit,
     onResetProject: () -> Unit,
-    onAutoSetup: (AutoSetupRequest) -> Unit,
+    onOpenAutoSetup: () -> Unit,
     onParcelUpdate: (Float, Float) -> Unit,
     onZoomReset: () -> Unit,
     onClearZones: () -> Unit,
     onProjectNameChange: (String) -> Unit,
-    onSave: () -> Unit,
-    onLoad: () -> Unit,
     onExportProjectFile: () -> Unit,
     onImportProjectFile: () -> Unit,
     onExportPng: () -> Unit,
@@ -694,6 +750,7 @@ private fun CompactLayout(
     // While a preset is dragged out of the sheet, hide it (without disposing the gesture) so the whole plan is a drop target.
     var presetDragging by remember { mutableStateOf(false) }
     var showWarningsPanel by remember { mutableStateOf(false) }
+    var moreOpen by remember { mutableStateOf(false) }
     val hasSelection = state.selectedAssetIds.isNotEmpty()
     val currentTool = state.currentTool
 
@@ -753,11 +810,18 @@ private fun CompactLayout(
                 if (state.warnings.isNotEmpty()) {
                     WarningsButton(count = state.warnings.size, onClick = { showWarningsPanel = !showWarningsPanel })
                 }
-                ThemeToggleButton(darkThemeEnabled = darkThemeEnabled, onToggleTheme = onToggleTheme)
                 IconButton(onClick = { sheet = if (sheet == CompactSheet.Properties) null else CompactSheet.Properties }) {
                     Icon(painterResource(Res.drawable.ic_settings), stringResource(Res.string.properties))
                 }
             }
+        }
+
+        if (state.currentTool == PlannerToolMode.BlockZone && sheet == null) {
+            BlockZoneHint(
+                state = state,
+                onClearZones = onClearZones,
+                modifier = Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 68.dp, start = 12.dp, end = 12.dp),
+            )
         }
 
         AnimatedVisibility(
@@ -817,22 +881,44 @@ private fun CompactLayout(
                         label = { Text(stringResource(Res.string.tool_select)) },
                     )
                     NavigationBarItem(
-                        selected = toolActive(PlannerToolMode.Measure),
-                        onClick = { onTool(PlannerToolMode.Measure) },
-                        icon = { Icon(painterResource(Res.drawable.ic_measure), null) },
-                        label = { Text(stringResource(Res.string.tool_measure)) },
-                    )
-                    NavigationBarItem(
-                        selected = toolActive(PlannerToolMode.BlockZone),
-                        onClick = { onTool(PlannerToolMode.BlockZone) },
-                        icon = { Icon(painterResource(Res.drawable.ic_block), null) },
-                        label = { Text(stringResource(Res.string.tool_block_zone)) },
-                    )
-                    NavigationBarItem(
                         selected = sheet == CompactSheet.Inventory || toolActive(PlannerToolMode.PlaceTent),
                         onClick = { sheet = if (sheet == CompactSheet.Inventory) null else CompactSheet.Inventory },
                         icon = { Icon(painterResource(Res.drawable.ic_tent), null) },
                         label = { Text(stringResource(Res.string.inventory)) },
+                    )
+                    NavigationBarItem(
+                        selected = false,
+                        onClick = onOpenAutoSetup,
+                        icon = { Icon(painterResource(Res.drawable.ic_auto_setup), null) },
+                        label = { Text(stringResource(Res.string.auto_setup_short)) },
+                    )
+                    NavigationBarItem(
+                        selected = toolActive(PlannerToolMode.Measure) || toolActive(PlannerToolMode.BlockZone),
+                        onClick = { moreOpen = true },
+                        icon = {
+                            Box {
+                                Icon(painterResource(Res.drawable.ic_more), null)
+                                DropdownMenu(expanded = moreOpen, onDismissRequest = { moreOpen = false }) {
+                                    MenuItem(Res.string.tool_measure) {
+                                        moreOpen = false
+                                        onTool(PlannerToolMode.Measure)
+                                    }
+                                    MenuItem(Res.string.tool_block_zone) {
+                                        moreOpen = false
+                                        onTool(PlannerToolMode.BlockZone)
+                                    }
+                                    MenuItem(Res.string.zoom_reset) {
+                                        moreOpen = false
+                                        onZoomReset()
+                                    }
+                                    MenuItem(Res.string.toggle_theme) {
+                                        moreOpen = false
+                                        onToggleTheme()
+                                    }
+                                }
+                            }
+                        },
+                        label = { Text(stringResource(Res.string.more)) },
                     )
                 }
             }
@@ -898,7 +984,6 @@ private fun CompactLayout(
                             modifier = Modifier.padding(horizontal = 12.dp),
                             enableFullScroll = true,
                             state = state,
-                            onTool = onTool,
                             onPresetSelect = { id ->
                                 onPresetSelect(id)
                                 sheet = null
@@ -917,11 +1002,6 @@ private fun CompactLayout(
                                 presetDragging = false
                                 onPresetDragCancel()
                             },
-                            onParcelUpdate = onParcelUpdate,
-                            onZoomIn = onZoomIn,
-                            onZoomOut = onZoomOut,
-                            onZoomReset = onZoomReset,
-                            onClearZones = onClearZones,
                         )
                     } else {
                         PropertiesPane(
@@ -929,15 +1009,12 @@ private fun CompactLayout(
                             enableFullScroll = true,
                             state = state,
                             onProjectNameChange = onProjectNameChange,
-                            onSave = onSave,
-                            onLoad = onLoad,
+                            onParcelUpdate = onParcelUpdate,
+                            fillWidth = true,
                             onResetProject = onResetProject,
-                            onAutoSetup = onAutoSetup,
                             onExportProjectFile = onExportProjectFile,
                             onImportProjectFile = onImportProjectFile,
                             onExportPng = onExportPng,
-                            onUndo = onUndo,
-                            onRedo = onRedo,
                             onLabelChange = onLabelChange,
                             onRotate = onRotate,
                             onToggleRopes = onToggleRopes,
@@ -1020,6 +1097,83 @@ private fun SelectionActionBar(
 }
 
 private const val ROTATE_STEP_DEG = 15f
+
+@Composable
+private fun BarDivider() {
+    VerticalDivider(modifier = Modifier.height(24.dp).padding(horizontal = 4.dp))
+}
+
+@Composable
+private fun ToolButton(
+    icon: DrawableResource,
+    label: StringResource,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    IconButton(onClick = onClick, modifier = Modifier.semantics { this.selected = selected }) {
+        Icon(
+            painterResource(icon),
+            stringResource(label),
+            tint = if (selected) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+        )
+    }
+}
+
+@Composable
+private fun MenuItem(
+    label: StringResource,
+    onClick: () -> Unit,
+) {
+    DropdownMenuItem(text = { Text(stringResource(label)) }, onClick = onClick)
+}
+
+/** Everything about the project file: rarely needed, so behind one menu instead of four buttons. */
+@Composable
+private fun FileMenu(
+    onExportProjectFile: () -> Unit,
+    onImportProjectFile: () -> Unit,
+    onExportPng: () -> Unit,
+    onResetProject: () -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        TextButton(onClick = { open = true }) { Text(stringResource(Res.string.file_menu) + " ▾") }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            listOf(
+                Res.string.export_file to onExportProjectFile,
+                Res.string.import_file to onImportProjectFile,
+                Res.string.export_png to onExportPng,
+                Res.string.reset_project to onResetProject,
+            ).forEach { (label, action) ->
+                MenuItem(label) {
+                    open = false
+                    action()
+                }
+            }
+        }
+    }
+}
+
+/** Shown while the block zone tool is active: how it works and a way to remove all zones again. */
+@Composable
+private fun BlockZoneHint(
+    state: PlannerUiState,
+    onClearZones: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(modifier = modifier, shape = RoundedCornerShape(14.dp)) {
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Text(stringResource(Res.string.block_zone_hint), style = MaterialTheme.typography.bodySmall)
+            TextButton(onClick = onClearZones, enabled = state.project.blockZones.isNotEmpty()) {
+                Text(stringResource(Res.string.clear_block_zones))
+            }
+        }
+    }
+}
 
 @Composable
 private fun WarningsButton(

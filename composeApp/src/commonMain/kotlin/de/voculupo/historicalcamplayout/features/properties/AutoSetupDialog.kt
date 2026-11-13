@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -67,7 +68,6 @@ import de.voculupo.historicalcamplayout.features.planner.state.BlockKey
 import de.voculupo.historicalcamplayout.features.planner.state.LayoutBlock
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.all_fits
-import lagerplaner.composeapp.generated.resources.apply_size
 import lagerplaner.composeapp.generated.resources.area_arena
 import lagerplaner.composeapp.generated.resources.area_custom
 import lagerplaner.composeapp.generated.resources.area_fire
@@ -95,9 +95,11 @@ import lagerplaner.composeapp.generated.resources.next
 import lagerplaner.composeapp.generated.resources.reset_positions
 import lagerplaner.composeapp.generated.resources.ring_auto
 import lagerplaner.composeapp.generated.resources.ring_n
+import lagerplaner.composeapp.generated.resources.shape_edge
 import lagerplaner.composeapp.generated.resources.shape_full_circle
 import lagerplaner.composeapp.generated.resources.shape_half_circle
 import lagerplaner.composeapp.generated.resources.shape_horseshoe
+import lagerplaner.composeapp.generated.resources.shape_spread
 import lagerplaner.composeapp.generated.resources.shape_u
 import lagerplaner.composeapp.generated.resources.side_bottom
 import lagerplaner.composeapp.generated.resources.side_left
@@ -112,12 +114,10 @@ import lagerplaner.composeapp.generated.resources.visitors
 import lagerplaner.composeapp.generated.resources.walkway
 import lagerplaner.composeapp.generated.resources.walkway_cloth
 import lagerplaner.composeapp.generated.resources.warn_compressed
-import lagerplaner.composeapp.generated.resources.warn_needed
 import lagerplaner.composeapp.generated.resources.warn_skipped
 import lagerplaner.composeapp.generated.resources.width_m
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.stringResource
-import kotlin.math.ceil
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -135,6 +135,8 @@ private val shapeLabels =
         RingShape.HORSESHOE to Res.string.shape_horseshoe,
         RingShape.FULL_CIRCLE to Res.string.shape_full_circle,
         RingShape.HALF_CIRCLE to Res.string.shape_half_circle,
+        RingShape.EDGE to Res.string.shape_edge,
+        RingShape.SPREAD to Res.string.shape_spread,
     )
 
 private val walkways = listOf(0f, 0.5f, 1.0f, 1.5f, 2.0f, 3.0f)
@@ -227,10 +229,13 @@ internal fun AutoSetupDialog(
                             else -> StepArrange(req) { req = it }
                         }
                     }
-                    val preview: @Composable () -> Unit = {
+                    val preview: @Composable (Modifier) -> Unit = { canvasModifier ->
                         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Preview(result, req, presetsById, userZones) { req = it }
-                            Warnings(result, req) { size -> setParcel(fmt(size.widthMeters), fmt(size.heightMeters)) }
+                            Preview(result, req, presetsById, userZones, onChange = { req = it }, modifier = canvasModifier)
+                            // Fixed height: warnings coming and going must not shift the list under the user's finger.
+                            Column(modifier = Modifier.fillMaxWidth().height(72.dp).verticalScroll(rememberScrollState())) {
+                                Warnings(result, req)
+                            }
                         }
                     }
                     if (wide) {
@@ -239,16 +244,21 @@ internal fun AutoSetupDialog(
                                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) { content() }
-                            Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) { preview() }
+                            Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                                preview(
+                                    Modifier.fillMaxWidth().aspectRatio(
+                                        (req.parcel.widthMeters / req.parcel.heightMeters).coerceIn(0.6f, 2.2f),
+                                    ),
+                                )
+                            }
                         }
                     } else {
+                        // Phones: preview fixed on top so + taps show their effect and dragging in it doesn't scroll.
+                        preview(Modifier.fillMaxWidth().height(220.dp))
                         Column(
                             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                             verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            content()
-                            preview()
-                        }
+                        ) { content() }
                     }
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
                         TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) }
@@ -495,6 +505,7 @@ private fun Preview(
     presetsById: Map<String, TentPreset>,
     userZones: List<BlockZone>,
     onChange: (AutoSetupRequest) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val textMeasurer = rememberTextMeasurer()
     val visitors = stringResource(Res.string.visitors)
@@ -507,9 +518,7 @@ private fun Preview(
     val parcel = req.parcel
     Canvas(
         modifier =
-            Modifier
-                .fillMaxWidth()
-                .aspectRatio((parcel.widthMeters / parcel.heightMeters).coerceIn(0.6f, 2.2f))
+            modifier
                 .pointerInput(Unit) {
                     detectDragGestures(
                         onDragStart = { pos ->
@@ -609,6 +618,12 @@ private fun Preview(
             val sail = GeometryEngine.isSunSailPreset(preset)
             drawPath(path, if (sail) Color(0x88D9B97A) else Color(0xFF7A5C3E))
             drawPath(path, colors.onSurface.copy(alpha = 0.6f), style = Stroke(1.2f))
+            GeometryEngine.entryWorld(asset, preset)?.let { (entry, out) ->
+                val tip = Vec2(entry.x + out.x * 0.9f, entry.y + out.y * 0.9f)
+                val l = Vec2(entry.x + out.x * 0.2f - out.y * 0.45f, entry.y + out.y * 0.2f + out.x * 0.45f)
+                val r = Vec2(entry.x + out.x * 0.2f + out.y * 0.45f, entry.y + out.y * 0.2f - out.x * 0.45f)
+                drawPath(poly(listOf(tip, l, r), shift), colors.primary)
+            }
         }
     }
 }
@@ -629,7 +644,6 @@ private fun originY(
 private fun Warnings(
     result: AutoLayoutResult,
     req: AutoSetupRequest,
-    onApplySize: (Parcel) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val warn = MaterialTheme.colorScheme.error
@@ -647,17 +661,7 @@ private fun Warnings(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        val needed = result.neededParcel
-        if (needed != null) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    stringResource(Res.string.warn_needed, ceil(needed.widthMeters).toInt(), ceil(needed.heightMeters).toInt()),
-                    modifier = Modifier.weight(1f),
-                    style = MaterialTheme.typography.bodySmall,
-                )
-                TextButton(onClick = { onApplySize(needed) }) { Text(stringResource(Res.string.apply_size)) }
-            }
-        } else if (result.assets.isNotEmpty()) {
+        if (result.skipped.isEmpty() && result.walkwayMeters >= req.walkwayMeters && result.assets.isNotEmpty()) {
             Text(stringResource(Res.string.all_fits), style = MaterialTheme.typography.bodySmall)
         }
     }

@@ -213,6 +213,10 @@ object GeometryEngine {
                     hard += a.asset.id
                     hard += b.asset.id
                     messages += "Seil-Kollision: Seil ragt in ${a.preset.name} oder ${b.preset.name}."
+                } else if (blocksEntry(a.asset, a.preset, b.asset, b.preset) || blocksEntry(b.asset, b.preset, a.asset, a.preset)) {
+                    warn += a.asset.id
+                    warn += b.asset.id
+                    messages += "Eingang verstellt: ${a.preset.name} und ${b.preset.name}."
                 } else if (distance in 0.001f..1.5f) {
                     warn += a.asset.id
                     warn += b.asset.id
@@ -318,6 +322,50 @@ object GeometryEngine {
     }
 
     fun isSunSailPreset(preset: TentPreset): Boolean = preset.isSunSail || preset.id.startsWith("sun_sail_")
+
+    /** How deep and wide the ground in front of an entry must stay free to get in and out. */
+    const val ENTRY_CLEARANCE_METERS = 1.5f
+    const val ENTRY_WIDTH_METERS = 1.5f
+
+    /**
+     * A tent's entry: the middle of its local -y side. That is the porch of the Saxon presets and a
+     * wedge tent's gable; round tents just get a default door there. Sun sails have none.
+     */
+    fun entryLocal(preset: TentPreset): Vec2? {
+        if (isSunSailPreset(preset)) return null
+        val points = localOutlinePoints(preset)
+        if (points.isEmpty()) return null
+        return Vec2(0f, points.minOf { it.y })
+    }
+
+    /** Entry point in world space and the unit direction pointing out of the tent. */
+    fun entryWorld(
+        asset: PlacedAsset,
+        preset: TentPreset,
+    ): Pair<Vec2, Vec2>? = entryLocal(preset)?.let { worldPoint(asset, it) to rotatePoint(Vec2(0f, -1f), asset.rotationDeg) }
+
+    /** Ground in front of the entry that must stay free (world polygon), or null for sun sails. */
+    fun entryZone(
+        asset: PlacedAsset,
+        preset: TentPreset,
+    ): List<Vec2>? =
+        entryLocal(preset)?.let { e ->
+            val w = ENTRY_WIDTH_METERS / 2f
+            listOf(Vec2(-w, e.y), Vec2(w, e.y), Vec2(w, e.y - ENTRY_CLEARANCE_METERS), Vec2(-w, e.y - ENTRY_CLEARANCE_METERS))
+                .map { worldPoint(asset, it) }
+        }
+
+    /** True when [b]'s body stands in the free zone in front of [a]'s entry. */
+    fun blocksEntry(
+        a: PlacedAsset,
+        presetA: TentPreset,
+        b: PlacedAsset,
+        presetB: TentPreset,
+    ): Boolean {
+        if (isSunSailPreset(presetB)) return false
+        val zone = entryZone(a, presetA) ?: return false
+        return polygonsIntersect(zone, assetWorldOutline(b, presetB))
+    }
 
     /** Position that lines [movingAsset] up edge-to-edge with [targetAsset], or null if no edge pair is close enough. */
     fun snapSunSailToNeighbor(

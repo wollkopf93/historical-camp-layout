@@ -81,36 +81,17 @@ import org.jetbrains.compose.resources.stringResource
 @OptIn(ExperimentalLayoutApi::class)
 internal fun InventoryPane(
     state: PlannerUiState,
-    onTool: (PlannerToolMode) -> Unit,
     onPresetSelect: (String) -> Unit,
     onPresetDragStart: (presetId: String, label: String, rootPosition: Offset) -> Unit,
     onPresetDrag: (rootPosition: Offset) -> Unit,
     onPresetDragEnd: (presetId: String, rootPosition: Offset) -> Unit,
-    onParcelUpdate: (Float, Float) -> Unit,
-    onZoomIn: () -> Unit,
-    onZoomOut: () -> Unit,
-    onZoomReset: () -> Unit,
-    onClearZones: () -> Unit,
     modifier: Modifier = Modifier,
     enableFullScroll: Boolean = false,
     onPresetDragCancel: () -> Unit = {},
 ) {
     val useLongPressDrag = enableFullScroll && getPlatform().name.startsWith("Android")
-    var widthInput by remember(state.project.parcel.widthMeters) {
-        mutableStateOf(
-            state.project.parcel.widthMeters
-                .toString(),
-        )
-    }
-    var heightInput by remember(state.project.parcel.heightMeters) {
-        mutableStateOf(
-            state.project.parcel.heightMeters
-                .toString(),
-        )
-    }
     var presetFilter by remember { mutableStateOf("") }
     var categoryFilter by remember { mutableStateOf("Alle") }
-    var showParcelZoom by remember { mutableStateOf(false) }
     var showPresetsSection by remember { mutableStateOf(true) }
     val visiblePresets =
         remember(state.presets, presetFilter, categoryFilter) {
@@ -155,76 +136,11 @@ internal fun InventoryPane(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Text(stringResource(Res.string.inventory), style = MaterialTheme.typography.titleMedium)
-            FlowRow(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                ToolChip(stringResource(Res.string.tool_select), state.currentTool == PlannerToolMode.Select) {
-                    onTool(PlannerToolMode.Select)
-                }
-                ToolChip(stringResource(Res.string.tool_measure), state.currentTool == PlannerToolMode.Measure) {
-                    onTool(PlannerToolMode.Measure)
-                }
-                ToolChip(stringResource(Res.string.tool_block_zone), state.currentTool == PlannerToolMode.BlockZone) {
-                    onTool(PlannerToolMode.BlockZone)
-                }
-            }
-            HorizontalDivider()
-
-            CollapsibleHeader(
-                title = stringResource(Res.string.parcel_and_zoom),
-                expanded = showParcelZoom,
-                onToggle = { showParcelZoom = !showParcelZoom },
+            Text(
+                stringResource(Res.string.drag_hint),
+                color = MaterialTheme.colorScheme.primary,
+                style = MaterialTheme.typography.bodySmall,
             )
-            if (showParcelZoom) {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OutlinedTextField(
-                        value = widthInput,
-                        onValueChange = { widthInput = it },
-                        singleLine = true,
-                        label = { Text(stringResource(Res.string.width_m)) },
-                        modifier = Modifier.weight(1f),
-                    )
-                    OutlinedTextField(
-                        value = heightInput,
-                        onValueChange = { heightInput = it },
-                        singleLine = true,
-                        label = { Text(stringResource(Res.string.height_m)) },
-                        modifier = Modifier.weight(1f),
-                    )
-                }
-                Button(
-                    onClick = {
-                        val w = widthInput.replace(',', '.').toFloatOrNull()
-                        val h = heightInput.replace(',', '.').toFloatOrNull()
-                        if (w != null && h != null) onParcelUpdate(w, h)
-                    },
-                ) {
-                    Text(stringResource(Res.string.apply_area))
-                }
-                val zoomPercent = (state.project.pixelsPerMeter / 50f * 100f).toInt()
-                Text(stringResource(Res.string.zoom_percent, zoomPercent), style = MaterialTheme.typography.bodySmall)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(modifier = Modifier.weight(1f), onClick = onZoomOut) { Text("Zoom -") }
-                    Button(modifier = Modifier.weight(1f), onClick = onZoomReset) { Text(stringResource(Res.string.reset)) }
-                    Button(modifier = Modifier.weight(1f), onClick = onZoomIn) { Text("Zoom +") }
-                }
-                Text(stringResource(Res.string.drag_hint), color = MaterialTheme.colorScheme.primary)
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Button(
-                        modifier = Modifier.fillMaxWidth().weight(1f),
-                        onClick = onClearZones,
-                        enabled = state.project.blockZones.isNotEmpty(),
-                    ) {
-                        Text(stringResource(Res.string.clear_block_zones))
-                    }
-                }
-                if (state.currentTool == PlannerToolMode.BlockZone) {
-                    Text(stringResource(Res.string.block_zone_hint), color = MaterialTheme.colorScheme.primary)
-                }
-            }
-            HorizontalDivider()
 
             CollapsibleHeader(
                 title = stringResource(Res.string.presets_title, visiblePresets.size),
@@ -429,18 +345,6 @@ fun CollapsibleHeader(
         onClick = onToggle,
         label = { Text(if (expanded) "▼ $title" else "▶ $title") },
         modifier = modifier.fillMaxWidth(),
-    )
-}
-
-@Composable
-private fun ToolChip(
-    label: String,
-    selected: Boolean,
-    onClick: () -> Unit,
-) {
-    AssistChip(
-        onClick = onClick,
-        label = { Text(if (selected) "• $label" else label) },
     )
 }
 

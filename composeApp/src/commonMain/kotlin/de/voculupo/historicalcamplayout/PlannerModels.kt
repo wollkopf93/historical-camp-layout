@@ -109,6 +109,12 @@ enum class RingShape(
 
     /** Straight back row plus two side rows, square to the parcel: how most groups actually pitch. */
     U_SHAPE(0f),
+
+    /** Tents with their backs to the back and side edges of the parcel: the largest open area stays free. */
+    EDGE(0f),
+
+    /** Tents spread over the whole parcel, each as far as possible from everything else. */
+    SPREAD(0f),
 }
 
 @Serializable

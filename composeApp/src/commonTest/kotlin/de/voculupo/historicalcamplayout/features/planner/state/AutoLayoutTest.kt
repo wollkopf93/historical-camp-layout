@@ -20,7 +20,6 @@ import kotlin.math.atan2
 import kotlin.math.hypot
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
 class AutoLayoutTest {
@@ -53,7 +52,7 @@ class AutoLayoutTest {
     private fun assertCleanAndInside(assets: List<PlacedAsset>) {
         val report = GeometryEngine.evaluate(PlannerProject(parcel = parcel, assets = assets), presets)
         assertTrue(report.hardCollisions.isEmpty(), "hard collisions: ${report.messages}")
-        assertTrue(report.messages.none { "Laufweg" in it || "Parzelle" in it }, "warnings: ${report.messages}")
+        assertTrue(report.messages.none { "Laufweg" in it || "Parzelle" in it || "Eingang" in it }, "warnings: ${report.messages}")
     }
 
     /** Unit vector the tent entry (local -y) points to in world space. */
@@ -140,18 +139,16 @@ class AutoLayoutTest {
     }
 
     @Test
-    fun smallParcelKeepsEverythingInsideAndSuggestsSize() {
+    fun smallParcelKeepsEverythingInside() {
         val small = Parcel(20f, 15f)
         val tents = mixedTents + "saxon_2x4" + "saxon_2x4"
         val result = run(AutoSetupRequest(small, tents, listOf("sun_sail_4x4_flat"), VisitorSide.BOTTOM))
         val r = report(result, small)
         assertTrue(r.hardCollisions.isEmpty(), "hard collisions: ${r.messages}")
-        assertTrue(r.messages.none { "Parzelle" in it }, "outside parcel: ${r.messages}")
+        assertTrue(r.messages.none { "Parzelle" in it || "Eingang" in it }, "outside parcel / blocked entry: ${r.messages}")
         assertTrue(result.skipped.isNotEmpty() || result.walkwayMeters < 1.5f, "10 tents don't fit on 20x15 with 1.5 m walkways")
         assertEquals(tents.size, result.assets.count { !isSail(it) } + result.skipped.size)
         assertTrue(result.assets.any { it.presetId == tents.first() }, "highest priority tent is placed")
-        val needed = assertNotNull(result.neededParcel)
-        assertTrue(needed.widthMeters > small.widthMeters || needed.heightMeters > small.heightMeters)
     }
 
     @Test
@@ -317,5 +314,56 @@ class AutoLayoutTest {
         assertEquals(sail.x, first.position.x, 0.5f)
         assertTrue(first.position.y > sail.y)
         assertEquals(0f, first.rotationDeg)
+    }
+
+    @Test
+    fun emptyOrUnknownRequestGivesEmptyDraft() {
+        // The sheet opens with nothing selected yet; that must not crash the live preview.
+        listOf(emptyList(), listOf("no_such_preset")).forEach { ids ->
+            val result = run(AutoSetupRequest(parcel, ids, ids, VisitorSide.BOTTOM, shape = RingShape.U_SHAPE))
+            assertTrue(result.assets.isEmpty() && result.zones.isEmpty() && result.skipped.isEmpty())
+        }
+    }
+
+    @Test
+    fun tentInFrontOfAnEntryIsReported() {
+        val saxon = presetsById.getValue("saxon_3x5")
+        val front = PlacedAsset(id = "a", presetId = saxon.id, position = Vec2(10f, 10f))
+        // Entry points to -y; a small tent 4 m in front of it stands in the door.
+        val blocker = PlacedAsset(id = "b", presetId = "round_3x3", position = Vec2(10f, 5.2f))
+        assertTrue(GeometryEngine.blocksEntry(front, saxon, blocker, presetsById.getValue("round_3x3")))
+        val r = GeometryEngine.evaluate(PlannerProject(parcel = parcel, assets = listOf(front, blocker)), presets)
+        assertTrue(r.messages.any { "Eingang" in it }, r.messages.toString())
+    }
+
+    @Test
+    fun edgeKeepsTentsOnBackAndSideEdges() {
+        val result = run(AutoSetupRequest(parcel, mixedTents, listOf("sun_sail_6x6_flat"), VisitorSide.TOP, shape = RingShape.EDGE))
+        assertCleanAndInside(result.assets)
+        assertTrue(result.skipped.isEmpty())
+        result.assets.filterNot(::isSail).forEach { tent ->
+            val b = GeometryEngine.assetBodyAabb(tent, presetsById.getValue(tent.presetId))
+            // Visitors on top: tents stand against the left, right or bottom edge, never the visitor edge.
+            val onEdge = minOf(b.left, parcel.widthMeters - b.right, parcel.heightMeters - b.bottom)
+            assertTrue(onEdge < 0.6f, "${tent.presetId} is not on an edge ($b)")
+        }
+    }
+
+    @Test
+    fun spreadKeepsTentsFarApart() {
+        val spread = run(AutoSetupRequest(parcel, mixedTents, listOf("sun_sail_6x6_flat"), VisitorSide.TOP, shape = RingShape.SPREAD))
+        val u = run(AutoSetupRequest(parcel, mixedTents, listOf("sun_sail_6x6_flat"), VisitorSide.TOP, shape = RingShape.U_SHAPE))
+        assertCleanAndInside(spread.assets)
+        assertTrue(spread.skipped.isEmpty())
+
+        fun closest(assets: List<PlacedAsset>): Float {
+            val tents = assets.filterNot(::isSail)
+            return tents.indices.minOf { i ->
+                (tents.indices - i).minOf { j ->
+                    hypot(tents[i].position.x - tents[j].position.x, tents[i].position.y - tents[j].position.y)
+                }
+            }
+        }
+        assertTrue(closest(spread.assets) > closest(u.assets), "spread ${closest(spread.assets)} vs U ${closest(u.assets)}")
     }
 }

@@ -13,6 +13,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.onAllNodesWithText
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performClick
@@ -27,7 +28,8 @@ import de.voculupo.historicalcamplayout.features.planner.canvas.parcelSizePx
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
 import kotlinx.coroutines.runBlocking
 import lagerplaner.composeapp.generated.resources.Res
-import lagerplaner.composeapp.generated.resources.save
+import lagerplaner.composeapp.generated.resources.auto_setup
+import lagerplaner.composeapp.generated.resources.auto_setup_short
 import lagerplaner.composeapp.generated.resources.undo
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
@@ -126,7 +128,7 @@ class CoreFlowsUiTest {
             settle()
             assertNear(Vec2(9f, 5f), vm.assets().single().position)
 
-            onNodeWithText(text(Res.string.undo)).performClick()
+            onNodeWithContentDescription(text(Res.string.undo)).performClick()
             settle()
             assertEquals(Vec2(5f, 5f), vm.assets().single().position, "one undo reverts the whole drag")
         }
@@ -136,6 +138,7 @@ class CoreFlowsUiTest {
     fun secondDragOfSameTent_stillGrabsItAtItsNewPosition() =
         runApp(setup = { placePresetAt("round_4", Vec2(5f, 5f)) }) { vm, _ ->
             val canvas = onNodeWithTag(PLANNER_CANVAS_TAG)
+
             fun drag(
                 fromM: Vec2,
                 toM: Vec2,
@@ -163,7 +166,7 @@ class CoreFlowsUiTest {
             waitForIdle()
             assertEquals("Küche", vm.assets().single().label)
 
-            onNodeWithText(text(Res.string.undo)).performClick()
+            onNodeWithContentDescription(text(Res.string.undo)).performClick()
             waitForIdle()
             assertEquals("Rundzelt 4m", vm.assets().single().label)
         }
@@ -182,11 +185,10 @@ class CoreFlowsUiTest {
         }
 
     @Test
-    fun saveButton_writesProject() =
-        runApp(setup = { placePresetAt("round_4", Vec2(5f, 5f)) }) { _, storage ->
-            onNodeWithText(text(Res.string.save)).performClick()
+    fun autoSetupButton_inTopBar_opensSheet() =
+        runApp { _, _ ->
+            onNodeWithText(text(Res.string.auto_setup_short)).performClick()
             waitForIdle()
-
-            assertEquals(1, storage.saved?.assets?.size)
+            onNodeWithText(text(Res.string.auto_setup)).assertExists()
         }
 }

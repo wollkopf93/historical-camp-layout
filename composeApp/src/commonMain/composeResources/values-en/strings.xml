@@ -79,6 +79,8 @@
     <string name="shape_full_circle">Full circle</string>
     <string name="shape_half_circle">Half circle</string>
     <string name="shape_u">U-shape</string>
+    <string name="shape_edge">Along the edges</string>
+    <string name="shape_spread">Spread evenly</string>
     <string name="auto_setup_join_sails">Join sun sails into one area</string>
     <string name="auto_setup_replace">Replace current layout</string>
     <string name="auto_setup_generate">Generate</string>
@@ -109,7 +111,11 @@
     <string name="visitors">Visitors</string>
     <string name="warn_compressed">Tight: walkways reduced to %1$s m.</string>
     <string name="warn_skipped">%1$d tents don\'t fit: %2$s</string>
-    <string name="warn_needed">Suggested: about %1$d × %2$d m</string>
-    <string name="apply_size">Use this size</string>
     <string name="all_fits">Everything fits.</string>
+    <string name="more">More</string>
+    <string name="file_menu">File</string>
+    <string name="auto_setup_short">Auto setup</string>
+    <string name="zoom_in">Zoom in</string>
+    <string name="zoom_out">Zoom out</string>
+    <string name="zoom_reset">Reset zoom</string>
 </resources>

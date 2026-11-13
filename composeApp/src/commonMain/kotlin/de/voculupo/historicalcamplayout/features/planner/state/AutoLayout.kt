@@ -45,8 +45,6 @@ data class AutoLayoutResult(
     /** Names of tents that did not fit, lowest priority last in the request. */
     val skipped: List<String>,
     val walkwayMeters: Float,
-    /** Suggested parcel size when the draft had to compress or drop tents. */
-    val neededParcel: Parcel?,
     val blocks: List<LayoutBlock>,
     /** Tents that had to leave their spot in the arrangement to fit (search fallback). */
     val displaced: Int = 0,
@@ -92,8 +90,7 @@ internal object AutoLayout {
             // Fewer dropped tents first, then a tidier arrangement (fewer tents scattered to fit).
             if (compareValuesBy(tight, result, { it.skipped.size }, { it.displaced }) < 0) result = tight
         }
-        val cramped = result.skipped.isNotEmpty() || result.displaced > 0 || result.walkwayMeters < req.walkwayMeters
-        return if (cramped) result.copy(neededParcel = neededParcel(req, presetsById)) else result
+        return result
     }
 
     /** Rings the request produces: one per sail (or one for joined sails), one per fire; at least one. */
@@ -104,41 +101,6 @@ internal object AutoLayout {
         val sails = req.sailPresetIds.count { id -> presetsById[id]?.let(GeometryEngine::isSunSailPreset) == true }
         val sailRings = if (req.joinSails) minOf(sails, 1) else sails
         return max(1, sailRings + req.freeAreas.count { it.kind == FreeAreaKind.FIRE })
-    }
-
-    /** Size of the unpinned draft on an unlimited parcel, plus walkway margins. */
-    private fun neededParcel(
-        req: AutoSetupRequest,
-        presetsById: Map<String, TentPreset>,
-    ): Parcel {
-        val free =
-            layout(
-                req.copy(
-                    parcel = Parcel(HUGE, HUGE),
-                    visitorSide = VisitorSide.TOP,
-                    clusterPins = emptyList(),
-                    freeAreas = req.freeAreas.map { it.copy(position = null) },
-                ),
-                presetsById,
-                emptyList(),
-                emptyList(),
-                req.walkwayMeters,
-            ) { it }
-        val laneZones =
-            free.blocks
-                .filter { !it.key.isRing && req.freeAreas[it.key.index].kind == FreeAreaKind.LANE }
-                .flatMap { it.zoneIds }
-                .toSet()
-        val presets = free.assets.map { presetsById.getValue(it.presetId) }
-        val points =
-            free.assets.zip(presets).flatMap { (a, p) -> footprint(a, p) } +
-                free.zones.filterNot { it.id in laneZones }.flatMap { it.points }
-        val xs = points.map { it.x } + free.zones.filter { it.id in laneZones }.flatMap { z -> z.points.map { it.x } }
-        if (points.isEmpty()) return req.parcel
-        val width = ceil(xs.max() - xs.min() + 2 * req.walkwayMeters)
-        val depth = ceil(points.maxOf { it.y } + req.walkwayMeters)
-        val sideways = req.visitorSide == VisitorSide.LEFT || req.visitorSide == VisitorSide.RIGHT
-        return if (sideways) Parcel(depth, width) else Parcel(width, depth)
     }
 
     /** One draggable unit, built in the canonical frame (visitors at -y) around its anchor. */
@@ -163,6 +125,8 @@ internal object AutoLayout {
         val asset: Pair<PlacedAsset, TentPreset>?,
         val owner: Block?,
         val ringSpaced: Boolean = false,
+        /** Free ground in front of a placed tent's entry: no other tent may stand on it. */
+        val entryZone: List<Vec2>? = null,
     )
 
     private fun zoneObstacle(
@@ -219,7 +183,9 @@ internal object AutoLayout {
         val fires = req.freeAreas.withIndex().filter { it.value.kind == FreeAreaKind.FIRE }
         // Ring centres: sail groups, then fires; with neither, one ring around an empty centre.
         val ringCount = max(1, sailGroups.size + fires.size)
-        val members = assignRings(tents, req.tentRings, ringCount)
+        // Edge / spread place tents against the whole parcel; the rings then only carry sails and fires.
+        val parcelWide = req.shape == RingShape.EDGE || req.shape == RingShape.SPREAD
+        val members = if (parcelWide) List(ringCount) { emptyList() } else assignRings(tents, req.tentRings, ringCount)
 
         val rings =
             (0 until ringCount).map { r ->
@@ -319,8 +285,39 @@ internal object AutoLayout {
                     val withId = placed.copy(id = newId(""))
                     tentsOut += withId to block
                     obstacles += assetObstacle(withId, preset, block, placed.position == ideal.position, clear)
+                    GeometryEngine.entryZone(withId, preset)?.let { zone ->
+                        obstacles += Obstacle(bounds(zone), bounds(zone), null, block, entryZone = zone)
+                    }
                 }
             }
+
+        if (parcelWide) {
+            // Not part of any ring: entries face the nearest sail or fire, else the parcel centre.
+            val loose = Block(BlockKey(true, -1), null, emptyList(), emptyList(), emptyList())
+            val centres =
+                rings
+                    .filter { it.fixed.isNotEmpty() || it.zones.isNotEmpty() }
+                    .map { anchors.getValue(it) }
+                    .ifEmpty { listOf(Vec2(parcel.widthMeters / 2f, parcel.heightMeters / 2f)) }
+            tents.forEach { (_, preset) ->
+                val placed =
+                    if (req.shape == RingShape.EDGE) {
+                        edgeSpot(preset, loose, side, obstacles, parcel, clear)
+                    } else {
+                        spreadSpot(preset, loose, centres, obstacles, parcel, clear)
+                    }
+                if (placed == null) {
+                    skipped += preset.name
+                } else {
+                    val withId = placed.copy(id = newId(""))
+                    tentsOut += withId to loose
+                    obstacles += assetObstacle(withId, preset, loose, false, clear)
+                    GeometryEngine.entryZone(withId, preset)?.let { zone ->
+                        obstacles += Obstacle(bounds(zone), bounds(zone), null, loose, entryZone = zone)
+                    }
+                }
+            }
+        }
 
         if (clear <= 0f) {
             val outlines =
@@ -331,6 +328,7 @@ internal object AutoLayout {
             tentsOut.replaceAll { (a, block) -> swingRopes(a, outlines.filter { it.first != a.id }.map { it.second }) to block }
         }
         val all = fixedOut + tentsOut
+        // Loose tents (edge / spread) are not grouped: they don't belong together.
         val groups = row.associateWith { block -> if (all.count { it.second === block } > 1) newId("group-") else null }
         val assets = all.map { (a, block) -> a.copy(groupId = groups[block]) }
         val blocks =
@@ -349,7 +347,7 @@ internal object AutoLayout {
                 val b = (grab.ifEmpty { fallback }).ifEmpty { listOf(anchors.getValue(block)) }.let(::bounds)
                 LayoutBlock(block.key, anchors.getValue(block), b, ids, zoneIds)
             }
-        return AutoLayoutResult(assets, zonesOut, skipped, clear, null, blocks, displaced)
+        return AutoLayoutResult(assets, zonesOut, skipped, clear, blocks, displaced)
     }
 
     /** Tents with a fixed ring go there; the rest join the ring with the fewest tents, in priority order. */
@@ -588,10 +586,14 @@ internal object AutoLayout {
         val swing = swingsRopes(preset, clear)
         val reach = box(asset, preset, withRopes = true)
         val spacing = spacingBox(asset, preset, clear)
+        val ownEntry = GeometryEngine.entryZone(asset, preset)
+        // Entries are checked for every tent, also within a ring: nobody stands in front of a door.
+        if (obstacles.any { o -> blocksAnEntry(outline, body, ownEntry, o) }) return null
         val close = mutableListOf<Pair<PlacedAsset, TentPreset>>()
         for (o in obstacles) {
-            if (ideal && o.ringSpaced && o.owner === block) continue
-            if (gap(spacing, o.body) < clear) {
+            if (o.entryZone != null || (ideal && o.ringSpaced && o.owner === block)) continue
+            // +1 cm for freely searched spots: the app's walkway warning counts exactly 1.50 m as "under 1.5 m".
+            if (gap(spacing, o.body) < clear + if (clear > 0f && !ideal) 0.01f else 0f) {
                 // Cloth to cloth: boxes of rotated tents overlap long before the walls touch; check the real outlines.
                 val other = o.asset ?: return null
                 if (!swing ||
@@ -619,6 +621,19 @@ internal object AutoLayout {
                     GeometryEngine.ropeSegments(a).any { GeometryEngine.lineIntersectsPolygon(it, outline) }
             }
         return swung.takeUnless { sailRopeIntoUs }
+    }
+
+    /** This tent stands in [o]'s entry zone, or [o] (a tent) stands in this tent's entry zone. */
+    private fun blocksAnEntry(
+        outline: List<Vec2>,
+        body: Rect,
+        ownEntry: List<Vec2>?,
+        o: Obstacle,
+    ): Boolean {
+        if (o.entryZone != null) return gap(body, o.body) < 0f && GeometryEngine.polygonsIntersect(outline, o.entryZone)
+        val other = o.asset ?: return false
+        if (ownEntry == null || GeometryEngine.isSunSailPreset(other.second) || gap(bounds(ownEntry), o.body) >= 0f) return false
+        return GeometryEngine.polygonsIntersect(ownEntry, GeometryEngine.assetWorldOutline(other.first, other.second))
     }
 
     private fun ropesHit(
@@ -654,6 +669,109 @@ internal object AutoLayout {
             }
         }
         return current
+    }
+
+    /**
+     * Along the back edge (opposite the visitors) from the middle outward, then down both side edges
+     * from the back toward the visitors. The tent's back touches the edge, its entry faces inward.
+     */
+    private fun edgeSpot(
+        preset: TentPreset,
+        loose: Block,
+        side: VisitorSide,
+        obstacles: List<Obstacle>,
+        parcel: Parcel,
+        clear: Float,
+    ): PlacedAsset? {
+        val w = parcel.widthMeters
+        val h = parcel.heightMeters
+
+        // Each edge: rotation that turns the entry inward, and where along it to try first.
+        data class Edge(
+            val rotation: Float,
+            val point: (Float, Rect) -> Vec2,
+            val length: Float,
+            val fromMiddle: Boolean,
+            val fromStart: Boolean,
+        )
+        val top = Edge(180f, { t, b -> Vec2(t, -b.top) }, w, true, true)
+        val bottom = Edge(0f, { t, b -> Vec2(t, h - b.bottom) }, w, true, true)
+        val left = Edge(90f, { t, b -> Vec2(-b.left, t) }, h, false, true)
+        val right = Edge(270f, { t, b -> Vec2(w - b.right, t) }, h, false, true)
+        val (back, sides) =
+            when (side) {
+                VisitorSide.TOP -> {
+                    bottom to listOf(left.copy(fromStart = false), right.copy(fromStart = false))
+                }
+
+                VisitorSide.BOTTOM -> {
+                    top to listOf(left, right)
+                }
+
+                VisitorSide.LEFT -> {
+                    right.copy(fromMiddle = true) to
+                        listOf(top.copy(fromMiddle = false, fromStart = false), bottom.copy(fromMiddle = false, fromStart = false))
+                }
+
+                VisitorSide.RIGHT -> {
+                    left.copy(fromMiddle = true) to listOf(top.copy(fromMiddle = false), bottom.copy(fromMiddle = false))
+                }
+            }
+
+        fun stops(edge: Edge): List<Float> {
+            val all = generateSequence(0f) { it + SEARCH_STEP }.takeWhile { it <= edge.length }.toList()
+            return when {
+                edge.fromMiddle -> all.sortedBy { abs(it - edge.length / 2f) }
+                edge.fromStart -> all
+                else -> all.reversed()
+            }
+        }
+
+        fun tryEdge(
+            edge: Edge,
+            t: Float,
+        ): PlacedAsset? {
+            val probe = place(preset, Vec2(0f, 0f), edge.rotation)
+            val b = bounds(GeometryEngine.assetWorldOutline(probe, preset))
+            return fits(probe.copy(position = edge.point(t, b)), preset, loose, false, obstacles, parcel, clear)
+        }
+        stops(back).forEach { t -> tryEdge(back, t)?.let { return it } }
+        // Side edges alternately, so both sides grow evenly from the back.
+        val sideStops = sides.map { edge -> stops(edge).map { edge to it } }
+        val interleaved = (0 until sideStops.maxOf { it.size }).flatMap { i -> sideStops.mapNotNull { it.getOrNull(i) } }
+        interleaved.forEach { (edge, t) -> tryEdge(edge, t)?.let { return it } }
+        return null
+    }
+
+    /**
+     * The free spot farthest from everything already there (tents, entries, sails, open areas and the
+     * parcel edges), entry turned toward the nearest centre.
+     */
+    private fun spreadSpot(
+        preset: TentPreset,
+        loose: Block,
+        centres: List<Vec2>,
+        obstacles: List<Obstacle>,
+        parcel: Parcel,
+        clear: Float,
+    ): PlacedAsset? {
+        val step = 1f
+        val candidates =
+            generateSequence(step / 2f) { it + step }
+                .takeWhile { it < parcel.widthMeters }
+                .flatMap { x ->
+                    generateSequence(step / 2f) { it + step }.takeWhile { it < parcel.heightMeters }.map { y -> Vec2(x, y) }
+                }.map { p ->
+                    val centre = centres.minBy { hypot(it.x - p.x, it.y - p.y) }
+                    val facing = atan2(p.y - centre.y, p.x - centre.x) * 180f / PI.toFloat() - 90f
+                    val asset = place(preset, p, squareUp(facing))
+                    val body = bounds(GeometryEngine.assetWorldOutline(asset, preset))
+                    val edgeGap = minOf(body.left, body.top, parcel.widthMeters - body.right, parcel.heightMeters - body.bottom)
+                    val nearest = obstacles.minOfOrNull { gap(body, it.body) } ?: Float.MAX_VALUE
+                    asset to minOf(edgeGap, nearest)
+                }.filter { (_, score) -> score >= 0f }
+                .sortedByDescending { it.second }
+        return candidates.firstNotNullOfOrNull { (asset, _) -> fits(asset, preset, loose, false, obstacles, parcel, clear) }
     }
 
     /** Spiral search around the ideal spot, entry still facing the ring centre. */
@@ -710,12 +828,15 @@ internal object AutoLayout {
         }
     }
 
+    // An empty block (nothing chosen yet in the sheet) is a point, not a crash.
     private fun localBounds(block: Block): Rect =
         bounds(
-            (block.fixed + block.tents.map { it.second }).flatMap { (a, p) ->
-                val padded = GeometryEngine.assetAabb(a, p)
-                footprint(a, p) + Vec2(padded.left, padded.top) + Vec2(padded.right, padded.bottom)
-            } + block.zones.flatMap { it.first },
+            (
+                (block.fixed + block.tents.map { it.second }).flatMap { (a, p) ->
+                    val padded = GeometryEngine.assetAabb(a, p)
+                    footprint(a, p) + Vec2(padded.left, padded.top) + Vec2(padded.right, padded.bottom)
+                } + block.zones.flatMap { it.first }
+            ).ifEmpty { listOf(Vec2(0f, 0f)) },
         )
 
     private fun rect(
