@@ -14,6 +14,7 @@ import lagerplaner.composeapp.generated.resources.auto_setup_short
 import org.jetbrains.compose.resources.getString
 import org.junit.Assume.assumeTrue
 import java.io.File
+import java.util.Locale
 import javax.imageio.ImageIO
 import kotlin.test.Test
 
@@ -27,7 +28,7 @@ class ReadmeScreenshots {
 
     private fun sampleCamp(): PlannerViewModel =
         PlannerViewModel(InMemoryStorage()).apply {
-            setProjectName("Sommerlager")
+            setProjectName("Summer camp")
             autoSetup(SAMPLE_REQUEST)
             setZoomLive(ZOOM)
         }
@@ -45,12 +46,19 @@ class ReadmeScreenshots {
     ) {
         assumeTrue("SCREENSHOT_DIR not set", outDir != null)
         outDir!!.mkdirs()
-        runDesktopComposeUiTest(width = width, height = height) {
-            val vm = sampleCamp()
-            setContent { App(viewModel = vm) }
-            waitForIdle()
-            action(vm)
-            save(name)
+        // README is in English, so render the English strings whatever the machine's locale.
+        val systemLocale = Locale.getDefault()
+        Locale.setDefault(Locale.ENGLISH)
+        try {
+            runDesktopComposeUiTest(width = width, height = height) {
+                val vm = sampleCamp()
+                setContent { App(viewModel = vm) }
+                waitForIdle()
+                action(vm)
+                save(name)
+            }
+        } finally {
+            Locale.setDefault(systemLocale)
         }
     }
 
@@ -90,7 +98,7 @@ class ReadmeScreenshots {
                 tentPresetIds = listOf("saxon_4x6", "round_5", "saxon_3x5", "a_tent_3x4_frame", "round_4", "saxon_2x4"),
                 sailPresetIds = listOf("sun_sail_6x6_flat"),
                 visitorSide = VisitorSide.BOTTOM,
-                freeAreas = listOf(FreeArea(FreeAreaKind.FIRE, "Feuer", 2f, 2f)),
+                freeAreas = listOf(FreeArea(FreeAreaKind.FIRE, "Fire", 2f, 2f)),
             )
     }
 }

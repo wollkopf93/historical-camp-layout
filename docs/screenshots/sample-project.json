@@ -1,12 +1,12 @@
 {
-    "name": "Sommerlager",
+    "name": "Summer camp",
     "parcel": {
         "widthMeters": 30.0,
         "heightMeters": 22.0
     },
     "assets": [
         {
-            "id": "1lbiguqzgu85u",
+            "id": "lk6ryzvmmgol",
             "presetId": "sun_sail_6x6_flat",
             "label": "Sonnensegel 6x6 (Flach/Dach)",
             "position": {
@@ -118,7 +118,7 @@
             ]
         },
         {
-            "id": "gi58dlx1no16",
+            "id": "2vvvgttaskrw7",
             "presetId": "saxon_4x6",
             "label": "Sachsenzelt 4x6",
             "position": {
@@ -157,7 +157,7 @@
             ]
         },
         {
-            "id": "26c4s47elwbvm",
+            "id": "3mav0k9gqky2q",
             "presetId": "round_5",
             "label": "Rundzelt 5m",
             "position": {
@@ -195,7 +195,7 @@
             ]
         },
         {
-            "id": "1poyv7sssyfkx",
+            "id": "gz2i6a6634i5",
             "presetId": "saxon_3x5",
             "label": "Sachsenzelt 3x5",
             "position": {
@@ -234,7 +234,7 @@
             ]
         },
         {
-            "id": "bw96vb2o0lka",
+            "id": "2ej6dfv8szdxw",
             "presetId": "a_tent_3x4_frame",
             "label": "Keilzelt 3x4 (Holzgestell)",
             "position": {
@@ -248,7 +248,7 @@
             }
         },
         {
-            "id": "5p2otk8fwrxv",
+            "id": "1drgqwptu7lj7",
             "presetId": "round_4",
             "label": "Rundzelt 4m",
             "position": {
@@ -286,7 +286,7 @@
             ]
         },
         {
-            "id": "zqtzejvj3pkt",
+            "id": "nf9bl2iqlp5c",
             "presetId": "saxon_2x4",
             "label": "Sachsenzelt 2x4",
             "position": {
@@ -324,7 +324,7 @@
     ],
     "blockZones": [
         {
-            "id": "auto-ds0h5czoxqta",
+            "id": "auto-3p3h46dkwf9t6",
             "points": [
                 {
                     "x": 17.5,
@@ -375,7 +375,7 @@
                     "y": 18.5
                 }
             ],
-            "label": "Feuer",
+            "label": "Fire",
             "kind": "FIRE"
         }
     ],
@@ -400,7 +400,7 @@
         "freeAreas": [
             {
                 "kind": "FIRE",
-                "label": "Feuer",
+                "label": "Fire",
                 "widthMeters": 2.0
             }
         ]
