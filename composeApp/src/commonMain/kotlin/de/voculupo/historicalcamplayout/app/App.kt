@@ -91,7 +91,9 @@ import de.voculupo.historicalcamplayout.features.planner.canvas.PlannerCanvas
 import de.voculupo.historicalcamplayout.features.planner.canvas.renderCampPng
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
 import de.voculupo.historicalcamplayout.features.properties.AutoSetupDialog
+import de.voculupo.historicalcamplayout.features.properties.PresetDialog
 import de.voculupo.historicalcamplayout.features.properties.PropertiesPane
+import de.voculupo.historicalcamplayout.features.properties.SpacingDialog
 import de.voculupo.historicalcamplayout.getPlatform
 import de.voculupo.historicalcamplayout.platform.PlatformBackHandler
 import de.voculupo.historicalcamplayout.rememberPresetNames
@@ -140,6 +142,7 @@ import lagerplaner.composeapp.generated.resources.reset
 import lagerplaner.composeapp.generated.resources.reset_project
 import lagerplaner.composeapp.generated.resources.rotate_left
 import lagerplaner.composeapp.generated.resources.rotate_right
+import lagerplaner.composeapp.generated.resources.spacing_title
 import lagerplaner.composeapp.generated.resources.toggle_theme
 import lagerplaner.composeapp.generated.resources.tool_block_zone
 import lagerplaner.composeapp.generated.resources.tool_measure
@@ -258,6 +261,8 @@ fun App(
     // Lives here, not in the properties pane: on phones that pane is a bottom sheet that closes when
     // the dialog takes focus, which would take the dialog down with it.
     var showAutoSetup by rememberSaveable { mutableStateOf(false) }
+    var showSpacing by rememberSaveable { mutableStateOf(false) }
+    var editingPresetId by rememberSaveable { mutableStateOf<String?>(null) }
 
     LaunchedEffect(suppressTapTemporarily) {
         if (suppressTapTemporarily) {
@@ -351,6 +356,7 @@ fun App(
                     onDragEnd = viewModel::finishInteractionWithGridSnap,
                     onResetProject = viewModel::resetProject,
                     onOpenAutoSetup = { showAutoSetup = true },
+                    onOpenSpacing = { showSpacing = true },
                     onParcelUpdate = viewModel::updateParcel,
                     onZoomReset = viewModel::resetZoom,
                     onClearZones = viewModel::clearBlockZones,
@@ -377,6 +383,7 @@ fun App(
                     onUngroup = viewModel::ungroupSelection,
                     onDuplicate = { viewModel.duplicateSelection(copySuffix) },
                     onDelete = viewModel::deleteSelection,
+                    onEditPreset = { editingPresetId = it },
                 )
             } else {
                 ExpandedLayout(
@@ -417,6 +424,7 @@ fun App(
                     onDragEnd = viewModel::finishInteractionWithGridSnap,
                     onResetProject = viewModel::resetProject,
                     onOpenAutoSetup = { showAutoSetup = true },
+                    onOpenSpacing = { showSpacing = true },
                     onParcelUpdate = viewModel::updateParcel,
                     onZoomReset = viewModel::resetZoom,
                     onClearZones = viewModel::clearBlockZones,
@@ -443,6 +451,7 @@ fun App(
                     onUngroup = viewModel::ungroupSelection,
                     onDuplicate = { viewModel.duplicateSelection(copySuffix) },
                     onDelete = viewModel::deleteSelection,
+                    onEditPreset = { editingPresetId = it },
                 )
             }
             dragState?.let { drag ->
@@ -471,6 +480,26 @@ fun App(
                     viewModel.autoSetup(it)
                 },
                 onDismiss = { showAutoSetup = false },
+            )
+        }
+        if (showSpacing) {
+            SpacingDialog(
+                rules = state.project.spacing,
+                onConfirm = {
+                    showSpacing = false
+                    viewModel.setSpacing(it)
+                },
+                onDismiss = { showSpacing = false },
+            )
+        }
+        state.presets.firstOrNull { it.id == editingPresetId }?.let { preset ->
+            PresetDialog(
+                preset = preset,
+                onConfirm = {
+                    editingPresetId = null
+                    viewModel.savePreset(it)
+                },
+                onDismiss = { editingPresetId = null },
             )
         }
     }
@@ -517,6 +546,7 @@ private fun ExpandedLayout(
     onDragEnd: () -> Unit,
     onResetProject: () -> Unit,
     onOpenAutoSetup: () -> Unit,
+    onOpenSpacing: () -> Unit,
     onParcelUpdate: (Float, Float) -> Unit,
     onZoomReset: () -> Unit,
     onClearZones: () -> Unit,
@@ -543,6 +573,7 @@ private fun ExpandedLayout(
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
+    onEditPreset: (String) -> Unit,
 ) {
     var showWarningsPanel by remember { mutableStateOf(true) }
     Box(modifier = Modifier.fillMaxSize()) {
@@ -622,6 +653,7 @@ private fun ExpandedLayout(
                 onUngroup = onUngroup,
                 onDuplicate = onDuplicate,
                 onDelete = onDelete,
+                onEditPreset = onEditPreset,
             )
         }
 
@@ -661,6 +693,7 @@ private fun ExpandedLayout(
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(Res.string.auto_setup_short))
                 }
+                TextButton(onClick = onOpenSpacing) { Text(stringResource(Res.string.spacing_title)) }
                 FileMenu(onExportProjectFile, onImportProjectFile, onExportPng, onResetProject)
                 if (state.warnings.isNotEmpty()) {
                     WarningsButton(count = state.warnings.size, onClick = { showWarningsPanel = !showWarningsPanel })
@@ -726,6 +759,7 @@ private fun CompactLayout(
     onDragEnd: () -> Unit,
     onResetProject: () -> Unit,
     onOpenAutoSetup: () -> Unit,
+    onOpenSpacing: () -> Unit,
     onParcelUpdate: (Float, Float) -> Unit,
     onZoomReset: () -> Unit,
     onClearZones: () -> Unit,
@@ -752,6 +786,7 @@ private fun CompactLayout(
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
+    onEditPreset: (String) -> Unit,
 ) {
     var sheet by remember { mutableStateOf<CompactSheet?>(null) }
     // Keeps the sheet's content visible while it slides out.
@@ -917,6 +952,10 @@ private fun CompactLayout(
                                         moreOpen = false
                                         onTool(PlannerToolMode.BlockZone)
                                     }
+                                    MenuItem(Res.string.spacing_title) {
+                                        moreOpen = false
+                                        onOpenSpacing()
+                                    }
                                     MenuItem(Res.string.zoom_reset) {
                                         moreOpen = false
                                         onZoomReset()
@@ -1042,6 +1081,7 @@ private fun CompactLayout(
                             onUngroup = onUngroup,
                             onDuplicate = onDuplicate,
                             onDelete = onDelete,
+                            onEditPreset = onEditPreset,
                         )
                     }
                 }

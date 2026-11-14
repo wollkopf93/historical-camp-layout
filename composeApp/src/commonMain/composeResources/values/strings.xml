@@ -120,6 +120,42 @@
     <string name="zoom_out">Verkleinern</string>
     <string name="zoom_reset">Zoom zurücksetzen</string>
     <string name="optimize_layout">Feinschliff: Abstände und Eingänge optimieren</string>
+    <string name="take_over">Übernehmen</string>
+    <string name="spacing_title">Abstände</string>
+    <string name="spacing_hint">Gemessen zwischen den Sicherheitsabständen der Zelte. Gilt für die Warnungen und den automatischen Aufbau. Weg = Gasse aus dem automatischen Aufbau.</string>
+    <string name="spacing_tent_tent">Zelt ↔ Zelt</string>
+    <string name="spacing_tent_sail">Zelt ↔ Sonnensegel, mindestens</string>
+    <string name="spacing_tent_sail_max">Zelt ↔ Sonnensegel, höchstens</string>
+    <string name="spacing_unlimited">beliebig</string>
+    <string name="spacing_tent_path">Zelt ↔ Weg</string>
+    <string name="spacing_sail_path">Sonnensegel ↔ Weg</string>
+    <string name="required_area">Benötigte Fläche ermitteln</string>
+    <string name="required_area_busy">Fläche wird gesucht …</string>
+    <string name="required_area_hint">Größe noch unbekannt? Erst Segel und Zelte wählen, dann die kleinste passende Fläche ermitteln lassen.</string>
+    <string name="required_area_none">Keine passende Fläche gefunden (bis 16-fache Größe).</string>
+    <string name="edit_tent_type">Zelttyp bearbeiten</string>
+    <string name="own_spacing">Eigene Abstände</string>
+    <string name="own_spacing_hint">Leer lassen, um die Abstände des Lagers zu nutzen. Gilt für alle Zelte dieses Typs.</string>
+    <string name="own_spacing_tents">Abstand zu Zelten</string>
+    <string name="own_spacing_sails">Abstand zu Sonnensegeln</string>
+    <string name="own_spacing_path">Abstand zum Weg</string>
+    <string name="spacing_camp_default">wie im Lager</string>
+    <string name="type_name">Name</string>
+    <string name="type_width">Breite</string>
+    <string name="type_depth">Tiefe</string>
+    <string name="type_margin">Sicherheitsabstand</string>
+    <string name="type_is_sail">Ist ein Sonnensegel / Baldachin</string>
+    <string name="type_ropes">Abspannseile (%1$d)</string>
+    <string name="type_ropes_hint">Heringabstand = wie weit der Hering vom Abspannpunkt entfernt steht (von oben gesehen). Gilt für neu gesetzte Zelte und für gesetzte Zelte, deren Seile noch nicht angepasst wurden.</string>
+    <string name="rope_n_stake">Seil %1$d: Heringabstand</string>
+    <string name="rope_slope_title">Heringabstand aus Höhe und Neigung</string>
+    <string name="rope_slope_height">Höhe Abspannpunkt</string>
+    <string name="rope_slope_deg">Neigung zum Boden</string>
+    <string name="rope_slope_result">Heringabstand: %1$s m</string>
+    <string name="rope_slope_apply">Für alle Seile übernehmen</string>
+    <string name="type_save_as_new">Als neuen Typ speichern</string>
+    <string name="rope_remove">Entfernen</string>
+    <string name="type_copy_suffix">(eigen)</string>
     <!-- Collision and spacing warnings: %1$s/%2$s are tent names -->
     <string name="issue_outside_parcel">%1$s ragt aus der Parzelle.</string>
     <string name="issue_sail_overlap">Sonnensegel überlappen: %1$s und %2$s.</string>
@@ -157,4 +193,6 @@
     <string name="preset_sun_sail_3x3_flat">Sonnensegel 3x3 (Flach/Dach)</string>
     <string name="preset_sun_sail_3x3_diamond">Sonnensegel 3x3 (Diagonal/Raute)</string>
     <string name="preset_sun_sail_3x3_lean_to">Sonnensegel 3x3 (Schrägdach/Kröte)</string>
+    <string name="issue_too_far_from_sail">%1$s steht zu weit vom Sonnensegel: %3$s m, höchstens %2$s m.</string>
+    <string name="issue_near_path">Abstand zum Weg: %1$s unter %2$s m (%3$s m).</string>
 </resources>

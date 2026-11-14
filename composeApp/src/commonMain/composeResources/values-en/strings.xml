@@ -120,6 +120,42 @@
     <string name="zoom_out">Zoom out</string>
     <string name="zoom_reset">Reset zoom</string>
     <string name="optimize_layout">Fine-tune spacing and entries</string>
+    <string name="take_over">Apply</string>
+    <string name="spacing_title">Spacing</string>
+    <string name="spacing_hint">Measured between the tents' safety margins. Used by the warnings and the auto setup. Path = lane from the auto setup.</string>
+    <string name="spacing_tent_tent">Tent ↔ tent</string>
+    <string name="spacing_tent_sail">Tent ↔ sun sail, at least</string>
+    <string name="spacing_tent_sail_max">Tent ↔ sun sail, at most</string>
+    <string name="spacing_unlimited">any</string>
+    <string name="spacing_tent_path">Tent ↔ path</string>
+    <string name="spacing_sail_path">Sun sail ↔ path</string>
+    <string name="required_area">Find required area</string>
+    <string name="required_area_busy">Searching area …</string>
+    <string name="required_area_hint">Size not known yet? Pick sails and tents first, then let the app find the smallest area that fits.</string>
+    <string name="required_area_none">No area found that fits (up to 16 times the size).</string>
+    <string name="edit_tent_type">Edit tent type</string>
+    <string name="own_spacing">Own spacing</string>
+    <string name="own_spacing_hint">Leave empty to use the camp's spacing. Applies to every tent of this type.</string>
+    <string name="own_spacing_tents">Gap to tents</string>
+    <string name="own_spacing_sails">Gap to sun sails</string>
+    <string name="own_spacing_path">Gap to path</string>
+    <string name="spacing_camp_default">as in the camp</string>
+    <string name="type_name">Name</string>
+    <string name="type_width">Width</string>
+    <string name="type_depth">Depth</string>
+    <string name="type_margin">Safety margin</string>
+    <string name="type_is_sail">Is a sun sail / canopy</string>
+    <string name="type_ropes">Guy ropes (%1$d)</string>
+    <string name="type_ropes_hint">Peg distance = how far the peg is from the attachment point, seen from above. Applies to newly placed tents and to placed tents whose ropes were not adjusted yet.</string>
+    <string name="rope_n_stake">Rope %1$d: peg distance</string>
+    <string name="rope_slope_title">Peg distance from height and slope</string>
+    <string name="rope_slope_height">Attachment height</string>
+    <string name="rope_slope_deg">Slope to the ground</string>
+    <string name="rope_slope_result">Peg distance: %1$s m</string>
+    <string name="rope_slope_apply">Apply to all ropes</string>
+    <string name="type_save_as_new">Save as new type</string>
+    <string name="rope_remove">Remove</string>
+    <string name="type_copy_suffix">(own)</string>
     <!-- Collision and spacing warnings: %1$s/%2$s are tent names -->
     <string name="issue_outside_parcel">%1$s sticks out of the parcel.</string>
     <string name="issue_sail_overlap">Sun sails overlap: %1$s and %2$s.</string>
@@ -157,4 +193,6 @@
     <string name="preset_sun_sail_3x3_flat">Sun sail 3x3 (flat/roof)</string>
     <string name="preset_sun_sail_3x3_diamond">Sun sail 3x3 (diagonal/diamond)</string>
     <string name="preset_sun_sail_3x3_lean_to">Sun sail 3x3 (lean-to)</string>
+    <string name="issue_too_far_from_sail">%1$s is too far from the sun sail: %3$s m, at most %2$s m.</string>
+    <string name="issue_near_path">Gap to path: %1$s under %2$s m (%3$s m).</string>
 </resources>

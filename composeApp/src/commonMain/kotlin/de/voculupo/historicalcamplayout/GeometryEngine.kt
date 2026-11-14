@@ -19,9 +19,26 @@ data class RopeSegment(
 )
 
 /** What [GeometryEngine.evaluate] found; the UI words it in the app language. */
-enum class IssueKind { OUTSIDE_PARCEL, SAIL_OVERLAP, COLLISION, ROPE_COLLISION, ENTRY_BLOCKED, NARROW_WALKWAY, IN_NO_GO_ZONE }
+enum class IssueKind {
+    OUTSIDE_PARCEL,
+    SAIL_OVERLAP,
+    COLLISION,
+    ROPE_COLLISION,
+    ENTRY_BLOCKED,
+    NARROW_WALKWAY,
+    IN_NO_GO_ZONE,
 
-/** One problem between the assets in [assetIds]; the walkway fields are only set for [IssueKind.NARROW_WALKWAY]. */
+    /** Farther from the nearest sun sail than [SpacingRules.tentToSailMax]. */
+    TOO_FAR_FROM_SAIL,
+
+    /** Closer to a path (lane) than the spacing rules allow. */
+    NEAR_PATH,
+}
+
+/**
+ * One problem between the assets in [assetIds]. For walkway, sail and path issues [walkwayMeters] is the
+ * wanted gap (for [IssueKind.TOO_FAR_FROM_SAIL] the allowed maximum) and [gapMeters] the measured one.
+ */
 data class CollisionIssue(
     val kind: IssueKind,
     val assetIds: List<String>,
@@ -187,18 +204,18 @@ object GeometryEngine {
 
     /**
      * @param autoZonesHard false (app): zones the auto setup drew are only a warning, so tents can still be rearranged.
-     * @param walkwayMeters gap (outline to outline, minus safety margins) below which neighbours get a walkway warning.
+     * Gaps come from [PlannerProject.spacing]: outline to outline, minus safety margins.
      */
     fun evaluate(
         project: PlannerProject,
         presets: List<TentPreset>,
         autoZonesHard: Boolean = false,
-        walkwayMeters: Float = project.autoSetup?.walkwayMeters ?: DEFAULT_WALKWAY_METERS,
     ): CollisionReport {
         val hard = mutableSetOf<String>()
         val warn = mutableSetOf<String>()
         val issues = mutableListOf<CollisionIssue>()
         val geometries = buildGeometries(project, presets)
+        val rules = project.spacing
 
         geometries.forEach { geo ->
             // Parcel border warnings should refer to the physical tent footprint,
@@ -241,11 +258,40 @@ object GeometryEngine {
                     warn += b.asset.id
                     issues += CollisionIssue(IssueKind.ENTRY_BLOCKED, listOf(a.asset.id, b.asset.id))
                 } else {
-                    walkwayGap(a, b, walkwayMeters)?.let { gap ->
-                        warn += a.asset.id
-                        warn += b.asset.id
-                        issues += CollisionIssue(IssueKind.NARROW_WALKWAY, listOf(a.asset.id, b.asset.id), walkwayMeters, gap)
+                    // A 0 m gap (cloth to cloth) never warns; otherwise overlapping margins count as the narrowest walkway.
+                    val need = rules.between(a.preset, b.preset)
+                    if (need > 0f) {
+                        walkwayGap(a, b, need)?.let { gap ->
+                            warn += a.asset.id
+                            warn += b.asset.id
+                            issues += CollisionIssue(IssueKind.NARROW_WALKWAY, listOf(a.asset.id, b.asset.id), need, gap)
+                        }
                     }
+                }
+            }
+        }
+
+        rules.tentToSailMax?.let { max ->
+            val sails = geometries.filter { isSunSailPreset(it.preset) }
+            if (sails.isEmpty()) return@let
+            geometries.filterNot { isSunSailPreset(it.preset) }.forEach { tent ->
+                // Measured like the walkway: outline to outline, minus both safety margins.
+                val nearest = sails.minOf { marginGap(tent, it.outline, it.asset.safetyMarginMeters) }
+                if (nearest > max) {
+                    warn += tent.asset.id
+                    issues += CollisionIssue(IssueKind.TOO_FAR_FROM_SAIL, listOf(tent.asset.id), max, nearest)
+                }
+            }
+        }
+
+        project.blockZones.filter { it.kind == FreeAreaKind.LANE && it.points.size >= 3 }.forEach { lane ->
+            geometries.forEach { geo ->
+                val need = rules.toPath(geo.preset)
+                if (polygonsIntersect(geo.outline, lane.points)) return@forEach // that is a no-go zone issue
+                val gap = marginGap(geo, lane.points, 0f)
+                if (gap < need) {
+                    warn += geo.asset.id
+                    issues += CollisionIssue(IssueKind.NEAR_PATH, listOf(geo.asset.id), need, gap)
                 }
             }
         }
@@ -395,6 +441,13 @@ object GeometryEngine {
         val gap = bodyGap - margins
         return if (bodyGap > 0.001f && gap < walkwayMeters) gap else null
     }
+
+    /** Outline gap from [geo] to [other], minus both safety margins (negative when the margins overlap). */
+    private fun marginGap(
+        geo: AssetGeometry,
+        other: List<Vec2>,
+        otherMargin: Float,
+    ): Float = outlineDistance(geo.outline, other) - geo.asset.safetyMarginMeters - otherMargin
 
     /** Shortest distance between two polygon outlines; 0 when they touch or overlap. */
     internal fun outlineDistance(

@@ -7,13 +7,18 @@ import de.voculupo.historicalcamplayout.FreeArea
 import de.voculupo.historicalcamplayout.FreeAreaKind
 import de.voculupo.historicalcamplayout.GeometryEngine
 import de.voculupo.historicalcamplayout.IssueKind
+import de.voculupo.historicalcamplayout.MIN_ZONE_CLEAR
 import de.voculupo.historicalcamplayout.Parcel
 import de.voculupo.historicalcamplayout.PlacedAsset
 import de.voculupo.historicalcamplayout.PlannerProject
 import de.voculupo.historicalcamplayout.RingShape
+import de.voculupo.historicalcamplayout.SpacingRules
 import de.voculupo.historicalcamplayout.TentPreset
 import de.voculupo.historicalcamplayout.Vec2
 import de.voculupo.historicalcamplayout.VisitorSide
+import de.voculupo.historicalcamplayout.between
+import de.voculupo.historicalcamplayout.capped
+import de.voculupo.historicalcamplayout.toPath
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.asin
@@ -61,9 +66,6 @@ data class AutoLayoutResult(
  * step by step (down to cloth to cloth) and the lowest-priority tents are left out.
  */
 internal object AutoLayout {
-    /** Walkway between footprints; the app's default walkway warning in [GeometryEngine.evaluate]. */
-    const val CLEAR = GeometryEngine.DEFAULT_WALKWAY_METERS
-
     /**
      * Walkways tried when tents don't fit: guy ropes plus 1 m to pass, then cloth to cloth (common when
      * space is short). Ropes still never run into another tent's body; that stays a hard collision.
@@ -86,19 +88,22 @@ internal object AutoLayout {
         obstacleAssets: List<PlacedAsset> = emptyList(),
         newId: (prefix: String) -> String,
     ): AutoLayoutResult {
-        fun attempt(clear: Float) =
-            repair(
-                layout(req, presetsById, obstacleZones, obstacleAssets, clear, newId),
-                req.parcel,
-                presetsById,
-                obstacleZones,
-                obstacleAssets,
-            )
-        var result = attempt(req.walkwayMeters)
+        // strict: the user's own gaps, so the draft must not cause walkway warnings; squeezed drafts may.
+        fun attempt(
+            rules: SpacingRules,
+            strict: Boolean,
+        ) = repair(
+            layout(req, presetsById, obstacleZones, obstacleAssets, rules, strict, newId),
+            req.parcel,
+            presetsById,
+            obstacleZones,
+            obstacleAssets,
+        )
+        var result = attempt(req.spacing, strict = true)
         // The chosen walkway is the user's call: only narrow it when that fits more tents.
-        for (clear in COMPRESS_STEPS.filter { it < req.walkwayMeters }) {
+        for (clear in COMPRESS_STEPS.filter { it < req.spacing.tentToTent }) {
             if (result.skipped.isEmpty()) break
-            val tight = attempt(clear)
+            val tight = attempt(req.spacing.capped(clear), strict = false)
             if (tight.skipped.size < result.skipped.size) result = tight
         }
         if (!req.optimize) return result
@@ -114,9 +119,8 @@ internal object AutoLayout {
         fun walkwayWarnings(r: AutoLayoutResult) =
             GeometryEngine
                 .evaluate(
-                    PlannerProject(parcel = req.parcel, assets = r.assets + obstacleAssets),
+                    PlannerProject(parcel = req.parcel, assets = r.assets + obstacleAssets, spacing = req.spacing),
                     presetsById.values.toList(),
-                    walkwayMeters = req.walkwayMeters,
                 ).issues
                 .count { it.kind == IssueKind.NARROW_WALKWAY }
         val keepTuned = tuned.skipped.size <= result.skipped.size && walkwayWarnings(tuned) <= walkwayWarnings(result)
@@ -170,6 +174,74 @@ internal object AutoLayout {
         )
     }
 
+    /** Parcel sizes the area search tries: half metres, like pitches are measured out. */
+    private const val AREA_STEP = 0.5f
+    private const val MAX_AREA_GROWTH = 16f
+    private const val MAX_ROUNDING_TRIES = 8
+
+    /**
+     * Smallest parcel (in [AREA_STEP]s) on which everything in [req] fits with the chosen gaps: no tent
+     * left out, no walkway squeezed. Keeps the shape of the current parcel while growing, then trims width
+     * and depth one after the other. Pins are dropped (they are absolute positions). Null when nothing is
+     * chosen or even a [MAX_AREA_GROWTH] times bigger parcel is not enough.
+     */
+    fun requiredParcel(
+        req: AutoSetupRequest,
+        presetsById: Map<String, TentPreset>,
+        obstacleZones: List<BlockZone> = emptyList(),
+        obstacleAssets: List<PlacedAsset> = emptyList(),
+    ): Parcel? {
+        if (req.tentPresetIds.isEmpty() && req.sailPresetIds.isEmpty() && req.freeAreas.isEmpty()) return null
+        // The optimizer only polishes; whether things fit is decided by the draft.
+        val base = req.copy(optimize = false, clusterPins = emptyList(), freeAreas = req.freeAreas.map { it.copy(position = null) })
+
+        fun fits(p: Parcel): Boolean {
+            var n = 0
+            val r = generate(base.copy(parcel = p), presetsById, obstacleZones, obstacleAssets) { "$it${n++}" }
+            return r.skipped.isEmpty() && r.walkwayMeters >= req.spacing.tentToTent
+        }
+
+        fun up(v: Float) = ceil(v / AREA_STEP) * AREA_STEP
+        val w0 = max(req.parcel.widthMeters, AREA_STEP)
+        val h0 = max(req.parcel.heightMeters, AREA_STEP)
+        var hi = 1f
+        while (!fits(Parcel(w0 * hi, h0 * hi))) {
+            hi *= 2f
+            if (hi > MAX_AREA_GROWTH) return null
+        }
+        var lo = 0f
+        while ((hi - lo) * max(w0, h0) > AREA_STEP) {
+            val mid = (lo + hi) / 2f
+            if (fits(Parcel(w0 * mid, h0 * mid))) hi = mid else lo = mid
+        }
+        // Rounding up can move rings around; only sizes that were checked are kept.
+        var w = up(w0 * hi)
+        var h = up(h0 * hi)
+        var tries = 0
+        while (!fits(Parcel(w, h))) {
+            if (++tries > MAX_ROUNDING_TRIES) return Parcel(w0 * hi, h0 * hi)
+            w += AREA_STEP
+            h += AREA_STEP
+        }
+
+        fun trim(
+            v: Float,
+            ok: (Float) -> Boolean,
+        ): Float {
+            var bad = 0f
+            var good = v
+            while (good - bad > AREA_STEP) {
+                val mid = up((bad + good) / 2f)
+                if (mid >= good) break
+                if (ok(mid)) good = mid else bad = mid
+            }
+            return good
+        }
+        w = trim(w) { fits(Parcel(it, h)) }
+        h = trim(h) { fits(Parcel(w, it)) }
+        return Parcel(w, h)
+    }
+
     /** Rings the request produces: one per sail (or one for joined sails); at least one. */
     fun ringCount(
         req: AutoSetupRequest,
@@ -206,19 +278,20 @@ internal object AutoLayout {
         val entryZone: List<Vec2>? = null,
         /** An open area (fire, arena, ...) no entry may face; lanes are fine to step out onto. */
         val noEntryZone: List<Vec2>? = null,
+        /** A lane: tents keep the path gap from it. */
+        val isPath: Boolean = false,
     )
 
     private fun zoneObstacle(
         points: List<Vec2>,
         owner: Block?,
         entryAllowed: Boolean = false,
-    ) = bounds(points).let { Obstacle(it, it, null, owner, ringSpaced = owner != null, noEntryZone = points.takeUnless { entryAllowed }) }
+    ) = bounds(points).let {
+        Obstacle(it, it, null, owner, ringSpaced = owner != null, noEntryZone = points.takeUnless { entryAllowed }, isPath = entryAllowed)
+    }
 
     /** Boxes closer than this may still touch for the app's polygon tests, which count shared edges. */
     private const val TOUCH = 0.01f
-
-    /** Open areas keep this distance even when the draft compresses tents to cloth to cloth. */
-    private const val MIN_ZONE_CLEAR = 1.0f
 
     private fun assetObstacle(
         asset: PlacedAsset,
@@ -245,9 +318,11 @@ internal object AutoLayout {
         presetsById: Map<String, TentPreset>,
         obstacleZones: List<BlockZone>,
         obstacleAssets: List<PlacedAsset>,
-        clear: Float,
+        rules: SpacingRules,
+        strict: Boolean,
         newId: (prefix: String) -> String,
     ): AutoLayoutResult {
+        val clear = rules.tentToTent
         val parcel = req.parcel
         val side = req.visitorSide
         val sideways = side == VisitorSide.LEFT || side == VisitorSide.RIGHT
@@ -280,7 +355,8 @@ internal object AutoLayout {
                     sails = sailGroups.getOrNull(r).orEmpty(),
                     tents = members[r],
                     shape = req.shape,
-                    clear = clear,
+                    rules = rules,
+                    strict = strict,
                 )
             }
         val areas =
@@ -299,13 +375,20 @@ internal object AutoLayout {
         val anchors = mutableMapOf<Block, Vec2>()
         val unpinned = row.filter { it.pin == null }
         val localBounds = unpinned.associateWith { localBounds(it) }
-        val rowWidth = unpinned.sumOf { localBounds.getValue(it).width.toDouble() }.toFloat() + (clear + TOUCH) * (unpinned.size - 1)
+
+        fun rowGap(
+            a: Block,
+            b: Block,
+        ) = (if (a.isLane || b.isLane) rules.tentToPath else clear) + TOUCH
+        val rowWidth =
+            unpinned.sumOf { localBounds.getValue(it).width.toDouble() }.toFloat() +
+                unpinned.zipWithNext { a, b -> rowGap(a, b) }.sum()
         var cursor = (canonicalWidth - rowWidth) / 2f
-        unpinned.forEach { block ->
+        unpinned.forEachIndexed { i, block ->
             val b = localBounds.getValue(block)
             val top = if (block.isLane) 0f else clear
             anchors[block] = toRealFrame(Vec2(cursor - b.left, top - b.top), side, parcel)
-            cursor += b.width + clear + TOUCH
+            cursor += b.width + (unpinned.getOrNull(i + 1)?.let { rowGap(block, it) } ?: 0f)
         }
         row.filter { it.pin != null }.forEach { anchors[it] = it.pin!! }
 
@@ -346,7 +429,8 @@ internal object AutoLayout {
                         Vec2(local.left, local.bottom),
                     ).map { transform(it, anchor, angle) } + solid,
                 )
-            val apart = max(clear, MIN_ZONE_CLEAR) + TOUCH
+            val pathGap = if (block.fixed.isNotEmpty() || block.isLane) rules.sailToPath else 0f
+            val apart = maxOf(clear, MIN_ZONE_CLEAR, pathGap) + TOUCH
 
             fun Rect.by(d: Vec2) = Rect(left + d.x, top + d.y, right + d.x, bottom + d.y)
 
@@ -407,7 +491,8 @@ internal object AutoLayout {
                 obstacles += assetObstacle(placed, p, block, true, clear)
             }
             block.zones.forEach { (poly, label) ->
-                val zone = BlockZone(AUTO_PREFIX + newId(""), poly.map { transform(it, anchor, angle) }, label)
+                val kind = if (block.isLane) FreeAreaKind.LANE else null
+                val zone = BlockZone(AUTO_PREFIX + newId(""), poly.map { transform(it, anchor, angle) }, label, kind)
                 zonesOut += zone
                 zoneOwner[zone.id] = block
                 obstacles += zoneObstacle(zone.points, block, entryAllowed = block.isLane)
@@ -427,8 +512,8 @@ internal object AutoLayout {
                 val anchor = anchors.getValue(block)
                 val ideal = transform(local, anchor, angle)
                 val placed =
-                    fits(ideal, preset, block, true, obstacles, parcel, clear)
-                        ?: search(ideal, preset, block, anchor, obstacles, parcel, clear, searchRadius)
+                    fits(ideal, preset, block, true, obstacles, parcel, rules)
+                        ?: search(ideal, preset, block, anchor, obstacles, parcel, rules, searchRadius)
                 if (placed == null) {
                     skipped += preset.name
                 } else {
@@ -456,9 +541,9 @@ internal object AutoLayout {
             tents.forEach { (_, preset) ->
                 val placed =
                     if (req.shape == RingShape.EDGE) {
-                        edgeSpot(preset, loose, side, obstacles, parcel, clear)
+                        edgeSpot(preset, loose, side, obstacles, parcel, rules)
                     } else {
-                        spreadSpot(preset, loose, centres, obstacles, parcel, clear)
+                        spreadSpot(preset, loose, centres, obstacles, parcel, rules)
                     }
                 if (placed == null) {
                     skipped += preset.name
@@ -551,8 +636,10 @@ internal object AutoLayout {
         sails: List<TentPreset>,
         tents: List<Pair<Int, TentPreset>>,
         shape: RingShape,
-        clear: Float,
+        rules: SpacingRules,
+        strict: Boolean,
     ): Block {
+        val clear = rules.tentToTent
         // Sails edge to edge in a row so joined sails lace together (shared edges hide their ropes).
         val sailBoxes = sails.map { bounds(GeometryEngine.assetWorldOutline(place(it, Vec2(0f, 0f)), it)) }
         var x = -sailBoxes.sumOf { it.width.toDouble() }.toFloat() / 2f
@@ -571,7 +658,7 @@ internal object AutoLayout {
         val n = tents.size
         if (n == 0) return Block(key, pin, placedSails, emptyList(), emptyList())
         if (shape == RingShape.U_SHAPE) {
-            return Block(key, pin, placedSails, buildU(placedSails, tents, clear), emptyList())
+            return Block(key, pin, placedSails, buildU(placedSails, tents, rules), emptyList())
         }
 
         val arc = shape.arcDeg / 180f * PI.toFloat()
@@ -582,8 +669,11 @@ internal object AutoLayout {
         // A tent's wedge is the widest angle any of its points (outline or rope end) reaches from the centre.
         fun wedges(r: Float) = shapes.mapIndexed { i, points -> 2f * points.maxOf { atan2(abs(it.x), r + inward[i] + it.y) } }
 
-        // Points on either side of this angle, both at least r out, are at least `clear` apart.
-        fun gap(r: Float) = asin((clear / r).coerceAtMost(1f))
+        // Tent types may want more room than the camp's walkway: the ring uses the widest pair.
+        val ringClear = tents.flatMap { (_, a) -> tents.map { (_, b) -> rules.between(a, b) } }.maxOrNull() ?: clear
+
+        // Points on either side of this angle, both at least r out, are at least `ringClear` apart.
+        fun gap(r: Float) = asin((ringClear / r).coerceAtMost(1f))
 
         fun needed(r: Float) = wedges(r).sum() + gapCount * gap(r)
 
@@ -618,15 +708,15 @@ internal object AutoLayout {
         }
 
         // At least 1 m: an empty centre with cloth-to-cloth spacing would otherwise start at r = 0 (0/0 in gap()).
-        var radius = max(centreRadius + clear, 1f)
+        val toSail = placedSails.flatMap { (_, s) -> tents.map { (_, t) -> rules.between(s, t) } }.maxOrNull()
+        var radius = max(centreRadius + (toSail ?: ringClear), 1f)
         while (needed(radius) > arc) radius += 0.25f
         // The spacing above is exact; the app's walkway warning measures axis-aligned boxes, which grow
         // when tents are rotated. Widen until the real checker is quiet (bounded). Compressed drafts
         // accept those warnings and only avoid hard collisions.
-        val strict = clear >= CLEAR
         var placed = ring(radius)
         repeat(MAX_WIDEN_STEPS) {
-            if (isClean(placedSails + placed.map { it.second }, strict, clear)) {
+            if (isClean(placedSails + placed.map { it.second }, strict, rules)) {
                 return Block(key, pin, placedSails, placed, emptyList())
             }
             radius += 0.25f
@@ -658,8 +748,9 @@ internal object AutoLayout {
     private fun buildU(
         placedSails: List<Pair<PlacedAsset, TentPreset>>,
         tents: List<Pair<Int, TentPreset>>,
-        clear: Float,
+        rules: SpacingRules,
     ): List<Pair<Int, Pair<PlacedAsset, TentPreset>>> {
+        val clear = rules.tentToTent
         // Sail outline, ropes and safety margin: a lean-to's margin reaches past its short ropes.
         val centre =
             placedSails
@@ -673,14 +764,24 @@ internal object AutoLayout {
         ) = box(place(preset, Vec2(0f, 0f), rotationDeg), preset, withRopes = !swingsRopes(preset, clear))
 
         // +1 cm: the app's walkway warning counts exactly 1.50 m as "under 1.5 m".
-        val space = if (clear > 0f) clear + TOUCH else 0f
+        fun padded(gap: Float) = if (gap > 0f) gap + TOUCH else 0f
+
+        fun space(
+            a: TentPreset,
+            b: TentPreset,
+        ) = padded(rules.between(a, b))
+        val rowSpace = tents.flatMap { (_, a) -> tents.map { (_, b) -> space(a, b) } }.maxOrNull() ?: padded(clear)
+        val toCentre = placedSails.flatMap { (_, s) -> tents.map { (_, t) -> rules.between(s, t) } }.maxOrNull() ?: clear
+        val centreSpace = padded(toCentre)
 
         // Back row takes about half, small camps are just a row.
         val backCount = if (tents.size <= 3) tents.size else (tents.size + 1) / 2
         val placed = mutableListOf<Pair<Int, Pair<PlacedAsset, TentPreset>>>()
-        val backY = centre.bottom + space
+        val backY = centre.bottom + centreSpace
         var left = 0f
         var right = 0f
+        var leftEnd: TentPreset? = null
+        var rightEnd: TentPreset? = null
         tents.take(backCount).forEachIndexed { i, (priority, preset) ->
             val b = boxAt(preset, 0f)
             // First tent centred behind the sail, each next one on the shorter end of the row.
@@ -690,32 +791,50 @@ internal object AutoLayout {
                         (-(b.left + b.right) / 2f).also {
                             left = it + b.left
                             right = it + b.right
+                            leftEnd = preset
+                            rightEnd = preset
                         }
                     }
 
                     -left <= right -> {
-                        (left - space - b.right).also { left = it + b.left }
+                        (left - space(leftEnd!!, preset) - b.right).also {
+                            left = it + b.left
+                            leftEnd = preset
+                        }
                     }
 
                     else -> {
-                        (right + space - b.left).also { right = it + b.right }
+                        (right + space(rightEnd!!, preset) - b.left).also {
+                            right = it + b.right
+                            rightEnd = preset
+                        }
                     }
                 }
             placed += priority to (place(preset, Vec2(x, backY - b.top), 0f) to preset)
         }
 
         // Side rows start just in front of the back row and run toward the visitors.
-        val innerHalf = max(-centre.left, centre.right) + space
-        var leftTop = backY - space
-        var rightTop = backY - space
+        val innerHalf = max(-centre.left, centre.right) + centreSpace
+        var leftTop = backY
+        var rightTop = backY
+        var leftLast: TentPreset? = null
+        var rightLast: TentPreset? = null
         tents.drop(backCount).forEach { (priority, preset) ->
             val toLeft = leftTop >= rightTop
             // 90 turns the entry toward +x (the centre) for the left row, 270 toward -x for the right row.
             val rotation = if (toLeft) 90f else 270f
             val b = boxAt(preset, rotation)
             val x = if (toLeft) -innerHalf - b.right else innerHalf - b.left
-            val y = (if (toLeft) leftTop else rightTop) - b.bottom
-            if (toLeft) leftTop = y + b.top - space else rightTop = y + b.top - space
+            // The first side tent faces the back row's corner: keep the widest gap of the camp to it.
+            val gapY = (if (toLeft) leftLast else rightLast)?.let { space(it, preset) } ?: rowSpace
+            val y = (if (toLeft) leftTop else rightTop) - gapY - b.bottom
+            if (toLeft) {
+                leftTop = y + b.top
+                leftLast = preset
+            } else {
+                rightTop = y + b.top
+                rightLast = preset
+            }
             placed += priority to (place(preset, Vec2(x, y), rotation) to preset)
         }
         return swingWithin(placedSails, placed, clear)
@@ -729,15 +848,17 @@ internal object AutoLayout {
     private fun isClean(
         assets: List<Pair<PlacedAsset, TentPreset>>,
         strict: Boolean,
-        clear: Float,
+        rules: SpacingRules,
     ): Boolean {
+        val clear = rules.tentToTent
         val project =
             PlannerProject(
                 parcel = Parcel(2 * HUGE, 2 * HUGE),
                 assets = assets.mapIndexed { i, (a, _) -> a.copy(id = "$i", position = Vec2(a.position.x + HUGE, a.position.y + HUGE)) },
+                spacing = rules,
             )
         val report = GeometryEngine.evaluate(project, assets.map { it.second }.distinctBy { it.id })
-        if (report.hardCollisions.isNotEmpty() || (strict && report.warningCollisions.isNotEmpty())) return false
+        if (report.hardCollisions.isNotEmpty() || (strict && clear > 0f && report.warningCollisions.isNotEmpty())) return false
         if (clear <= 0f) return true
         val outlines = assets.map { (a, p) -> GeometryEngine.assetWorldOutline(a, p) }
         return assets.indices.all { i ->
@@ -746,7 +867,7 @@ internal object AutoLayout {
                 (GeometryEngine.isSunSailPreset(assets[i].second) && GeometryEngine.isSunSailPreset(assets[j].second)) ||
                     GeometryEngine.outlineDistance(outlines[i], outlines[j]) -
                     assets[i].first.safetyMarginMeters -
-                    assets[j].first.safetyMarginMeters >= clear
+                    assets[j].first.safetyMarginMeters >= rules.between(assets[i].second, assets[j].second)
             }
         }
     }
@@ -763,8 +884,9 @@ internal object AutoLayout {
         ideal: Boolean,
         obstacles: List<Obstacle>,
         parcel: Parcel,
-        clear: Float,
+        rules: SpacingRules,
     ): PlacedAsset? {
+        val clear = rules.tentToTent
         val outline = GeometryEngine.assetWorldOutline(asset, preset)
         if (outline.any { !it.x.isFinite() || !it.y.isFinite() }) return null
         val body = bounds(outline)
@@ -784,7 +906,12 @@ internal object AutoLayout {
         for (o in obstacles) {
             if (o.entryZone != null || (ideal && o.ringSpaced && o.owner === block)) continue
             // +1 cm for freely searched spots: the app's walkway warning counts exactly 1.50 m as "under 1.5 m".
-            val needed = if (o.noEntryZone != null || o.asset == null) max(clear, MIN_ZONE_CLEAR) else clear
+            val needed =
+                when {
+                    o.isPath -> rules.toPath(preset)
+                    o.asset == null || o.noEntryZone != null -> max(clear, MIN_ZONE_CLEAR)
+                    else -> rules.between(preset, o.asset.second)
+                }
             if (gap(spacing, o.body) < needed + if (needed > 0f && !ideal) 0.01f else 0f) {
                 // Cloth to cloth: boxes of rotated tents overlap long before the walls touch; check the real outlines.
                 val other = o.asset ?: return null
@@ -893,7 +1020,7 @@ internal object AutoLayout {
         side: VisitorSide,
         obstacles: List<Obstacle>,
         parcel: Parcel,
-        clear: Float,
+        rules: SpacingRules,
     ): PlacedAsset? {
         val w = parcel.widthMeters
         val h = parcel.heightMeters
@@ -945,7 +1072,7 @@ internal object AutoLayout {
         ): PlacedAsset? {
             val probe = place(preset, Vec2(0f, 0f), edge.rotation)
             val b = bounds(GeometryEngine.assetWorldOutline(probe, preset))
-            return fits(probe.copy(position = edge.point(t, b)), preset, loose, false, obstacles, parcel, clear)
+            return fits(probe.copy(position = edge.point(t, b)), preset, loose, false, obstacles, parcel, rules)
         }
         stops(back).forEach { t -> tryEdge(back, t)?.let { return it } }
         // Side edges alternately, so both sides grow evenly from the back.
@@ -965,7 +1092,7 @@ internal object AutoLayout {
         centres: List<Vec2>,
         obstacles: List<Obstacle>,
         parcel: Parcel,
-        clear: Float,
+        rules: SpacingRules,
     ): PlacedAsset? {
         val step = 1f
         val candidates =
@@ -983,7 +1110,7 @@ internal object AutoLayout {
                     asset to minOf(edgeGap, nearest)
                 }.filter { (_, score) -> score >= 0f }
                 .sortedByDescending { it.second }
-        return candidates.firstNotNullOfOrNull { (asset, _) -> fits(asset, preset, loose, false, obstacles, parcel, clear) }
+        return candidates.firstNotNullOfOrNull { (asset, _) -> fits(asset, preset, loose, false, obstacles, parcel, rules) }
     }
 
     /** Distance a fire pit keeps from tents and sails (fire safety); relaxed to [MIN_ZONE_CLEAR] when space is short. */
@@ -1028,7 +1155,7 @@ internal object AutoLayout {
         anchor: Vec2,
         obstacles: List<Obstacle>,
         parcel: Parcel,
-        clear: Float,
+        rules: SpacingRules,
         maxRadius: Float,
     ): PlacedAsset? {
         var s = SEARCH_STEP
@@ -1039,7 +1166,7 @@ internal object AutoLayout {
                 val p = Vec2(ideal.position.x + s * cos(a).toFloat(), ideal.position.y + s * sin(a).toFloat())
                 val facing = atan2(p.y - anchor.y, p.x - anchor.x) * 180f / PI.toFloat() - 90f
                 val candidate = ideal.copy(position = p, rotationDeg = squareUp(facing))
-                fits(candidate, preset, block, false, obstacles, parcel, clear)?.let { return it }
+                fits(candidate, preset, block, false, obstacles, parcel, rules)?.let { return it }
             }
             s += SEARCH_STEP
         }

@@ -6,9 +6,11 @@ import lagerplaner.composeapp.generated.resources.issue_collision
 import lagerplaner.composeapp.generated.resources.issue_entry_blocked
 import lagerplaner.composeapp.generated.resources.issue_in_no_go_zone
 import lagerplaner.composeapp.generated.resources.issue_narrow_walkway
+import lagerplaner.composeapp.generated.resources.issue_near_path
 import lagerplaner.composeapp.generated.resources.issue_outside_parcel
 import lagerplaner.composeapp.generated.resources.issue_rope_collision
 import lagerplaner.composeapp.generated.resources.issue_sail_overlap
+import lagerplaner.composeapp.generated.resources.issue_too_far_from_sail
 import org.jetbrains.compose.resources.stringResource
 
 /** The plan's warnings as sentences in the app language, naming tents as the canvas labels them. */
@@ -55,6 +57,14 @@ private fun issueText(
 
         IssueKind.IN_NO_GO_ZONE -> {
             stringResource(Res.string.issue_in_no_go_zone, a)
+        }
+
+        IssueKind.TOO_FAR_FROM_SAIL -> {
+            stringResource(Res.string.issue_too_far_from_sail, a, "%.1f".format(issue.walkwayMeters), "%.2f".format(issue.gapMeters))
+        }
+
+        IssueKind.NEAR_PATH -> {
+            stringResource(Res.string.issue_near_path, a, "%.1f".format(issue.walkwayMeters), "%.2f".format(issue.gapMeters))
         }
     }
 }

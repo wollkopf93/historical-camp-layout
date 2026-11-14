@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -73,6 +74,7 @@ import de.voculupo.historicalcamplayout.features.planner.state.LayoutBlock
 import de.voculupo.historicalcamplayout.presetDisplayName
 import de.voculupo.historicalcamplayout.rememberPresetNames
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -103,6 +105,10 @@ import lagerplaner.composeapp.generated.resources.move_down
 import lagerplaner.composeapp.generated.resources.move_up
 import lagerplaner.composeapp.generated.resources.next
 import lagerplaner.composeapp.generated.resources.optimize_layout
+import lagerplaner.composeapp.generated.resources.required_area
+import lagerplaner.composeapp.generated.resources.required_area_busy
+import lagerplaner.composeapp.generated.resources.required_area_hint
+import lagerplaner.composeapp.generated.resources.required_area_none
 import lagerplaner.composeapp.generated.resources.reset_positions
 import lagerplaner.composeapp.generated.resources.ring_auto
 import lagerplaner.composeapp.generated.resources.ring_n
@@ -201,7 +207,8 @@ internal fun AutoSetupDialog(
             ),
     ) {
         mutableStateOf(
-            project.autoSetup ?: AutoSetupRequest(project.parcel, emptyList(), emptyList(), VisitorSide.BOTTOM, shape = RingShape.U_SHAPE),
+            (project.autoSetup ?: AutoSetupRequest(project.parcel, emptyList(), emptyList(), VisitorSide.BOTTOM, shape = RingShape.U_SHAPE))
+                .copy(spacing = project.spacing),
         )
     }
     var widthInput by rememberSaveable { mutableStateOf(fmt(req.parcel.widthMeters)) }
@@ -211,7 +218,7 @@ internal fun AutoSetupDialog(
     val kept = if (req.replaceExisting) emptyList() else project.assets
     // Computed off the main thread: the optimizer needs a moment on phones, taps must stay smooth.
     val result by produceState(
-        AutoLayoutResult(emptyList(), emptyList(), emptyList(), req.walkwayMeters, emptyList()),
+        AutoLayoutResult(emptyList(), emptyList(), emptyList(), req.spacing.tentToTent, emptyList()),
         req,
         presetsById,
         userZones,
@@ -233,6 +240,28 @@ internal fun AutoSetupDialog(
         val width = w.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
         val height = h.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
         if (width != null && height != null) req = req.copy(parcel = Parcel(width, height), clusterPins = emptyList())
+    }
+
+    // Area search: runs many drafts, so off the main thread; the result becomes the parcel size.
+    val scope = rememberCoroutineScope()
+    var areaSearch by remember { mutableStateOf(AreaSearch.Idle) }
+    val findArea = {
+        areaSearch = AreaSearch.Running
+        val current = req
+        scope.launch {
+            val found = withContext(Dispatchers.Default) { AutoLayout.requiredParcel(current, presetsById, userZones, kept) }
+            if (found == null) {
+                areaSearch = AreaSearch.NotFound
+            } else {
+                areaSearch = AreaSearch.Idle
+                setParcel(fmt(found.widthMeters), fmt(found.heightMeters))
+                req = req.copy(freeAreas = req.freeAreas.map { it.copy(position = null) })
+            }
+        }
+        Unit
+    }
+    val areaButton: @Composable () -> Unit = {
+        RequiredAreaButton(areaSearch, enabled = req.tentPresetIds.isNotEmpty() || req.sailPresetIds.isNotEmpty(), onClick = findArea)
     }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -257,10 +286,10 @@ internal fun AutoSetupDialog(
                     HorizontalDivider()
                     val content: @Composable () -> Unit = {
                         when (step) {
-                            0 -> StepPlace(widthInput, heightInput, req, ::setParcel) { req = it }
+                            0 -> StepPlace(widthInput, heightInput, req, ::setParcel, areaButton) { req = it }
                             1 -> StepSailsAndAreas(req, presets) { req = it }
                             2 -> StepTents(req, presets, presetsById) { req = it }
-                            else -> StepArrange(req) { req = it }
+                            else -> StepArrange(req, areaButton) { req = it }
                         }
                     }
                     val preview: @Composable (Modifier) -> Unit = { canvasModifier ->
@@ -318,9 +347,12 @@ private fun StepPlace(
     heightInput: String,
     req: AutoSetupRequest,
     onParcel: (String, String) -> Unit,
+    areaButton: @Composable () -> Unit,
     onChange: (AutoSetupRequest) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(Res.string.required_area_hint), style = MaterialTheme.typography.bodySmall)
+        areaButton()
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = widthInput,
@@ -511,9 +543,11 @@ private fun StepTents(
 @Composable
 private fun StepArrange(
     req: AutoSetupRequest,
+    areaButton: @Composable () -> Unit,
     onChange: (AutoSetupRequest) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        areaButton()
         ChipRow(
             Res.string.auto_setup_shape,
             shapeLabels.map { (v, l) ->
@@ -522,9 +556,10 @@ private fun StepArrange(
             req.shape,
         ) { onChange(req.copy(shape = it)) }
         val cloth = stringResource(Res.string.walkway_cloth)
-        ChipRow(Res.string.walkway, walkways.map { it to if (it == 0f) cloth else "${fmt(it)} m" }, req.walkwayMeters) {
-            onChange(req.copy(walkwayMeters = it))
+        ChipRow(Res.string.walkway, walkways.map { it to if (it == 0f) cloth else "${fmt(it)} m" }, req.spacing.tentToTent) {
+            onChange(req.copy(spacing = req.spacing.copy(tentToTent = it)))
         }
+        SpacingEditor(req.spacing, { onChange(req.copy(spacing = it)) }, withTentToTent = false)
         SwitchRow(stringResource(Res.string.optimize_layout), req.optimize) { onChange(req.copy(optimize = it)) }
         SwitchRow(stringResource(Res.string.auto_setup_replace), req.replaceExisting) { onChange(req.copy(replaceExisting = it)) }
         Text(stringResource(Res.string.drag_preview_hint), style = MaterialTheme.typography.bodySmall)
@@ -687,7 +722,7 @@ private fun Warnings(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val warn = MaterialTheme.colorScheme.error
-        if (result.walkwayMeters < req.walkwayMeters) {
+        if (result.walkwayMeters < req.spacing.tentToTent) {
             Text(
                 stringResource(Res.string.warn_compressed, fmt(result.walkwayMeters)),
                 color = warn,
@@ -701,8 +736,31 @@ private fun Warnings(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        if (result.skipped.isEmpty() && result.walkwayMeters >= req.walkwayMeters && result.assets.isNotEmpty()) {
+        if (result.skipped.isEmpty() && result.walkwayMeters >= req.spacing.tentToTent && result.assets.isNotEmpty()) {
             Text(stringResource(Res.string.all_fits), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+private enum class AreaSearch { Idle, Running, NotFound }
+
+/** "How much space do I need?": sets the parcel to the smallest size the chosen camp fits on. */
+@Composable
+private fun RequiredAreaButton(
+    search: AreaSearch,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        OutlinedButton(onClick = onClick, enabled = enabled && search != AreaSearch.Running) {
+            Text(stringResource(if (search == AreaSearch.Running) Res.string.required_area_busy else Res.string.required_area))
+        }
+        if (search == AreaSearch.NotFound) {
+            Text(
+                stringResource(Res.string.required_area_none),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
     }
 }

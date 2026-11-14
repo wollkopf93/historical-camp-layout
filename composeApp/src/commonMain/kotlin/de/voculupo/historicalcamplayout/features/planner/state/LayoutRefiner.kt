@@ -5,11 +5,15 @@ import de.voculupo.historicalcamplayout.AutoSetupRequest
 import de.voculupo.historicalcamplayout.BlockZone
 import de.voculupo.historicalcamplayout.FreeAreaKind
 import de.voculupo.historicalcamplayout.GeometryEngine
+import de.voculupo.historicalcamplayout.MIN_ZONE_CLEAR
 import de.voculupo.historicalcamplayout.PlacedAsset
 import de.voculupo.historicalcamplayout.RingShape
 import de.voculupo.historicalcamplayout.RopeSegment
 import de.voculupo.historicalcamplayout.TentPreset
 import de.voculupo.historicalcamplayout.Vec2
+import de.voculupo.historicalcamplayout.between
+import de.voculupo.historicalcamplayout.capped
+import de.voculupo.historicalcamplayout.toPath
 import kotlin.math.exp
 import kotlin.math.hypot
 import kotlin.math.max
@@ -22,8 +26,9 @@ import kotlin.random.Random
  * penalty and simulated annealing shifts, turns and swaps tents to lower the total.
  * - Hard (1000 each): bodies overlapping, ropes running into a body, a door blocked by a tent or
  *   facing a fire/arena, body outside the parcel.
- * - Soft: walkway shorter than chosen, too close to an open area, door not facing the nearest sail,
- *   skewed (not 90 degrees), drifting from the draft spot, and for ring shapes distance from the sail.
+ * - Soft: gap shorter than the spacing rules, too close to an open area or path, farther from a sail
+ *   than allowed, door not facing the nearest sail, skewed (not 90 degrees), drifting from the draft
+ *   spot, and for ring shapes distance from the sail.
  * Sails, open areas and existing assets stay where they are. Fixed seed, so the preview is stable.
  */
 internal object LayoutRefiner {
@@ -37,7 +42,6 @@ internal object LayoutRefiner {
     private const val SKEW = 0.5f
     private const val DRIFT = 0.2f
     private const val COHESION = 0.4f
-    private const val MIN_ZONE_CLEAR = 1.0f
     private const val ITERATIONS_PER_TENT = 800
     private const val START_TEMP = 1f
     private const val END_TEMP = 0.05f
@@ -52,12 +56,14 @@ internal object LayoutRefiner {
         val ropes: List<RopeSegment>,
         val door: List<Vec2>?,
         val isSail: Boolean,
+        val preset: TentPreset,
     )
 
     private class Zone(
         val points: List<Vec2>,
         val box: Rect,
         val noEntry: Boolean,
+        val isPath: Boolean = false,
     )
 
     fun refine(
@@ -78,7 +84,7 @@ internal object LayoutRefiner {
                 .flatMap { it.zoneIds }
                 .toSet()
         val zones =
-            result.zones.map { Zone(it.points, bounds(it.points), it.id !in laneZones) } +
+            result.zones.map { Zone(it.points, bounds(it.points), it.id !in laneZones, isPath = it.id in laneZones) } +
                 userZones.filter { it.points.size >= 3 }.map { Zone(it.points, bounds(it.points), true) }
         val centres = sails.map { it.position }
         val ringShape = req.shape != RingShape.EDGE && req.shape != RingShape.SPREAD
@@ -89,6 +95,10 @@ internal object LayoutRefiner {
         val start = tents.map { it.position }
         val walk = result.walkwayMeters
         val cloth = walk <= 0f
+        // The gaps the draft was built with (squeezed when it had to compress).
+        val rules = if (walk < req.spacing.tentToTent) req.spacing.capped(walk) else req.spacing
+        val maxToSail = rules.tentToSailMax
+        val sailShapes = fixed.filter { it.isSail }
         val shapes = tents.map { shape(it, preset(it)) }.toMutableList()
 
         // A ring tent belongs to its own sail(s), even when another ring's sail is closer.
@@ -131,8 +141,9 @@ internal object LayoutRefiner {
             }
             // Cloth to cloth: walls may touch, so measure the walls rather than the safety boxes.
             val g = if (cloth) gap(a.box, b.box) else gap(a.padded, b.padded)
+            val need = rules.between(a.preset, b.preset)
             // +1 cm: the app counts exactly the walkway as too short.
-            if (g < walk + 0.01f) c += WALK_STEP + WALK * (walk - g)
+            if (g < need + 0.01f) c += WALK_STEP + WALK * (need - g)
             return c
         }
 
@@ -141,7 +152,7 @@ internal object LayoutRefiner {
                 .sumOf { z ->
                     var c = 0f
                     val g = gap(a.box, z.box)
-                    val need = max(walk, MIN_ZONE_CLEAR)
+                    val need = if (z.isPath) rules.toPath(a.preset) else max(walk, MIN_ZONE_CLEAR)
                     if (g < need) c += WALK_STEP + WALK * (need - g)
                     if (g < 0f && GeometryEngine.polygonsIntersect(a.outline, z.points)) c += HARD
                     if (z.noEntry && a.door != null && gap(bounds(a.door), z.box) < 0f &&
@@ -170,6 +181,10 @@ internal object LayoutRefiner {
                 val len = hypot(to.x, to.y)
                 if (len > 0.01f) c += FACE * (1f - (out.x * to.x + out.y * to.y) / len)
                 if (ringShape) c += COHESION * len
+            }
+            if (maxToSail != null && sailShapes.isNotEmpty()) {
+                val far = sailShapes.minOf { gap(s.padded, it.padded) } - maxToSail
+                if (far > 0f) c += WALK_STEP + WALK * far
             }
             if (a.rotationDeg % 90f != 0f) c += SKEW
             c += DRIFT * hypot(a.position.x - start[i].x, a.position.y - start[i].y)
@@ -275,7 +290,7 @@ internal object LayoutRefiner {
         val box = bounds(outline)
         val padded = GeometryEngine.assetAabb(a, p)
         val reach = bounds(outline + ropes.map { it.end } + listOf(Vec2(padded.left, padded.top), Vec2(padded.right, padded.bottom)))
-        return Shape(outline, box, padded, reach, ropes, GeometryEngine.entryZone(a, p), GeometryEngine.isSunSailPreset(p))
+        return Shape(outline, box, padded, reach, ropes, GeometryEngine.entryZone(a, p), GeometryEngine.isSunSailPreset(p), p)
     }
 
     private fun bounds(points: List<Vec2>) =

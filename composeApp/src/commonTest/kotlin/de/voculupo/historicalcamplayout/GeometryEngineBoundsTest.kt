@@ -46,7 +46,10 @@ class GeometryEngineBoundsTest {
         val project = PlannerProject(parcel = Parcel(30f, 30f), assets = listOf(a, b))
 
         assertTrue(GeometryEngine.evaluate(project, presets).warningCollisions.isEmpty())
-        assertEquals(setOf("a", "b"), GeometryEngine.evaluate(project, presets, walkwayMeters = 2.5f).warningCollisions)
+        assertEquals(
+            setOf("a", "b"),
+            GeometryEngine.evaluate(project.copy(spacing = SpacingRules(tentToTent = 2.5f)), presets).warningCollisions,
+        )
     }
 
     @Test

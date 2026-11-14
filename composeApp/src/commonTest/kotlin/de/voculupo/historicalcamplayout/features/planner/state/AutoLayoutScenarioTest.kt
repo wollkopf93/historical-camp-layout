@@ -9,6 +9,7 @@ import de.voculupo.historicalcamplayout.Parcel
 import de.voculupo.historicalcamplayout.PlacedAsset
 import de.voculupo.historicalcamplayout.PlannerProject
 import de.voculupo.historicalcamplayout.RingShape
+import de.voculupo.historicalcamplayout.SpacingRules
 import de.voculupo.historicalcamplayout.VisitorSide
 import de.voculupo.historicalcamplayout.defaultPresets
 import kotlin.random.Random
@@ -46,7 +47,7 @@ class AutoLayoutScenarioTest {
             shape = RingShape.entries[rnd.nextInt(RingShape.entries.size)],
             joinSails = sails.size > 1 && rnd.nextBoolean(),
             freeAreas = areas,
-            walkwayMeters = listOf(1.5f, 1.5f, 1.5f, 1.0f, 2.0f, 0f)[rnd.nextInt(6)],
+            spacing = SpacingRules(tentToTent = listOf(1.5f, 1.5f, 1.5f, 1.0f, 2.0f, 0f)[rnd.nextInt(6)]),
             optimize = rnd.nextInt(4) != 0,
         )
     }
@@ -117,10 +118,10 @@ class AutoLayoutScenarioTest {
             val result = AutoLayout.generate(req, presetsById) { "$it${id++}" }
             tents += req.tentPresetIds.size
             skipped += result.skipped.size
-            if (result.walkwayMeters < req.walkwayMeters) compressed++
+            if (result.walkwayMeters < req.spacing.tentToTent) compressed++
             violations(req, result).takeIf { it.isNotEmpty() }?.let {
                 failures += "#$n $req\n  -> $it"
-                println("FAIL\t#$n\t${req.shape}\topt=${req.optimize}\twalk=${req.walkwayMeters}->${result.walkwayMeters}\t$it")
+                println("FAIL\t#$n\t${req.shape}\topt=${req.optimize}\twalk=${req.spacing.tentToTent}->${result.walkwayMeters}\t$it")
             }
         }
         println("scenarios=$CASES tents=$tents skipped=$skipped compressed=$compressed failures=${failures.size}")
@@ -162,7 +163,7 @@ class AutoLayoutScenarioTest {
             val result = AutoLayout.generate(req, presetsById) { "$it${id++}" }
             val problems = violations(req, result).toMutableList()
             if (result.skipped.isNotEmpty()) problems += "skipped ${result.skipped}"
-            if (result.walkwayMeters < req.walkwayMeters) problems += "walkway shrank to ${result.walkwayMeters}"
+            if (result.walkwayMeters < req.spacing.tentToTent) problems += "walkway shrank to ${result.walkwayMeters}"
             if (problems.isNotEmpty()) failures += "#$n ${req.shape} ${req.visitorSide} $tents $sails -> $problems"
         }
         assertTrue(failures.isEmpty(), "${failures.size} of $ROOMY_CASES roomy camps:\n" + failures.take(15).joinToString("\n"))
@@ -184,7 +185,7 @@ class AutoLayoutScenarioTest {
                             listOf("sun_sail_6x6_flat"),
                             VisitorSide.TOP,
                             shape = shape,
-                            walkwayMeters = w,
+                            spacing = SpacingRules(tentToTent = w),
                         )
                     var id = 0
                     val r = AutoLayout.generate(req, presetsById) { "$it${id++}" }

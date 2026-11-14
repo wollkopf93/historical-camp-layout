@@ -11,6 +11,8 @@ import de.voculupo.historicalcamplayout.PlacedAsset
 import de.voculupo.historicalcamplayout.PlannerJson
 import de.voculupo.historicalcamplayout.PlannerProject
 import de.voculupo.historicalcamplayout.RingShape
+import de.voculupo.historicalcamplayout.SpacingOverride
+import de.voculupo.historicalcamplayout.SpacingRules
 import de.voculupo.historicalcamplayout.Vec2
 import de.voculupo.historicalcamplayout.VisitorSide
 import de.voculupo.historicalcamplayout.data.storage.toJsonString
@@ -270,8 +272,28 @@ class AutoLayoutTest {
         // Frame tents have no guy ropes, so cloth to cloth really means touching walls.
         val tight = Parcel(16f, 11f)
         val tents = List(6) { "a_tent_3x4_frame" }
-        val roomy = run(AutoSetupRequest(tight, tents, emptyList(), VisitorSide.TOP, walkwayMeters = 1.5f, shape = RingShape.HALF_CIRCLE))
-        val cloth = run(AutoSetupRequest(tight, tents, emptyList(), VisitorSide.TOP, walkwayMeters = 0f, shape = RingShape.HALF_CIRCLE))
+        val roomy =
+            run(
+                AutoSetupRequest(
+                    tight,
+                    tents,
+                    emptyList(),
+                    VisitorSide.TOP,
+                    spacing = SpacingRules(tentToTent = 1.5f),
+                    shape = RingShape.HALF_CIRCLE,
+                ),
+            )
+        val cloth =
+            run(
+                AutoSetupRequest(
+                    tight,
+                    tents,
+                    emptyList(),
+                    VisitorSide.TOP,
+                    spacing = SpacingRules(tentToTent = 0f),
+                    shape = RingShape.HALF_CIRCLE,
+                ),
+            )
         assertTrue(cloth.assets.size >= roomy.assets.size, "cloth to cloth places ${cloth.assets.size}, roomy ${roomy.assets.size}")
         val r = report(cloth, tight)
         assertTrue(r.hardCollisions.isEmpty(), "hard collisions: ${r.issues}")
@@ -282,7 +304,7 @@ class AutoLayoutTest {
     fun clothToClothSwingsGuyRopesBehindNeighbours() {
         val tight = Parcel(14f, 10f)
         val tents = List(6) { "saxon_2x4" }
-        val cloth = run(AutoSetupRequest(tight, tents, emptyList(), VisitorSide.TOP, walkwayMeters = 0f))
+        val cloth = run(AutoSetupRequest(tight, tents, emptyList(), VisitorSide.TOP, spacing = SpacingRules(tentToTent = 0f)))
         assertTrue(cloth.assets.size >= 4, "cloth to cloth placed only ${cloth.assets.size}")
         val r = report(cloth, tight)
         assertTrue(r.hardCollisions.isEmpty(), "hard collisions: ${r.issues}")
@@ -476,5 +498,57 @@ class AutoLayoutTest {
         val tuned = run(req)
         assertTrue(spread(tuned) < spread(plain), "tuned ${spread(tuned)} vs plain ${spread(plain)}")
         assertTrue(report(tuned, req.parcel).hardCollisions.isEmpty())
+    }
+
+    @Test
+    fun requiredParcel_isTheSmallestThatFits() {
+        val req =
+            AutoSetupRequest(
+                Parcel(10f, 8f),
+                mixedTents.take(5),
+                listOf("sun_sail_6x6_flat"),
+                VisitorSide.BOTTOM,
+                shape = RingShape.U_SHAPE,
+            )
+        val found = assertNotNull(AutoLayout.requiredParcel(req, presetsById))
+
+        fun fits(p: Parcel) = run(req.copy(parcel = p, optimize = false)).let { it.skipped.isEmpty() && it.walkwayMeters >= 1.5f }
+        assertTrue(fits(found), "found $found must fit")
+        assertTrue(!fits(found.copy(widthMeters = found.widthMeters - 1f)), "1 m narrower than $found still fits")
+        assertTrue(!fits(found.copy(heightMeters = found.heightMeters - 1f)), "1 m shallower than $found still fits")
+    }
+
+    @Test
+    fun requiredParcel_nothingChosen_isNull() {
+        assertEquals(null, AutoLayout.requiredParcel(AutoSetupRequest(parcel, emptyList(), emptyList(), VisitorSide.TOP), presetsById))
+    }
+
+    @Test
+    fun tentTypeOverride_widensTheDraft() {
+        // Wedge tents that want 3 m to their neighbours: the draft must keep it, the app must not warn.
+        val wide = presetsById.getValue("a_tent_3x4_frame").copy(spacing = SpacingOverride(toTents = 3f))
+        val byId = presetsById + (wide.id to wide)
+        listOf(RingShape.U_SHAPE, RingShape.HORSESHOE).forEach { shape ->
+            var n = 0
+            val req =
+                AutoSetupRequest(
+                    parcel,
+                    List(5) { wide.id },
+                    listOf("sun_sail_6x6_flat"),
+                    VisitorSide.BOTTOM,
+                    shape = shape,
+                    optimize = false,
+                )
+            val result = AutoLayout.generate(req, byId) { "$it${n++}" }
+            assertEquals(6, result.assets.size, "$shape skipped ${result.skipped}")
+            val warnings =
+                GeometryEngine
+                    .evaluate(
+                        PlannerProject(parcel = parcel, assets = result.assets),
+                        byId.values.toList(),
+                    ).issues
+                    .map { it.kind }
+            assertTrue(warnings.none { it == IssueKind.NARROW_WALKWAY }, "$shape: $warnings")
+        }
     }
 }

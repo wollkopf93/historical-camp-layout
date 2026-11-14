@@ -170,4 +170,154 @@ class PlannerViewModelScenarioTest {
                 .isEmpty(),
         )
     }
+
+    @Test
+    fun editingTentType_updatesUntouchedPlacedTents_andSaveAsNewAddsType() {
+        val vm = PlannerViewModel(InMemoryStorage())
+        vm.placePresetAt("saxon_2x4", Vec2(5f, 5f))
+        vm.placePresetAt("saxon_2x4", Vec2(15f, 5f))
+        vm.selectRopeIndex(0)
+        vm.setSelectedRopeLengthScale(0.5f) // the second tent's first rope is tuned by hand
+        val type =
+            vm.uiState.value.presets
+                .first { it.id == "saxon_2x4" }
+
+        vm.savePreset(type.copy(ropeAnchors = type.ropeAnchors.map { it.copy(lengthMeters = 3f) }))
+
+        val (untouched, tuned) = vm.assets()
+        assertTrue(untouched.ropes.all { it.lengthMeters == 3f }, "untouched tent follows the type")
+        assertEquals(0.5f, tuned.ropes.first().lengthMeters, "hand-tuned rope stays")
+        assertTrue(
+            vm.uiState.value.presets
+                .first { it.id == "saxon_2x4" }
+                .userModified,
+        )
+
+        vm.savePreset(type.copy(id = "custom_1", name = "Mein Zelt"))
+        assertTrue(
+            vm.uiState.value.presets
+                .any { it.id == "custom_1" && it.name == "Mein Zelt" },
+        )
+        assertTrue(
+            vm.uiState.value.presets
+                .any { it.id == "saxon_2x4" },
+            "the original stays",
+        )
+    }
+
+    @Test
+    fun setSpacing_changesWarnings_syncsAutoSetup_andUndoes() {
+        val vm = PlannerViewModel(InMemoryStorage())
+        vm.autoSetup(AutoSetupRequest(Parcel(30f, 20f), listOf("round_3x3"), emptyList(), VisitorSide.TOP))
+        vm.placePresetAt("round_3x3", Vec2(5f, 15f))
+        vm.placePresetAt("round_3x3", Vec2(13f, 15f))
+        val before =
+            vm.uiState.value.warnings
+                .count { it.kind == IssueKind.NARROW_WALKWAY }
+
+        vm.setSpacing(SpacingRules(tentToTent = 10f))
+        assertEquals(10f, vm.uiState.value.project.spacing.tentToTent)
+        assertEquals(
+            10f,
+            vm.uiState.value.project.autoSetup!!
+                .spacing.tentToTent,
+            "reopening the auto setup shows the same gaps",
+        )
+        assertTrue(
+            vm.uiState.value.warnings
+                .count { it.kind == IssueKind.NARROW_WALKWAY } > before,
+            "a wider walkway warns about the close pair",
+        )
+
+        vm.undo()
+        assertEquals(SpacingRules(), vm.uiState.value.project.spacing)
+    }
+
+    @Test
+    fun autoSetup_storesItsSpacingOnTheProject() {
+        val vm = PlannerViewModel(InMemoryStorage())
+        val rules = SpacingRules(tentToTent = 2f, tentToSailMax = 5f)
+        vm.autoSetup(
+            AutoSetupRequest(Parcel(40f, 30f), listOf("round_4", "round_4"), listOf("sun_sail_6x6_flat"), VisitorSide.TOP, spacing = rules),
+        )
+        assertEquals(rules, vm.uiState.value.project.spacing)
+        assertTrue(
+            vm.uiState.value.warnings
+                .none { it.kind == IssueKind.NARROW_WALKWAY },
+            vm.uiState.value.warnings
+                .toString(),
+        )
+    }
+
+    @Test
+    fun spacing_survivesSaveAndRestart() {
+        val storage = InMemoryStorage()
+        val vm = PlannerViewModel(storage)
+        vm.setSpacing(SpacingRules(tentToPath = 0.7f))
+        vm.saveProject()
+        assertEquals(
+            0.7f,
+            PlannerViewModel(storage)
+                .uiState.value.project.spacing.tentToPath,
+        )
+    }
+
+    @Test
+    fun editingTentType_marginFollowsUnlessChanged_andNewTypeCanBePlaced() {
+        val vm = PlannerViewModel(InMemoryStorage())
+        vm.placePresetAt("round_4", Vec2(5f, 5f))
+        val type =
+            vm.uiState.value.presets
+                .first { it.id == "round_4" }
+        vm.savePreset(type.copy(defaultSafetyMarginMeters = 0.25f))
+        assertEquals(0.25f, vm.assets().single().safetyMarginMeters)
+
+        vm.savePreset(type.copy(id = "custom_x", name = "Eigenes Rundzelt", defaultSafetyMarginMeters = 0.1f))
+        vm.placePresetAt("custom_x", Vec2(15f, 5f))
+        val placed = vm.assets().last()
+        assertEquals("custom_x", placed.presetId)
+        assertEquals(0.1f, placed.safetyMarginMeters)
+        assertEquals(0.25f, vm.assets().first().safetyMarginMeters, "the original type's tent is untouched")
+    }
+
+    @Test
+    fun editingTentType_resizeMovesNothingButRecomputesWarnings() {
+        val vm = PlannerViewModel(InMemoryStorage())
+        vm.placePresetAt("round_3x3", Vec2(5f, 5f))
+        vm.placePresetAt("round_3x3", Vec2(9f, 5f))
+        val positions = vm.assets().map { it.position }
+        val type =
+            vm.uiState.value.presets
+                .first { it.id == "round_3x3" }
+        vm.savePreset(
+            de.voculupo.historicalcamplayout.features.planner.state.PlannerDomainOps
+                .resized(type, 5f, 5f),
+        ) // now the two overlap
+        assertEquals(positions, vm.assets().map { it.position })
+        assertTrue(
+            vm.uiState.value.hardCollisionAssetIds.size == 2,
+            vm.uiState.value.warnings
+                .toString(),
+        )
+    }
+
+    @Test
+    fun ownSpacingOnType_changesWarnings() {
+        val vm = PlannerViewModel(InMemoryStorage())
+        // Default margin 1 m: padded boxes 3 m apart, fine for the camp's 1.5 m.
+        vm.placePresetAt("round_3x3", Vec2(5f, 15f))
+        vm.placePresetAt("round_3x3", Vec2(13f, 15f))
+        assertTrue(
+            vm.uiState.value.warnings
+                .none { it.kind == IssueKind.NARROW_WALKWAY },
+        )
+        val type =
+            vm.uiState.value.presets
+                .first { it.id == "round_3x3" }
+        vm.savePreset(type.copy(spacing = SpacingOverride(toTents = 6f)))
+        assertTrue(
+            vm.uiState.value.warnings
+                .any { it.kind == IssueKind.NARROW_WALKWAY },
+        )
+    }
 }
