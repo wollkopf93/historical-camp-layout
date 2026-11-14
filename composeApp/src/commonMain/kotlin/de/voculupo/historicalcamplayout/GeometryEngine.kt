@@ -40,12 +40,16 @@ object GeometryEngine {
         val end: Vec2,
     )
 
+    /** Walkway the app warns about when the project has no auto setup to take it from. */
+    const val DEFAULT_WALKWAY_METERS = 1.5f
+
     private data class AssetGeometry(
         val asset: PlacedAsset,
         val preset: TentPreset,
+        val outline: List<Vec2>,
         val bodyAabb: Rect,
-        val paddedAabb: Rect,
         val bodyPath: Path,
+        val entryZone: List<Vec2>?,
     )
 
     fun anchorSlotsForPreset(preset: TentPreset): List<Vec2> {
@@ -127,12 +131,14 @@ object GeometryEngine {
         val byId = presets.associateBy { it.id }
         return project.assets.mapNotNull { asset ->
             val preset = byId[asset.presetId] ?: return@mapNotNull null
+            val outline = assetWorldOutline(asset, preset)
             AssetGeometry(
                 asset = asset,
                 preset = preset,
-                bodyAabb = assetBodyAabb(asset, preset),
-                paddedAabb = assetAabb(asset, preset),
+                outline = outline,
+                bodyAabb = boundsOf(outline),
                 bodyPath = assetWorldPath(asset, preset),
+                entryZone = entryZone(asset, preset),
             )
         }
     }
@@ -168,11 +174,15 @@ object GeometryEngine {
         hidden: Set<Int>,
     ): List<IndexedValue<RopeSegment>> = ropeSegments(asset).withIndex().filterNot { it.index in hidden }
 
-    /** @param autoZonesHard false (app): zones the auto setup drew are only a warning, so tents can still be rearranged. */
+    /**
+     * @param autoZonesHard false (app): zones the auto setup drew are only a warning, so tents can still be rearranged.
+     * @param walkwayMeters gap (outline to outline, minus safety margins) below which neighbours get a walkway warning.
+     */
     fun evaluate(
         project: PlannerProject,
         presets: List<TentPreset>,
         autoZonesHard: Boolean = false,
+        walkwayMeters: Float = project.autoSetup?.walkwayMeters ?: DEFAULT_WALKWAY_METERS,
     ): CollisionReport {
         val hard = mutableSetOf<String>()
         val warn = mutableSetOf<String>()
@@ -203,7 +213,6 @@ object GeometryEngine {
                 if (bothSunSails && joinedEdgePairs(a, b).isNotEmpty()) {
                     continue
                 }
-                val distance = aabbDistanceMeters(a.paddedAabb, b.paddedAabb)
                 if (bothSunSails && aabbOverlap(a.bodyAabb, b.bodyAabb) && CollisionEngine.pathsIntersect(a.bodyPath, b.bodyPath)) {
                     warn += a.asset.id
                     warn += b.asset.id
@@ -216,14 +225,18 @@ object GeometryEngine {
                     hard += a.asset.id
                     hard += b.asset.id
                     messages += "Seil-Kollision: Seil ragt in ${a.preset.name} oder ${b.preset.name}."
-                } else if (blocksEntry(a.asset, a.preset, b.asset, b.preset) || blocksEntry(b.asset, b.preset, a.asset, a.preset)) {
+                } else if (blocksEntry(a, b) || blocksEntry(b, a)) {
                     warn += a.asset.id
                     warn += b.asset.id
                     messages += "Eingang verstellt: ${a.preset.name} und ${b.preset.name}."
-                } else if (distance in 0.001f..1.5f) {
-                    warn += a.asset.id
-                    warn += b.asset.id
-                    messages += "Laufweg zwischen ${a.preset.name} und ${b.preset.name} unter 1.5m (${formatFloat(distance, 2)}m)."
+                } else {
+                    walkwayGap(a, b, walkwayMeters)?.let { gap ->
+                        warn += a.asset.id
+                        warn += b.asset.id
+                        messages +=
+                            "Laufweg zwischen ${a.preset.name} und ${b.preset.name} unter ${formatFloat(walkwayMeters, 1)}m " +
+                            "(${formatFloat(gap, 2)}m)."
+                    }
                 }
             }
         }
@@ -232,8 +245,7 @@ object GeometryEngine {
             if (zone.points.size < 3) return@forEach
             val zonePolygon = zone.points
             geometries.forEach { geo ->
-                val assetPolygon = assetWorldOutline(geo.asset, geo.preset)
-                if (polygonsIntersect(assetPolygon, zonePolygon)) {
+                if (polygonsIntersect(geo.outline, zonePolygon)) {
                     if (autoZonesHard || !zone.id.startsWith(AutoLayout.AUTO_PREFIX)) hard += geo.asset.id else warn += geo.asset.id
                     messages += "Sperrzone verletzt: ${geo.preset.name} liegt in einer Sperrzone."
                 }
@@ -288,25 +300,7 @@ object GeometryEngine {
         worldPoint: Vec2,
         asset: PlacedAsset,
         preset: TentPreset,
-    ): Boolean {
-        val localPoint = localPoint(asset, worldPoint)
-        val outline = localOutlinePoints(preset)
-        if (outline.isEmpty()) return false
-
-        var inside = false
-        var j = outline.lastIndex
-        for (i in outline.indices) {
-            val pi = outline[i]
-            val pj = outline[j]
-            val denom = pj.y - pi.y
-            val intersects =
-                (pi.y > localPoint.y) != (pj.y > localPoint.y) &&
-                    localPoint.x < (pj.x - pi.x) * (localPoint.y - pi.y) / denom + pi.x
-            if (intersects) inside = !inside
-            j = i
-        }
-        return inside
-    }
+    ): Boolean = pointInPolygon(localPoint(asset, worldPoint), localOutlinePoints(preset))
 
     fun ropeSegments(asset: PlacedAsset): List<RopeSegment> {
         // No fallback to preset ropes: an empty list means the user removed them all.
@@ -370,6 +364,43 @@ object GeometryEngine {
         return polygonsIntersect(zone, assetWorldOutline(b, presetB))
     }
 
+    /** Same rule as the public [blocksEntry], on the cached geometry. */
+    private fun blocksEntry(
+        a: AssetGeometry,
+        b: AssetGeometry,
+    ): Boolean = !isSunSailPreset(b.preset) && a.entryZone != null && polygonsIntersect(a.entryZone, b.outline)
+
+    /**
+     * Walkway left between [a] and [b] when it is under [walkwayMeters], else null. Touching or overlapping
+     * bodies are not a walkway problem (cloth to cloth, or already a collision).
+     */
+    private fun walkwayGap(
+        a: AssetGeometry,
+        b: AssetGeometry,
+        walkwayMeters: Float,
+    ): Float? {
+        val margins = a.asset.safetyMarginMeters + b.asset.safetyMarginMeters
+        // Cheap reject: the box gap never exceeds the outline gap.
+        if (aabbDistanceMeters(a.bodyAabb, b.bodyAabb) - margins >= walkwayMeters) return null
+        val bodyGap = outlineDistance(a.outline, b.outline)
+        val gap = bodyGap - margins
+        return if (bodyGap > 0.001f && gap < walkwayMeters) gap else null
+    }
+
+    /** Shortest distance between two polygon outlines; 0 when they touch or overlap. */
+    internal fun outlineDistance(
+        a: List<Vec2>,
+        b: List<Vec2>,
+    ): Float {
+        if (polygonsIntersect(a, b)) return 0f
+
+        fun pointToEdges(
+            p: Vec2,
+            poly: List<Vec2>,
+        ) = poly.indices.minOf { k -> pointToSegmentDistance(p, poly[k], poly[(k + 1) % poly.size]) }
+        return minOf(a.minOf { pointToEdges(it, b) }, b.minOf { pointToEdges(it, a) })
+    }
+
     /** Position that lines [movingAsset] up edge-to-edge with [targetAsset], or null if no edge pair is close enough. */
     fun snapSunSailToNeighbor(
         movingAsset: PlacedAsset,
@@ -410,14 +441,16 @@ object GeometryEngine {
         preset: TentPreset,
     ): Rect {
         // Built from the rotated world outline: outlines can be off-center (Saxon tents) and assets rotated.
-        val points = assetWorldOutline(asset, preset)
-        return Rect(
+        return boundsOf(assetWorldOutline(asset, preset))
+    }
+
+    private fun boundsOf(points: List<Vec2>) =
+        Rect(
             left = points.minOf { it.x },
             top = points.minOf { it.y },
             right = points.maxOf { it.x },
             bottom = points.maxOf { it.y },
         )
-    }
 
     fun assetAabb(
         asset: PlacedAsset,
@@ -451,11 +484,9 @@ object GeometryEngine {
         // Sun sails are intentionally combinable; body-body overlap between two sun sails
         // must not be treated as hard collision.
         if (isSunSailPreset(a.preset) && isSunSailPreset(b.preset)) return false
-        if (!heightOverlaps(a.asset.heightRange, b.asset.heightRange)) return false
-        if (!aabbOverlap(a.bodyAabb, b.bodyAabb)) return false
-        val colliding = CollisionEngine.isColliding(a.asset, b.asset, a.bodyPath, b.bodyPath)
-        if (!colliding) return false
-        return true
+        return heightOverlaps(a.asset.heightRange, b.asset.heightRange) &&
+            aabbOverlap(a.bodyAabb, b.bodyAabb) &&
+            CollisionEngine.pathsIntersect(a.bodyPath, b.bodyPath)
     }
 
     /**
@@ -484,8 +515,8 @@ object GeometryEngine {
         val ropesA = visibleRopeSegments(a, hiddenRopes[a.id].orEmpty()).map { it.value }
         val ropesB = visibleRopeSegments(b, hiddenRopes[b.id].orEmpty()).map { it.value }
 
-        val bodyPolyA = assetWorldOutline(a, presetA)
-        val bodyPolyB = assetWorldOutline(b, presetB)
+        val bodyPolyA = geoA.outline
+        val bodyPolyB = geoB.outline
 
         val ropeAIntoBodyB =
             ropesA.any { lineIntersectsPolygon(it, bodyPolyB) } &&
@@ -822,6 +853,10 @@ object GeometryEngine {
         return inside
     }
 
+    /**
+     * Touching counts as intersecting (zones, doors). Tent-vs-tent bodies use [CollisionEngine.pathsIntersect]
+     * instead, which needs real shared area, so cloth-to-cloth tents are not a collision.
+     */
     internal fun polygonsIntersect(
         a: List<Vec2>,
         b: List<Vec2>,

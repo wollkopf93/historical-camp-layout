@@ -60,8 +60,8 @@ data class AutoLayoutResult(
  * step by step (down to cloth to cloth) and the lowest-priority tents are left out.
  */
 internal object AutoLayout {
-    /** Walkway between footprints; matches the 1.5 m warning in [GeometryEngine.evaluate]. */
-    const val CLEAR = 1.5f
+    /** Walkway between footprints; the app's default walkway warning in [GeometryEngine.evaluate]. */
+    const val CLEAR = GeometryEngine.DEFAULT_WALKWAY_METERS
 
     /**
      * Walkways tried when tents don't fit: guy ropes plus 1 m to pass, then cloth to cloth (common when
@@ -112,8 +112,11 @@ internal object AutoLayout {
 
         fun walkwayWarnings(r: AutoLayoutResult) =
             GeometryEngine
-                .evaluate(PlannerProject(parcel = req.parcel, assets = r.assets + obstacleAssets), presetsById.values.toList())
-                .messages
+                .evaluate(
+                    PlannerProject(parcel = req.parcel, assets = r.assets + obstacleAssets),
+                    presetsById.values.toList(),
+                    walkwayMeters = req.walkwayMeters,
+                ).messages
                 .count { "Laufweg" in it }
         val keepTuned = tuned.skipped.size <= result.skipped.size && walkwayWarnings(tuned) <= walkwayWarnings(result)
         return if (keepTuned) tuned else result
@@ -740,32 +743,11 @@ internal object AutoLayout {
             (i + 1 until assets.size).all { j ->
                 // Joined sails lace together edge to edge.
                 (GeometryEngine.isSunSailPreset(assets[i].second) && GeometryEngine.isSunSailPreset(assets[j].second)) ||
-                    outlineDistance(outlines[i], outlines[j]) - assets[i].first.safetyMarginMeters - assets[j].first.safetyMarginMeters >=
-                    clear
+                    GeometryEngine.outlineDistance(outlines[i], outlines[j]) -
+                    assets[i].first.safetyMarginMeters -
+                    assets[j].first.safetyMarginMeters >= clear
             }
         }
-    }
-
-    /** Shortest distance between two polygon outlines; 0 when they touch or overlap. */
-    private fun outlineDistance(
-        a: List<Vec2>,
-        b: List<Vec2>,
-    ): Float {
-        if (GeometryEngine.polygonsIntersect(a, b)) return 0f
-
-        fun pointToEdges(
-            p: Vec2,
-            poly: List<Vec2>,
-        ) = poly.indices.minOf { k ->
-            val s = poly[k]
-            val e = poly[(k + 1) % poly.size]
-            val dx = e.x - s.x
-            val dy = e.y - s.y
-            val len2 = dx * dx + dy * dy
-            val t = if (len2 == 0f) 0f else (((p.x - s.x) * dx + (p.y - s.y) * dy) / len2).coerceIn(0f, 1f)
-            hypot(p.x - (s.x + t * dx), p.y - (s.y + t * dy))
-        }
-        return minOf(a.minOf { pointToEdges(it, b) }, b.minOf { pointToEdges(it, a) })
     }
 
     /**

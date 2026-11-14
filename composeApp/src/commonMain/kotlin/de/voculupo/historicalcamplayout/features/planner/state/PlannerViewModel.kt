@@ -259,7 +259,12 @@ class PlannerViewModel(
         val result = AutoLayout.generate(request, presetsById, userZones, kept) { newId(it) }
         mutateProject {
             // Placed tents stay loose so each can be moved on its own.
-            copy(parcel = request.parcel, assets = kept + result.assets.map { it.copy(groupId = null) }, blockZones = userZones + result.zones, autoSetup = request)
+            copy(
+                parcel = request.parcel,
+                assets = kept + result.assets.map { it.copy(groupId = null) },
+                blockZones = userZones + result.zones,
+                autoSetup = request,
+            )
         }
         _uiState.update { it.copy(selectedAssetIds = emptySet(), selectedRopeIndex = null) }
     }
