@@ -223,7 +223,10 @@ object GeometryEngine {
                     messages += "Eingang verstellt: ${a.preset.name} und ${b.preset.name}."
                 } else {
                     val need = rules.between(a.preset, b.preset)
-                    if (distance >= 0.001f && distance <= need) {
+                    // Overlapping safety margins (distance 0) are the closest case, not an exception; a 0 m gap (cloth to cloth)
+                    // never warns. Sails touching each other are laced together on purpose (their overlap has its own warning).
+                    val touchingSails = bothSunSails && distance < 0.001f
+                    if (need > 0f && distance <= need && !touchingSails) {
                         warn += a.asset.id
                         warn += b.asset.id
                         messages +=

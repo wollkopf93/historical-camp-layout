@@ -175,4 +175,22 @@ class SpacingRulesTest {
         assertTrue(msgs.any { "Sperrzone" in it })
         assertFalse(msgs.any { "Abstand zum Weg" in it })
     }
+
+    @Test
+    fun overlappingMargins_warn_unlessClothToCloth() {
+        // Walls 0.5 m apart, 0.5 m margins each: the safety boxes overlap, the bodies don't.
+        val close = listOf(tent("a", 10f), tent("b", 13.5f)).map { it.copy(safetyMarginMeters = 0.5f) }
+        assertTrue(messages(close, SpacingRules()).any { "Laufweg" in it })
+        assertFalse(messages(close, SpacingRules(tentToTent = 0f)).any { "Laufweg" in it })
+        val report = GeometryEngine.evaluate(PlannerProject(parcel = Parcel(40f, 30f), assets = close), presets)
+        assertTrue(report.hardCollisions.isEmpty(), "margins overlapping is a warning, not a collision")
+    }
+
+    @Test
+    fun sailsLacedEdgeToEdge_doNotWarn() {
+        // Diamond next to a square sail: touching, but not an edge pair the join check recognises.
+        val square = sail.copy(id = "s1", position = Vec2(10f, 10f))
+        val diamond = PlacedAsset(id = "s2", presetId = "sun_sail_6x6_diamond", position = Vec2(17.25f, 10f), safetyMarginMeters = 0f)
+        assertFalse(messages(listOf(square, diamond), SpacingRules()).any { "Laufweg" in it })
+    }
 }
