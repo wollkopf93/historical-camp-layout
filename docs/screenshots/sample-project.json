@@ -6,7 +6,7 @@
     },
     "assets": [
         {
-            "id": "lk6ryzvmmgol",
+            "id": "3g000ew367nit",
             "presetId": "sun_sail_6x6_flat",
             "label": "Sonnensegel 6x6 (Flach/Dach)",
             "position": {
@@ -118,7 +118,7 @@
             ]
         },
         {
-            "id": "2vvvgttaskrw7",
+            "id": "1wu0uvghx96ly",
             "presetId": "saxon_4x6",
             "label": "Sachsenzelt 4x6",
             "position": {
@@ -157,7 +157,7 @@
             ]
         },
         {
-            "id": "3mav0k9gqky2q",
+            "id": "l0jqpymxbq41",
             "presetId": "round_5",
             "label": "Rundzelt 5m",
             "position": {
@@ -195,7 +195,7 @@
             ]
         },
         {
-            "id": "gz2i6a6634i5",
+            "id": "iwvaq3iu3o5i",
             "presetId": "saxon_3x5",
             "label": "Sachsenzelt 3x5",
             "position": {
@@ -234,7 +234,7 @@
             ]
         },
         {
-            "id": "2ej6dfv8szdxw",
+            "id": "hwbpvybqvaoq",
             "presetId": "a_tent_3x4_frame",
             "label": "Keilzelt 3x4 (Holzgestell)",
             "position": {
@@ -248,7 +248,7 @@
             }
         },
         {
-            "id": "1drgqwptu7lj7",
+            "id": "1wigrnw9hc21d",
             "presetId": "round_4",
             "label": "Rundzelt 4m",
             "position": {
@@ -286,7 +286,7 @@
             ]
         },
         {
-            "id": "nf9bl2iqlp5c",
+            "id": "aga5ass89lac",
             "presetId": "saxon_2x4",
             "label": "Sachsenzelt 2x4",
             "position": {
@@ -324,7 +324,7 @@
     ],
     "blockZones": [
         {
-            "id": "auto-3p3h46dkwf9t6",
+            "id": "auto-1y2gmx5z0exqa",
             "points": [
                 {
                     "x": 17.5,

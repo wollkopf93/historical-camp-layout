@@ -105,7 +105,7 @@ fun buildPngExportScene(
         assets =
             placed.map { (asset, preset, ropes) ->
                 PngExportAsset(
-                    label = asset.label.ifBlank { preset.name },
+                    label = assetDisplayLabel(asset, preset, preset.name),
                     outline = GeometryEngine.assetWorldOutline(asset, preset).map(::px),
                     ropes = if (asset.showRopes) ropes.map { px(it.start) to px(it.end) } else emptyList(),
                     center = px(asset.position),

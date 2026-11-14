@@ -119,4 +119,33 @@
     <string name="zoom_out">Verkleinern</string>
     <string name="zoom_reset">Zoom zurücksetzen</string>
     <string name="optimize_layout">Feinschliff: Abstände und Eingänge optimieren</string>
+    <!-- Built-in tent presets, keyed preset_<id> -->
+    <string name="preset_saxon_2x4">Sachsenzelt 2x4</string>
+    <string name="preset_saxon_3x5">Sachsenzelt 3x5</string>
+    <string name="preset_saxon_4x6">Sachsenzelt 4x6</string>
+    <string name="preset_saxon_2x4_closed">Sachsenzelt 2x4 (Geschlossen)</string>
+    <string name="preset_saxon_3x5_closed">Sachsenzelt 3x5 (Geschlossen)</string>
+    <string name="preset_saxon_4x6_closed">Sachsenzelt 4x6 (Geschlossen)</string>
+    <string name="preset_saxon_niord_6">Sachsenzelt Niord 6m</string>
+    <string name="preset_a_tent_2x3_basic">Keilzelt 2x3 (Minimal)</string>
+    <string name="preset_a_tent_2_5x3_full">Keilzelt 2.5x3 (Sturm-Setup)</string>
+    <string name="preset_a_tent_3x4_frame">Keilzelt 3x4 (Holzgestell)</string>
+    <string name="preset_a_tent_4x5_pro">Keilzelt 4x5 (V-Abspannung)</string>
+    <string name="preset_oval_6x4">Speichenrad 6x4</string>
+    <string name="preset_round_4">Rundzelt 4m</string>
+    <string name="preset_round_3x3">Rundzelt 3x3</string>
+    <string name="preset_round_5">Rundzelt 5m</string>
+    <string name="preset_sun_sail_6x6_flat">Sonnensegel 6x6 (Flach/Dach)</string>
+    <string name="preset_sun_sail_6x6_diamond">Sonnensegel 6x6 (Diagonal/Raute)</string>
+    <string name="preset_sun_sail_6x2_flat">Sonnensegel 6x2 (Flach aufgebaut)</string>
+    <string name="preset_sun_sail_6x2_folded">Sonnensegel 6x2 (als 4x2, Seiten geklappt)</string>
+    <string name="preset_sun_sail_5x5_flat">Sonnensegel 5x5 (Flach/Dach)</string>
+    <string name="preset_sun_sail_5x5_diamond">Sonnensegel 5x5 (Diagonal/Raute)</string>
+    <string name="preset_sun_sail_5x3_flat">Sonnensegel 5x3 (Flach/Dach)</string>
+    <string name="preset_sun_sail_4x6">Sonnensegel 4x6</string>
+    <string name="preset_sun_sail_4x4_flat">Sonnensegel 4x4 (Flach/Dach)</string>
+    <string name="preset_sun_sail_4x4_diamond">Sonnensegel 4x4 (Diagonal/Raute)</string>
+    <string name="preset_sun_sail_3x3_flat">Sonnensegel 3x3 (Flach/Dach)</string>
+    <string name="preset_sun_sail_3x3_diamond">Sonnensegel 3x3 (Diagonal/Raute)</string>
+    <string name="preset_sun_sail_3x3_lean_to">Sonnensegel 3x3 (Schrägdach/Kröte)</string>
 </resources>

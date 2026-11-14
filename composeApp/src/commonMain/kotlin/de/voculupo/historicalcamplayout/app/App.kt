@@ -92,6 +92,7 @@ import de.voculupo.historicalcamplayout.features.properties.AutoSetupDialog
 import de.voculupo.historicalcamplayout.features.properties.PropertiesPane
 import de.voculupo.historicalcamplayout.getPlatform
 import de.voculupo.historicalcamplayout.platform.PlatformBackHandler
+import de.voculupo.historicalcamplayout.rememberPresetNames
 import kotlinx.coroutines.delay
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.auto_setup_short
@@ -238,6 +239,7 @@ fun App(
     viewModel: PlannerViewModel = viewModel { PlannerViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val presetNames = rememberPresetNames(state.presets)
     val density = LocalDensity.current
     val rootFocusRequester = remember { FocusRequester() }
     var leftPaneWidthDp by remember { mutableFloatStateOf(340f) }
@@ -348,7 +350,7 @@ fun App(
                     onProjectNameChange = viewModel::setProjectName,
                     onExportProjectFile = viewModel::exportProjectFile,
                     onImportProjectFile = viewModel::importProjectFile,
-                    onExportPng = viewModel::exportPng,
+                    onExportPng = { viewModel.exportPng(presetNames) },
                     onUndo = viewModel::undo,
                     onRedo = viewModel::redo,
                     onLabelChange = viewModel::setSelectedLabel,
@@ -414,7 +416,7 @@ fun App(
                     onProjectNameChange = viewModel::setProjectName,
                     onExportProjectFile = viewModel::exportProjectFile,
                     onImportProjectFile = viewModel::importProjectFile,
-                    onExportPng = viewModel::exportPng,
+                    onExportPng = { viewModel.exportPng(presetNames) },
                     onUndo = viewModel::undo,
                     onRedo = viewModel::redo,
                     onLabelChange = viewModel::setSelectedLabel,

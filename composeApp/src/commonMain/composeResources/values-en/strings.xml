@@ -119,4 +119,33 @@
     <string name="zoom_out">Zoom out</string>
     <string name="zoom_reset">Reset zoom</string>
     <string name="optimize_layout">Fine-tune spacing and entries</string>
+    <!-- Built-in tent presets, keyed preset_<id> -->
+    <string name="preset_saxon_2x4">Saxon tent 2x4</string>
+    <string name="preset_saxon_3x5">Saxon tent 3x5</string>
+    <string name="preset_saxon_4x6">Saxon tent 4x6</string>
+    <string name="preset_saxon_2x4_closed">Saxon tent 2x4 (closed)</string>
+    <string name="preset_saxon_3x5_closed">Saxon tent 3x5 (closed)</string>
+    <string name="preset_saxon_4x6_closed">Saxon tent 4x6 (closed)</string>
+    <string name="preset_saxon_niord_6">Saxon tent Niord 6m</string>
+    <string name="preset_a_tent_2x3_basic">Wedge tent 2x3 (minimal)</string>
+    <string name="preset_a_tent_2_5x3_full">Wedge tent 2.5x3 (storm setup)</string>
+    <string name="preset_a_tent_3x4_frame">Wedge tent 3x4 (wooden frame)</string>
+    <string name="preset_a_tent_4x5_pro">Wedge tent 4x5 (V guying)</string>
+    <string name="preset_oval_6x4">Spoke wheel tent 6x4</string>
+    <string name="preset_round_4">Round tent 4m</string>
+    <string name="preset_round_3x3">Round tent 3x3</string>
+    <string name="preset_round_5">Round tent 5m</string>
+    <string name="preset_sun_sail_6x6_flat">Sun sail 6x6 (flat/roof)</string>
+    <string name="preset_sun_sail_6x6_diamond">Sun sail 6x6 (diagonal/diamond)</string>
+    <string name="preset_sun_sail_6x2_flat">Sun sail 6x2 (pitched flat)</string>
+    <string name="preset_sun_sail_6x2_folded">Sun sail 6x2 (as 4x2, sides folded)</string>
+    <string name="preset_sun_sail_5x5_flat">Sun sail 5x5 (flat/roof)</string>
+    <string name="preset_sun_sail_5x5_diamond">Sun sail 5x5 (diagonal/diamond)</string>
+    <string name="preset_sun_sail_5x3_flat">Sun sail 5x3 (flat/roof)</string>
+    <string name="preset_sun_sail_4x6">Sun sail 4x6</string>
+    <string name="preset_sun_sail_4x4_flat">Sun sail 4x4 (flat/roof)</string>
+    <string name="preset_sun_sail_4x4_diamond">Sun sail 4x4 (diagonal/diamond)</string>
+    <string name="preset_sun_sail_3x3_flat">Sun sail 3x3 (flat/roof)</string>
+    <string name="preset_sun_sail_3x3_diamond">Sun sail 3x3 (diagonal/diamond)</string>
+    <string name="preset_sun_sail_3x3_lean_to">Sun sail 3x3 (lean-to)</string>
 </resources>

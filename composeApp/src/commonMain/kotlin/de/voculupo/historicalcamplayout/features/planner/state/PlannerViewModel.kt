@@ -17,6 +17,7 @@ import de.voculupo.historicalcamplayout.data.storage.ProjectStorage
 import de.voculupo.historicalcamplayout.data.storage.StorageProvider
 import de.voculupo.historicalcamplayout.defaultPresets
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerDomainOps.constrainAssetCenterToParcel
+import de.voculupo.historicalcamplayout.hasDefaultLabel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -558,7 +559,14 @@ class PlannerViewModel(
                     }
                 asset.copy(
                     id = newId(),
-                    label = if (asset.label.isBlank()) asset.label else "${asset.label} (Kopie)",
+                    label =
+                        if (asset.label.isBlank() ||
+                            (preset != null && hasDefaultLabel(asset, preset))
+                        ) {
+                            asset.label
+                        } else {
+                            "${asset.label} (Kopie)"
+                        },
                     position = constrained,
                     // A copy starts unlocked so it can be moved away from the original.
                     isLocked = false,
@@ -632,8 +640,10 @@ class PlannerViewModel(
         recomputeWarnings()
     }
 
-    fun exportPng() {
-        storage.exportProjectPng(_uiState.value.project, _uiState.value.presets)
+    /** @param presetNames preset id to name in the app language, so the image matches what the canvas shows. */
+    fun exportPng(presetNames: Map<String, String> = emptyMap()) {
+        val presets = _uiState.value.presets.map { it.copy(name = presetNames[it.id] ?: it.name) }
+        storage.exportProjectPng(_uiState.value.project, presets)
     }
 
     fun saveInventory() {

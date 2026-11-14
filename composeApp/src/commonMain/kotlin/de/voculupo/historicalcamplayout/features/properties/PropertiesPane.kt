@@ -36,7 +36,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import de.voculupo.historicalcamplayout.GeometryEngine
 import de.voculupo.historicalcamplayout.PlannerUiState
+import de.voculupo.historicalcamplayout.assetDisplayLabel
 import de.voculupo.historicalcamplayout.features.inventory.CollapsibleHeader
+import de.voculupo.historicalcamplayout.presetDisplayName
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.active_rope
 import lagerplaner.composeapp.generated.resources.add_rope
@@ -131,6 +133,8 @@ internal fun PropertiesPane(
     var showSelectionSection by remember { mutableStateOf(true) }
     var showWarningsSection by remember { mutableStateOf(false) }
     val selectedAsset = state.project.assets.firstOrNull { it.id in state.selectedAssetIds }
+    val selectedPreset = state.presets.firstOrNull { it.id == selectedAsset?.presetId }
+    val selectedPresetName = selectedPreset?.let { presetDisplayName(it) }
     val selectedRope = selectedAsset?.ropes?.getOrNull(state.selectedRopeIndex ?: -1)
     val currentSelectRopeIndex by rememberUpdatedState(onSelectRopeIndex)
     val paneModifier =
@@ -163,7 +167,12 @@ internal fun PropertiesPane(
             )
             if (showSelectionSection && selectedAsset != null) {
                 OutlinedTextField(
-                    value = selectedAsset.label,
+                    value =
+                        if (selectedPreset != null && selectedPresetName != null) {
+                            assetDisplayLabel(selectedAsset, selectedPreset, selectedPresetName)
+                        } else {
+                            selectedAsset.label
+                        },
                     onValueChange = onLabelChange,
                     singleLine = true,
                     label = { Text(stringResource(Res.string.tent_name)) },

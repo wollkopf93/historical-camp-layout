@@ -56,7 +56,9 @@ import de.voculupo.historicalcamplayout.TentPreset
 import de.voculupo.historicalcamplayout.TentShapeType
 import de.voculupo.historicalcamplayout.Vec2
 import de.voculupo.historicalcamplayout.app.PresetDropRequest
+import de.voculupo.historicalcamplayout.assetDisplayLabel
 import de.voculupo.historicalcamplayout.platform.platformScrollZoom
+import de.voculupo.historicalcamplayout.rememberPresetNames
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
@@ -88,6 +90,7 @@ internal fun PlannerCanvas(
     allowMultiTouchCanvasPan: Boolean = true,
 ) {
     val presetsById = remember(state.presets) { state.presets.associateBy { it.id } }
+    val presetNames = rememberPresetNames(state.presets)
     val currentTool by rememberUpdatedState(state.currentTool)
     val currentParcel by rememberUpdatedState(state.project.parcel)
     val currentHiddenRopes by rememberUpdatedState(state.hiddenRopeIndices)
@@ -490,6 +493,7 @@ internal fun PlannerCanvas(
                 drawAssetLabel(
                     asset,
                     preset,
+                    presetNames[preset.id] ?: preset.name,
                     state.project.pixelsPerMeter,
                     parcelOrigin,
                     selectionHighlighted,
@@ -536,13 +540,14 @@ private fun pickRopeHandleHit(
 private fun DrawScope.drawAssetLabel(
     asset: PlacedAsset,
     preset: TentPreset,
+    presetName: String,
     pixelsPerMeter: Float,
     origin: Offset,
     selected: Boolean,
     textMeasurer: TextMeasurer,
     darkMode: Boolean,
 ) {
-    val raw = asset.label.ifBlank { preset.name }.trim()
+    val raw = assetDisplayLabel(asset, preset, presetName).trim()
     if (raw.isEmpty()) return
     val label = if (raw.length > 30) raw.take(29) + "…" else raw
     val meta = "${preset.shape.name} • ${"%.1f".format(preset.widthMeters)} x ${"%.1f".format(preset.heightMeters)} m"
