@@ -756,7 +756,7 @@ object GeometryEngine {
         return configured
     }
 
-    private fun localOutlinePoints(preset: TentPreset): List<Vec2> {
+    fun localOutlinePoints(preset: TentPreset): List<Vec2> {
         if (preset.polygonPoints.isNotEmpty()) return preset.polygonPoints
         val generated =
             GeometryHelper.generatePoints(
