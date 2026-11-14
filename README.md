@@ -1,13 +1,23 @@
-This is a Kotlin Multiplatform project targeting Android, Desktop (JVM).
+# Historical Camp Layout
 
-* [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./composeApp/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./composeApp/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./composeApp/src/jvmMain/kotlin)
-    folder is the appropriate location.
+A planner for historical and medieval reenactment camps. Lay out tents, sun sails and fire pits on a
+to-scale parcel before you arrive on site, and see right away where things collide or block walkways.
+
+## Features
+
+- **Camp canvas**: place, move, rotate and lock tents, sun sails and fire pits on a scaled plot.
+- **Collision and spacing checks**: overlaps, blocked tent entries and walkway width are flagged as you edit.
+- **Auto setup**: generates a camp draft from your tent inventory and parcel size (edge, spread and U-shape
+  layouts), with a step-by-step setup sheet.
+- **PNG export** of the finished layout.
+- Runs on **Android** and **desktop (JVM)**, in English and German.
+
+## Project structure
+
+* [/composeApp](./composeApp/src) holds the shared Compose Multiplatform app.
+  - [commonMain](./composeApp/src/commonMain/kotlin) contains the UI, geometry/collision engines and auto layout.
+  - [androidMain](./composeApp/src/androidMain/kotlin) and [jvmMain](./composeApp/src/jvmMain/kotlin) contain
+    the platform-specific code.
 * [/androidApp](./androidApp/src/main) is the thin Android app shell (`MainActivity`, manifest, launcher icons, theme).
   AGP 9 no longer allows the Android application plugin in a Kotlin Multiplatform module, so `composeApp`
   is an Android library and `androidApp` packages it into the installable app.
