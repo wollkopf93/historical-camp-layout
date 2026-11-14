@@ -269,7 +269,8 @@ private class AndroidProjectStorage : ProjectStorage {
 
 private fun List<Offset>.toAndroidPath(): Path =
     Path().apply {
-        if (isEmpty()) return@apply
+        // Qualified: a bare isEmpty() here resolves to Path.isEmpty(), which is true for a new Path.
+        if (this@toAndroidPath.isEmpty()) return@apply
         moveTo(first().x, first().y)
         for (i in 1 until size) lineTo(this@toAndroidPath[i].x, this@toAndroidPath[i].y)
         close()

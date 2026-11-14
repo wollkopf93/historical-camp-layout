@@ -55,6 +55,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -247,7 +248,7 @@ fun App(
 
     // Lives here, not in the properties pane: on phones that pane is a bottom sheet that closes when
     // the dialog takes focus, which would take the dialog down with it.
-    var showAutoSetup by remember { mutableStateOf(false) }
+    var showAutoSetup by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(suppressTapTemporarily) {
         if (suppressTapTemporarily) {

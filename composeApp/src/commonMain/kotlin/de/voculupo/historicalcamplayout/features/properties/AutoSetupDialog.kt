@@ -32,6 +32,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.Saver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -58,6 +60,7 @@ import de.voculupo.historicalcamplayout.FreeArea
 import de.voculupo.historicalcamplayout.FreeAreaKind
 import de.voculupo.historicalcamplayout.GeometryEngine
 import de.voculupo.historicalcamplayout.Parcel
+import de.voculupo.historicalcamplayout.PlannerJson
 import de.voculupo.historicalcamplayout.PlannerProject
 import de.voculupo.historicalcamplayout.RingShape
 import de.voculupo.historicalcamplayout.TentPreset
@@ -69,6 +72,8 @@ import de.voculupo.historicalcamplayout.features.planner.state.BlockKey
 import de.voculupo.historicalcamplayout.features.planner.state.LayoutBlock
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.all_fits
 import lagerplaner.composeapp.generated.resources.area_arena
@@ -178,14 +183,15 @@ internal fun AutoSetupDialog(
     onDismiss: () -> Unit,
 ) {
     val presetsById = remember(presets) { presets.associateBy { it.id } }
-    var req by remember {
+    // Saveable so rotating the device keeps the half-done setup.
+    var req by rememberSaveable(stateSaver = Saver({ PlannerJson.json.encodeToString(it) }, { PlannerJson.json.decodeFromString<AutoSetupRequest>(it) })) {
         mutableStateOf(
             project.autoSetup ?: AutoSetupRequest(project.parcel, emptyList(), emptyList(), VisitorSide.BOTTOM, shape = RingShape.U_SHAPE),
         )
     }
-    var widthInput by remember { mutableStateOf(fmt(req.parcel.widthMeters)) }
-    var heightInput by remember { mutableStateOf(fmt(req.parcel.heightMeters)) }
-    var step by remember { mutableIntStateOf(0) }
+    var widthInput by rememberSaveable { mutableStateOf(fmt(req.parcel.widthMeters)) }
+    var heightInput by rememberSaveable { mutableStateOf(fmt(req.parcel.heightMeters)) }
+    var step by rememberSaveable { mutableIntStateOf(0) }
     val userZones = remember(project) { project.blockZones.filterNot { it.id.startsWith(AutoLayout.AUTO_PREFIX) } }
     val kept = if (req.replaceExisting) emptyList() else project.assets
     // Computed off the main thread: the optimizer needs a moment on phones, taps must stay smooth.
