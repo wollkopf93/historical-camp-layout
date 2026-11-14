@@ -10,6 +10,7 @@ import de.voculupo.historicalcamplayout.PlacedAsset
 import de.voculupo.historicalcamplayout.PlannerJson
 import de.voculupo.historicalcamplayout.PlannerProject
 import de.voculupo.historicalcamplayout.RingShape
+import de.voculupo.historicalcamplayout.SpacingOverride
 import de.voculupo.historicalcamplayout.SpacingRules
 import de.voculupo.historicalcamplayout.Vec2
 import de.voculupo.historicalcamplayout.VisitorSide
@@ -508,5 +509,29 @@ class AutoLayoutTest {
     @Test
     fun requiredParcel_nothingChosen_isNull() {
         assertEquals(null, AutoLayout.requiredParcel(AutoSetupRequest(parcel, emptyList(), emptyList(), VisitorSide.TOP), presetsById))
+    }
+
+    @Test
+    fun tentTypeOverride_widensTheDraft() {
+        // Wedge tents that want 3 m to their neighbours: the draft must keep it, the app must not warn.
+        val wide = presetsById.getValue("a_tent_3x4_frame").copy(spacing = SpacingOverride(toTents = 3f))
+        val byId = presetsById + (wide.id to wide)
+        listOf(RingShape.U_SHAPE, RingShape.HORSESHOE).forEach { shape ->
+            var n = 0
+            val req =
+                AutoSetupRequest(
+                    parcel,
+                    List(5) { wide.id },
+                    listOf("sun_sail_6x6_flat"),
+                    VisitorSide.BOTTOM,
+                    shape = shape,
+                    optimize = false,
+                )
+            val result = AutoLayout.generate(req, byId) { "$it${n++}" }
+            assertEquals(6, result.assets.size, "$shape skipped ${result.skipped}")
+            val warnings =
+                GeometryEngine.evaluate(PlannerProject(parcel = parcel, assets = result.assets), byId.values.toList()).messages
+            assertTrue(warnings.none { "Laufweg" in it }, "$shape: $warnings")
+        }
     }
 }

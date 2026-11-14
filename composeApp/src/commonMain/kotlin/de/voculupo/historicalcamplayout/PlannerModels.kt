@@ -2,6 +2,7 @@
 
 import de.voculupo.historicalcamplayout.GeometryHelper
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.Transient
 import kotlin.math.PI
 import kotlin.math.cos
 import kotlin.math.sin
@@ -75,6 +76,18 @@ data class TentPreset(
     val isSunSail: Boolean = false,
     /** Set when the user edited this preset, so newer built-in defaults with the same id don't overwrite it. */
     val userModified: Boolean = false,
+    /** Gaps this tent type wants instead of the camp's [SpacingRules]. */
+    val spacing: SpacingOverride = SpacingOverride(),
+)
+
+/** Per tent type gaps that replace the camp's rules; null = use the camp's value. */
+@Serializable
+data class SpacingOverride(
+    /** To sleeping tents (for a sail: to the tents around it). */
+    val toTents: Float? = null,
+    /** To sun sails. */
+    val toSails: Float? = null,
+    val toPath: Float? = null,
 )
 
 @Serializable
@@ -148,6 +161,8 @@ data class SpacingRules(
     val tentToSailMax: Float? = null,
     val tentToPath: Float = 1.5f,
     val sailToPath: Float = 1.5f,
+    /** Auto setup only: walkway the draft is squeezed to when space runs out; caps tent overrides too. */
+    @Transient val cap: Float = Float.MAX_VALUE,
 )
 
 /** Everything the auto setup sheet asks for; stored on the project so it can be reopened and edited. */

@@ -89,6 +89,7 @@ import de.voculupo.historicalcamplayout.features.inventory.InventoryPane
 import de.voculupo.historicalcamplayout.features.planner.canvas.PlannerCanvas
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
 import de.voculupo.historicalcamplayout.features.properties.AutoSetupDialog
+import de.voculupo.historicalcamplayout.features.properties.PresetDialog
 import de.voculupo.historicalcamplayout.features.properties.PropertiesPane
 import de.voculupo.historicalcamplayout.features.properties.SpacingDialog
 import de.voculupo.historicalcamplayout.getPlatform
@@ -252,6 +253,7 @@ fun App(
     // the dialog takes focus, which would take the dialog down with it.
     var showAutoSetup by rememberSaveable { mutableStateOf(false) }
     var showSpacing by rememberSaveable { mutableStateOf(false) }
+    var editingPresetId by rememberSaveable { mutableStateOf<String?>(null) }
 
     LaunchedEffect(suppressTapTemporarily) {
         if (suppressTapTemporarily) {
@@ -372,6 +374,7 @@ fun App(
                     onUngroup = viewModel::ungroupSelection,
                     onDuplicate = viewModel::duplicateSelection,
                     onDelete = viewModel::deleteSelection,
+                    onEditPreset = { editingPresetId = it },
                 )
             } else {
                 ExpandedLayout(
@@ -439,6 +442,7 @@ fun App(
                     onUngroup = viewModel::ungroupSelection,
                     onDuplicate = viewModel::duplicateSelection,
                     onDelete = viewModel::deleteSelection,
+                    onEditPreset = { editingPresetId = it },
                 )
             }
             dragState?.let { drag ->
@@ -477,6 +481,16 @@ fun App(
                     viewModel.setSpacing(it)
                 },
                 onDismiss = { showSpacing = false },
+            )
+        }
+        state.presets.firstOrNull { it.id == editingPresetId }?.let { preset ->
+            PresetDialog(
+                preset = preset,
+                onConfirm = {
+                    editingPresetId = null
+                    viewModel.savePreset(it)
+                },
+                onDismiss = { editingPresetId = null },
             )
         }
     }
@@ -550,6 +564,7 @@ private fun ExpandedLayout(
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
+    onEditPreset: (String) -> Unit,
 ) {
     var showWarningsPanel by remember { mutableStateOf(true) }
     Box(modifier = Modifier.fillMaxSize()) {
@@ -629,6 +644,7 @@ private fun ExpandedLayout(
                 onUngroup = onUngroup,
                 onDuplicate = onDuplicate,
                 onDelete = onDelete,
+                onEditPreset = onEditPreset,
             )
         }
 
@@ -761,6 +777,7 @@ private fun CompactLayout(
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
+    onEditPreset: (String) -> Unit,
 ) {
     var sheet by remember { mutableStateOf<CompactSheet?>(null) }
     // Keeps the sheet's content visible while it slides out.
@@ -1055,6 +1072,7 @@ private fun CompactLayout(
                             onUngroup = onUngroup,
                             onDuplicate = onDuplicate,
                             onDelete = onDelete,
+                            onEditPreset = onEditPreset,
                         )
                     }
                 }

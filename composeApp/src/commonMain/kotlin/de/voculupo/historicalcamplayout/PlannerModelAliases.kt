@@ -18,6 +18,7 @@ typealias VisitorSide = de.voculupo.historicalcamplayout.domain.model.VisitorSid
 typealias RingShape = de.voculupo.historicalcamplayout.domain.model.RingShape
 typealias FreeAreaKind = de.voculupo.historicalcamplayout.domain.model.FreeAreaKind
 typealias FreeArea = de.voculupo.historicalcamplayout.domain.model.FreeArea
+typealias SpacingOverride = de.voculupo.historicalcamplayout.domain.model.SpacingOverride
 typealias SpacingRules = de.voculupo.historicalcamplayout.domain.model.SpacingRules
 typealias AutoSetupRequest = de.voculupo.historicalcamplayout.domain.model.AutoSetupRequest
 

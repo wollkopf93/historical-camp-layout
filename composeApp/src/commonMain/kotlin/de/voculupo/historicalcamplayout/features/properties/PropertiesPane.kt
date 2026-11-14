@@ -19,6 +19,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
@@ -47,6 +48,7 @@ import lagerplaner.composeapp.generated.resources.apply_project_name
 import lagerplaner.composeapp.generated.resources.auto_setup
 import lagerplaner.composeapp.generated.resources.delete
 import lagerplaner.composeapp.generated.resources.duplicate
+import lagerplaner.composeapp.generated.resources.edit_tent_type
 import lagerplaner.composeapp.generated.resources.export_file
 import lagerplaner.composeapp.generated.resources.export_png
 import lagerplaner.composeapp.generated.resources.group
@@ -106,6 +108,7 @@ internal fun PropertiesPane(
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
     onDelete: () -> Unit,
+    onEditPreset: (String) -> Unit,
     modifier: Modifier = Modifier,
     enableFullScroll: Boolean = false,
     /** Phones have no top bar with a file menu: export/import/reset live here. */
@@ -182,6 +185,7 @@ internal fun PropertiesPane(
                     stringResource(Res.string.height_range, heights.minMeters.toString(), heights.maxMeters.toString()),
                     color = paneTextColor,
                 )
+                OutlinedButton(onClick = { onEditPreset(selectedAsset.presetId) }) { Text(stringResource(Res.string.edit_tent_type)) }
                 Button(onClick = onToggleRopes) { Text(stringResource(Res.string.toggle_ropes)) }
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     Button(onClick = onAddRope) { Text(stringResource(Res.string.add_rope)) }

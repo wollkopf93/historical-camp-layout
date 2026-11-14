@@ -43,20 +43,26 @@ internal fun SpacingEditor(
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (withTentToTent) MetersField(Res.string.spacing_tent_tent, rules.tentToTent) { onChange(rules.copy(tentToTent = it!!)) }
         MetersField(Res.string.spacing_tent_sail, rules.tentToSail) { onChange(rules.copy(tentToSail = it!!)) }
-        MetersField(Res.string.spacing_tent_sail_max, rules.tentToSailMax, optional = true) { onChange(rules.copy(tentToSailMax = it)) }
+        MetersField(Res.string.spacing_tent_sail_max, rules.tentToSailMax, placeholder = Res.string.spacing_unlimited) {
+            onChange(rules.copy(tentToSailMax = it))
+        }
         MetersField(Res.string.spacing_tent_path, rules.tentToPath) { onChange(rules.copy(tentToPath = it!!)) }
         MetersField(Res.string.spacing_sail_path, rules.sailToPath) { onChange(rules.copy(sailToPath = it!!)) }
     }
 }
 
-/** Metres >= 0; with [optional] an empty field means "no value" (null). Invalid text is kept but not passed on. */
+/**
+ * Metres >= 0. With a [placeholder] the field is optional: empty means "no value" (null), the placeholder
+ * says what applies then. Invalid text is kept but not passed on.
+ */
 @Composable
 internal fun MetersField(
     label: StringResource,
     value: Float?,
-    optional: Boolean = false,
+    placeholder: StringResource? = null,
     onValue: (Float?) -> Unit,
 ) {
+    val optional = placeholder != null
     var text by remember { mutableStateOf(value?.let(::formatMeters).orEmpty()) }
     val parsed = text.replace(',', '.').toFloatOrNull()?.takeIf { it >= 0f }
     val valid = parsed != null || (optional && text.isBlank())
@@ -70,7 +76,7 @@ internal fun MetersField(
         singleLine = true,
         isError = !valid,
         label = { Text(stringResource(label)) },
-        placeholder = { if (optional) Text(stringResource(Res.string.spacing_unlimited)) },
+        placeholder = { placeholder?.let { Text(stringResource(it)) } },
         suffix = { Text("m") },
         modifier = Modifier.fillMaxWidth(),
     )

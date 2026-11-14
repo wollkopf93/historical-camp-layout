@@ -645,6 +645,17 @@ class PlannerViewModel(
         storage.saveInventory(_uiState.value.presets)
     }
 
+    /** Adds or replaces a tent type (by id); marked as user-edited so built-in updates don't overwrite it. */
+    fun savePreset(preset: TentPreset) {
+        val saved = preset.copy(userModified = true)
+        _uiState.update { state ->
+            val others = state.presets.filterNot { it.id == saved.id }
+            state.copy(presets = (others + saved).sortedBy { it.name })
+        }
+        saveInventory()
+        recomputeWarnings()
+    }
+
     /**
      * Turns pending live edits into one undo step. Called when a slider is released, and implicitly
      * before every discrete edit and before undo/redo. No-op if nothing changed (zoom is ignored).

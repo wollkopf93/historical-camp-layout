@@ -132,4 +132,11 @@
     <string name="required_area_busy">Searching area …</string>
     <string name="required_area_hint">Size not known yet? Pick sails and tents first, then let the app find the smallest area that fits.</string>
     <string name="required_area_none">No area found that fits (up to 16 times the size).</string>
+    <string name="edit_tent_type">Edit tent type</string>
+    <string name="own_spacing">Own spacing</string>
+    <string name="own_spacing_hint">Leave empty to use the camp's spacing. Applies to every tent of this type.</string>
+    <string name="own_spacing_tents">Gap to tents</string>
+    <string name="own_spacing_sails">Gap to sun sails</string>
+    <string name="own_spacing_path">Gap to path</string>
+    <string name="spacing_camp_default">as in the camp</string>
 </resources>

@@ -668,8 +668,11 @@ internal object AutoLayout {
         // A tent's wedge is the widest angle any of its points (outline or rope end) reaches from the centre.
         fun wedges(r: Float) = shapes.mapIndexed { i, points -> 2f * points.maxOf { atan2(abs(it.x), r + inward[i] + it.y) } }
 
-        // Points on either side of this angle, both at least r out, are at least `clear` apart.
-        fun gap(r: Float) = asin((clear / r).coerceAtMost(1f))
+        // Tent types may want more room than the camp's walkway: the ring uses the widest pair.
+        val ringClear = tents.flatMap { (_, a) -> tents.map { (_, b) -> rules.between(a, b) } }.maxOrNull() ?: clear
+
+        // Points on either side of this angle, both at least r out, are at least `ringClear` apart.
+        fun gap(r: Float) = asin((ringClear / r).coerceAtMost(1f))
 
         fun needed(r: Float) = wedges(r).sum() + gapCount * gap(r)
 
@@ -704,7 +707,8 @@ internal object AutoLayout {
         }
 
         // At least 1 m: an empty centre with cloth-to-cloth spacing would otherwise start at r = 0 (0/0 in gap()).
-        var radius = max(centreRadius + if (placedSails.isEmpty()) clear else rules.tentToSail, 1f)
+        val toSail = placedSails.flatMap { (_, s) -> tents.map { (_, t) -> rules.between(s, t) } }.maxOrNull()
+        var radius = max(centreRadius + (toSail ?: ringClear), 1f)
         while (needed(radius) > arc) radius += 0.25f
         // The spacing above is exact; the app's walkway warning measures axis-aligned boxes, which grow
         // when tents are rotated. Widen until the real checker is quiet (bounded). Compressed drafts
@@ -759,9 +763,15 @@ internal object AutoLayout {
         ) = box(place(preset, Vec2(0f, 0f), rotationDeg), preset, withRopes = !swingsRopes(preset, clear))
 
         // +1 cm: the app's walkway warning counts exactly 1.50 m as "under 1.5 m".
-        val space = if (clear > 0f) clear + TOUCH else 0f
-        val toCentre = if (placedSails.isEmpty()) clear else rules.tentToSail
-        val centreSpace = if (toCentre > 0f) toCentre + TOUCH else 0f
+        fun padded(gap: Float) = if (gap > 0f) gap + TOUCH else 0f
+
+        fun space(
+            a: TentPreset,
+            b: TentPreset,
+        ) = padded(rules.between(a, b))
+        val rowSpace = tents.flatMap { (_, a) -> tents.map { (_, b) -> space(a, b) } }.maxOrNull() ?: padded(clear)
+        val toCentre = placedSails.flatMap { (_, s) -> tents.map { (_, t) -> rules.between(s, t) } }.maxOrNull() ?: clear
+        val centreSpace = padded(toCentre)
 
         // Back row takes about half, small camps are just a row.
         val backCount = if (tents.size <= 3) tents.size else (tents.size + 1) / 2
@@ -769,6 +779,8 @@ internal object AutoLayout {
         val backY = centre.bottom + centreSpace
         var left = 0f
         var right = 0f
+        var leftEnd: TentPreset? = null
+        var rightEnd: TentPreset? = null
         tents.take(backCount).forEachIndexed { i, (priority, preset) ->
             val b = boxAt(preset, 0f)
             // First tent centred behind the sail, each next one on the shorter end of the row.
@@ -778,15 +790,23 @@ internal object AutoLayout {
                         (-(b.left + b.right) / 2f).also {
                             left = it + b.left
                             right = it + b.right
+                            leftEnd = preset
+                            rightEnd = preset
                         }
                     }
 
                     -left <= right -> {
-                        (left - space - b.right).also { left = it + b.left }
+                        (left - space(leftEnd!!, preset) - b.right).also {
+                            left = it + b.left
+                            leftEnd = preset
+                        }
                     }
 
                     else -> {
-                        (right + space - b.left).also { right = it + b.right }
+                        (right + space(rightEnd!!, preset) - b.left).also {
+                            right = it + b.right
+                            rightEnd = preset
+                        }
                     }
                 }
             placed += priority to (place(preset, Vec2(x, backY - b.top), 0f) to preset)
@@ -794,16 +814,26 @@ internal object AutoLayout {
 
         // Side rows start just in front of the back row and run toward the visitors.
         val innerHalf = max(-centre.left, centre.right) + centreSpace
-        var leftTop = backY - space
-        var rightTop = backY - space
+        var leftTop = backY
+        var rightTop = backY
+        var leftLast: TentPreset? = null
+        var rightLast: TentPreset? = null
         tents.drop(backCount).forEach { (priority, preset) ->
             val toLeft = leftTop >= rightTop
             // 90 turns the entry toward +x (the centre) for the left row, 270 toward -x for the right row.
             val rotation = if (toLeft) 90f else 270f
             val b = boxAt(preset, rotation)
             val x = if (toLeft) -innerHalf - b.right else innerHalf - b.left
-            val y = (if (toLeft) leftTop else rightTop) - b.bottom
-            if (toLeft) leftTop = y + b.top - space else rightTop = y + b.top - space
+            // The first side tent faces the back row's corner: keep the widest gap of the camp to it.
+            val gapY = (if (toLeft) leftLast else rightLast)?.let { space(it, preset) } ?: rowSpace
+            val y = (if (toLeft) leftTop else rightTop) - gapY - b.bottom
+            if (toLeft) {
+                leftTop = y + b.top
+                leftLast = preset
+            } else {
+                rightTop = y + b.top
+                rightLast = preset
+            }
             placed += priority to (place(preset, Vec2(x, y), rotation) to preset)
         }
         return swingWithin(placedSails, placed, clear)

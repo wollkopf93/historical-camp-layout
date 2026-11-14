@@ -55,4 +55,28 @@ class SpacingRulesTest {
         // A zone that is not a lane has no path gap.
         assertFalse(messages(one, SpacingRules(), listOf(lane.copy(kind = null))).any { "Abstand zum Weg" in it })
     }
+
+    @Test
+    fun tentTypeOverride_replacesTheCampValue() {
+        val pair = listOf(tent("a", 10f), tent("b", 15f)) // 2.0 m apart
+
+        fun withOwn(gap: Float?) =
+            GeometryEngine
+                .evaluate(
+                    PlannerProject(parcel = Parcel(40f, 30f), assets = pair),
+                    presets.map { if (it.id == "round_3x3") it.copy(spacing = SpacingOverride(toTents = gap)) else it },
+                ).messages
+                .any { "Laufweg" in it }
+        assertFalse(withOwn(null), "camp default 1.5 m is met")
+        assertTrue(withOwn(3f), "the tent type wants 3 m")
+    }
+
+    @Test
+    fun capped_alsoCapsOverrides() {
+        val wide = presets.first { it.id == "round_3x3" }.copy(spacing = SpacingOverride(toTents = 3f, toPath = 4f))
+        val rules = SpacingRules().capped(1f)
+        assertTrue(rules.between(wide, wide) == 1f)
+        assertTrue(rules.toPath(wide) == 1f)
+        assertTrue(SpacingRules().between(wide, wide) == 3f)
+    }
 }
