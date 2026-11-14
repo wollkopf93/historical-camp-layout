@@ -39,6 +39,7 @@ import de.voculupo.historicalcamplayout.PlannerUiState
 import de.voculupo.historicalcamplayout.assetDisplayLabel
 import de.voculupo.historicalcamplayout.features.inventory.CollapsibleHeader
 import de.voculupo.historicalcamplayout.presetDisplayName
+import de.voculupo.historicalcamplayout.rememberWarningTexts
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.active_rope
 import lagerplaner.composeapp.generated.resources.add_rope
@@ -133,6 +134,7 @@ internal fun PropertiesPane(
     var showSelectionSection by remember { mutableStateOf(true) }
     var showWarningsSection by remember { mutableStateOf(false) }
     val selectedAsset = state.project.assets.firstOrNull { it.id in state.selectedAssetIds }
+    val warningTexts = rememberWarningTexts(state)
     val selectedPreset = state.presets.firstOrNull { it.id == selectedAsset?.presetId }
     val selectedPresetName = selectedPreset?.let { presetDisplayName(it) }
     val selectedRope = selectedAsset?.ropes?.getOrNull(state.selectedRopeIndex ?: -1)
@@ -361,13 +363,13 @@ internal fun PropertiesPane(
                 if (showWarningsSection) {
                     if (enableFullScroll) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            state.warnings.take(8).forEach { warning ->
+                            warningTexts.take(8).forEach { warning ->
                                 Text("• $warning", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     } else {
                         LazyColumn {
-                            items(state.warnings.take(8)) { warning ->
+                            items(warningTexts.take(8)) { warning ->
                                 Text("• $warning", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                             }
                         }

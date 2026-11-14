@@ -4,6 +4,7 @@ import de.voculupo.historicalcamplayout.AutoSetupRequest
 import de.voculupo.historicalcamplayout.FreeArea
 import de.voculupo.historicalcamplayout.FreeAreaKind
 import de.voculupo.historicalcamplayout.GeometryEngine
+import de.voculupo.historicalcamplayout.IssueKind
 import de.voculupo.historicalcamplayout.Parcel
 import de.voculupo.historicalcamplayout.PlacedAsset
 import de.voculupo.historicalcamplayout.PlannerProject
@@ -62,10 +63,15 @@ class AutoLayoutScenarioTest {
         }
         val report =
             GeometryEngine.evaluate(PlannerProject(parcel = req.parcel, assets = result.assets, blockZones = result.zones), presets)
-        if (report.hardCollisions.isNotEmpty()) out += "hard: " + report.messages.filter { "Laufweg" !in it }
-        out += report.messages.filter { "Parzelle" in it || "Eingang" in it || "Sperrzone" in it }
+        if (report.hardCollisions.isNotEmpty()) out += "hard: " + report.issues.filter { it.kind != IssueKind.NARROW_WALKWAY }
+        out +=
+            report.issues
+                .filter {
+                    it.kind == IssueKind.OUTSIDE_PARCEL || it.kind == IssueKind.ENTRY_BLOCKED ||
+                        it.kind == IssueKind.IN_NO_GO_ZONE
+                }.map { "$it" }
         // The walkway the result reports must really be kept (the app warns below 1.5 m).
-        if (result.walkwayMeters >= 1.5f) out += report.messages.filter { "Laufweg" in it }
+        if (result.walkwayMeters >= 1.5f) out += report.issues.filter { it.kind == IssueKind.NARROW_WALKWAY }.map { "$it" }
 
         // Everything asked for is either placed or reported as left out.
         val names = { ids: List<String> -> ids.map { presetsById.getValue(it).name }.toSet() }

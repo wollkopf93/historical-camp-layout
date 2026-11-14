@@ -54,7 +54,7 @@ class GeometryEngineSunSailTest {
 
         assertEquals(setOf("a", "b"), report.warningCollisions)
         assertTrue(report.hardCollisions.isEmpty())
-        assertTrue(report.messages.any { it.startsWith("Sonnensegel überlappen") }, report.messages.toString())
+        assertTrue(report.issues.any { it.kind == IssueKind.SAIL_OVERLAP }, report.issues.toString())
     }
 
     @Test
@@ -63,7 +63,7 @@ class GeometryEngineSunSailTest {
 
         val report = GeometryEngine.evaluate(project, listOf(preset))
 
-        assertTrue(report.warningCollisions.isEmpty(), report.messages.toString())
+        assertTrue(report.warningCollisions.isEmpty(), report.issues.toString())
         assertTrue(report.hardCollisions.isEmpty())
         assertFalse(report.hiddenRopeIndices["a"].isNullOrEmpty())
         assertFalse(report.hiddenRopeIndices["b"].isNullOrEmpty())

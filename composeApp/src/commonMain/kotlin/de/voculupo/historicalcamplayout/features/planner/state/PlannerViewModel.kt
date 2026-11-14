@@ -694,7 +694,7 @@ class PlannerViewModel(
         val report = GeometryEngine.evaluate(state.project, state.presets)
         _uiState.update {
             it.copy(
-                warnings = report.messages,
+                warnings = report.issues,
                 warningAssetIds = report.warningCollisions,
                 hardCollisionAssetIds = report.hardCollisions,
                 hiddenRopeIndices = report.hiddenRopeIndices,

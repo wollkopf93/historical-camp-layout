@@ -119,6 +119,14 @@
     <string name="zoom_out">Verkleinern</string>
     <string name="zoom_reset">Zoom zurücksetzen</string>
     <string name="optimize_layout">Feinschliff: Abstände und Eingänge optimieren</string>
+    <!-- Collision and spacing warnings: %1$s/%2$s are tent names -->
+    <string name="issue_outside_parcel">%1$s ragt aus der Parzelle.</string>
+    <string name="issue_sail_overlap">Sonnensegel überlappen: %1$s und %2$s.</string>
+    <string name="issue_collision">Kollision zwischen %1$s und %2$s.</string>
+    <string name="issue_rope_collision">Seil-Kollision: Seil ragt in %1$s oder %2$s.</string>
+    <string name="issue_entry_blocked">Eingang verstellt: %1$s und %2$s.</string>
+    <string name="issue_narrow_walkway">Laufweg zwischen %1$s und %2$s unter %3$s m (%4$s m).</string>
+    <string name="issue_in_no_go_zone">%1$s liegt in einer Sperrzone.</string>
     <!-- Built-in tent presets, keyed preset_<id> -->
     <string name="preset_saxon_2x4">Sachsenzelt 2x4</string>
     <string name="preset_saxon_3x5">Sachsenzelt 3x5</string>

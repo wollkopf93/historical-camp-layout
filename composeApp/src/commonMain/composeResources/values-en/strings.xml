@@ -119,6 +119,14 @@
     <string name="zoom_out">Zoom out</string>
     <string name="zoom_reset">Reset zoom</string>
     <string name="optimize_layout">Fine-tune spacing and entries</string>
+    <!-- Collision and spacing warnings: %1$s/%2$s are tent names -->
+    <string name="issue_outside_parcel">%1$s sticks out of the parcel.</string>
+    <string name="issue_sail_overlap">Sun sails overlap: %1$s and %2$s.</string>
+    <string name="issue_collision">Collision between %1$s and %2$s.</string>
+    <string name="issue_rope_collision">Rope collision: a rope reaches into %1$s or %2$s.</string>
+    <string name="issue_entry_blocked">Entry blocked: %1$s and %2$s.</string>
+    <string name="issue_narrow_walkway">Walkway between %1$s and %2$s is under %3$s m (%4$s m).</string>
+    <string name="issue_in_no_go_zone">%1$s is inside a no-go zone.</string>
     <!-- Built-in tent presets, keyed preset_<id> -->
     <string name="preset_saxon_2x4">Saxon tent 2x4</string>
     <string name="preset_saxon_3x5">Saxon tent 3x5</string>

@@ -93,6 +93,7 @@ import de.voculupo.historicalcamplayout.features.properties.PropertiesPane
 import de.voculupo.historicalcamplayout.getPlatform
 import de.voculupo.historicalcamplayout.platform.PlatformBackHandler
 import de.voculupo.historicalcamplayout.rememberPresetNames
+import de.voculupo.historicalcamplayout.rememberWarningTexts
 import kotlinx.coroutines.delay
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.auto_setup_short
@@ -672,7 +673,7 @@ private fun ExpandedLayout(
 
         if (state.warnings.isNotEmpty() && showWarningsPanel) {
             WarningsCard(
-                warnings = state.warnings,
+                warnings = rememberWarningTexts(state),
                 maxShown = 8,
                 onClick = { showWarningsPanel = false },
                 modifier =
@@ -839,7 +840,7 @@ private fun CompactLayout(
                     .widthIn(max = 360.dp)
                     .zIndex(1f),
         ) {
-            WarningsCard(warnings = state.warnings, maxShown = 6, onClick = { showWarningsPanel = false })
+            WarningsCard(warnings = rememberWarningTexts(state), maxShown = 6, onClick = { showWarningsPanel = false })
         }
 
         Column(

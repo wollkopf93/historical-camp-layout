@@ -18,10 +18,21 @@ data class RopeSegment(
     val end: Vec2,
 )
 
+/** What [GeometryEngine.evaluate] found; the UI words it in the app language. */
+enum class IssueKind { OUTSIDE_PARCEL, SAIL_OVERLAP, COLLISION, ROPE_COLLISION, ENTRY_BLOCKED, NARROW_WALKWAY, IN_NO_GO_ZONE }
+
+/** One problem between the assets in [assetIds]; the walkway fields are only set for [IssueKind.NARROW_WALKWAY]. */
+data class CollisionIssue(
+    val kind: IssueKind,
+    val assetIds: List<String>,
+    val walkwayMeters: Float = 0f,
+    val gapMeters: Float = 0f,
+)
+
 data class CollisionReport(
     val hardCollisions: Set<String> = emptySet(),
     val warningCollisions: Set<String> = emptySet(),
-    val messages: List<String> = emptyList(),
+    val issues: List<CollisionIssue> = emptyList(),
     /** Rope indices per asset id that are hidden because two sun sails are joined along that edge. */
     val hiddenRopeIndices: Map<String, Set<Int>> = emptyMap(),
 )
@@ -186,7 +197,7 @@ object GeometryEngine {
     ): CollisionReport {
         val hard = mutableSetOf<String>()
         val warn = mutableSetOf<String>()
-        val messages = mutableListOf<String>()
+        val issues = mutableListOf<CollisionIssue>()
         val geometries = buildGeometries(project, presets)
 
         geometries.forEach { geo ->
@@ -199,7 +210,7 @@ object GeometryEngine {
                 bounds.bottom > project.parcel.heightMeters
             ) {
                 warn += geo.asset.id
-                messages += "Asset ${geo.preset.name} ragt aus der Parzelle."
+                issues += CollisionIssue(IssueKind.OUTSIDE_PARCEL, listOf(geo.asset.id))
             }
         }
 
@@ -216,26 +227,24 @@ object GeometryEngine {
                 if (bothSunSails && aabbOverlap(a.bodyAabb, b.bodyAabb) && CollisionEngine.pathsIntersect(a.bodyPath, b.bodyPath)) {
                     warn += a.asset.id
                     warn += b.asset.id
-                    messages += "Sonnensegel überlappen: ${a.preset.name} und ${b.preset.name}."
+                    issues += CollisionIssue(IssueKind.SAIL_OVERLAP, listOf(a.asset.id, b.asset.id))
                 } else if (isHardCollision(a, b)) {
                     hard += a.asset.id
                     hard += b.asset.id
-                    messages += "Harte Kollision zwischen ${a.preset.name} und ${b.preset.name}."
+                    issues += CollisionIssue(IssueKind.COLLISION, listOf(a.asset.id, b.asset.id))
                 } else if (isRopeIntrusionCollision(a, b, hiddenRopes)) {
                     hard += a.asset.id
                     hard += b.asset.id
-                    messages += "Seil-Kollision: Seil ragt in ${a.preset.name} oder ${b.preset.name}."
+                    issues += CollisionIssue(IssueKind.ROPE_COLLISION, listOf(a.asset.id, b.asset.id))
                 } else if (blocksEntry(a, b) || blocksEntry(b, a)) {
                     warn += a.asset.id
                     warn += b.asset.id
-                    messages += "Eingang verstellt: ${a.preset.name} und ${b.preset.name}."
+                    issues += CollisionIssue(IssueKind.ENTRY_BLOCKED, listOf(a.asset.id, b.asset.id))
                 } else {
                     walkwayGap(a, b, walkwayMeters)?.let { gap ->
                         warn += a.asset.id
                         warn += b.asset.id
-                        messages +=
-                            "Laufweg zwischen ${a.preset.name} und ${b.preset.name} unter ${formatFloat(walkwayMeters, 1)}m " +
-                            "(${formatFloat(gap, 2)}m)."
+                        issues += CollisionIssue(IssueKind.NARROW_WALKWAY, listOf(a.asset.id, b.asset.id), walkwayMeters, gap)
                     }
                 }
             }
@@ -247,12 +256,12 @@ object GeometryEngine {
             geometries.forEach { geo ->
                 if (polygonsIntersect(geo.outline, zonePolygon)) {
                     if (autoZonesHard || !zone.id.startsWith(AutoLayout.AUTO_PREFIX)) hard += geo.asset.id else warn += geo.asset.id
-                    messages += "Sperrzone verletzt: ${geo.preset.name} liegt in einer Sperrzone."
+                    issues += CollisionIssue(IssueKind.IN_NO_GO_ZONE, listOf(geo.asset.id))
                 }
             }
         }
 
-        return CollisionReport(hard, warn, messages.distinct(), hiddenRopes)
+        return CollisionReport(hard, warn, issues.distinct(), hiddenRopes)
     }
 
     fun metersToOffset(
@@ -900,9 +909,4 @@ object GeometryEngine {
         val upper = min(a.maxMeters, b.maxMeters)
         return upper - lower > 0.02f
     }
-
-    private fun formatFloat(
-        value: Float,
-        decimals: Int,
-    ): String = "%.${decimals}f".format(value)
 }

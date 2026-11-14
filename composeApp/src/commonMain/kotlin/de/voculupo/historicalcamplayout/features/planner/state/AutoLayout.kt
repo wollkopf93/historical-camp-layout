@@ -6,6 +6,7 @@ import de.voculupo.historicalcamplayout.BlockZone
 import de.voculupo.historicalcamplayout.FreeArea
 import de.voculupo.historicalcamplayout.FreeAreaKind
 import de.voculupo.historicalcamplayout.GeometryEngine
+import de.voculupo.historicalcamplayout.IssueKind
 import de.voculupo.historicalcamplayout.Parcel
 import de.voculupo.historicalcamplayout.PlacedAsset
 import de.voculupo.historicalcamplayout.PlannerProject
@@ -116,8 +117,8 @@ internal object AutoLayout {
                     PlannerProject(parcel = req.parcel, assets = r.assets + obstacleAssets),
                     presetsById.values.toList(),
                     walkwayMeters = req.walkwayMeters,
-                ).messages
-                .count { "Laufweg" in it }
+                ).issues
+                .count { it.kind == IssueKind.NARROW_WALKWAY }
         val keepTuned = tuned.skipped.size <= result.skipped.size && walkwayWarnings(tuned) <= walkwayWarnings(result)
         return if (keepTuned) tuned else result
     }
