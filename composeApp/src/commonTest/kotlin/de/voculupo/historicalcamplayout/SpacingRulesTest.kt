@@ -23,37 +23,38 @@ class SpacingRulesTest {
         .evaluate(
             PlannerProject(parcel = Parcel(40f, 30f), assets = assets, blockZones = zones, spacing = rules),
             presets,
-        ).messages
+        ).issues
+        .map { it.kind }
 
     @Test
     fun tentToTent_followsTheRule() {
         val pair = listOf(tent("a", 10f), tent("b", 14f)) // 1.0 m apart
-        assertTrue(messages(pair, SpacingRules()).any { "Laufweg" in it })
-        assertFalse(messages(pair, SpacingRules(tentToTent = 0.8f)).any { "Laufweg" in it })
+        assertTrue(messages(pair, SpacingRules()).any { it == IssueKind.NARROW_WALKWAY })
+        assertFalse(messages(pair, SpacingRules(tentToTent = 0.8f)).any { it == IssueKind.NARROW_WALKWAY })
     }
 
     @Test
     fun tentToSail_usesItsOwnGap() {
         val near = listOf(tent("a", 14.5f), sail) // 1.0 m from the sail
-        assertTrue(messages(near, SpacingRules(tentToTent = 3f, tentToSail = 1.5f)).any { "Laufweg" in it })
-        assertFalse(messages(near, SpacingRules(tentToTent = 3f, tentToSail = 0.5f)).any { "Laufweg" in it })
+        assertTrue(messages(near, SpacingRules(tentToTent = 3f, tentToSail = 1.5f)).any { it == IssueKind.NARROW_WALKWAY })
+        assertFalse(messages(near, SpacingRules(tentToTent = 3f, tentToSail = 0.5f)).any { it == IssueKind.NARROW_WALKWAY })
     }
 
     @Test
     fun tentToSailMax_warnsWhenTooFar() {
         val far = listOf(tent("a", 5f), sail) // 10.5 m from the sail
-        assertTrue(messages(far, SpacingRules(tentToSailMax = 3f)).any { "Zu weit" in it })
-        assertFalse(messages(far, SpacingRules()).any { "Zu weit" in it })
+        assertTrue(messages(far, SpacingRules(tentToSailMax = 3f)).any { it == IssueKind.TOO_FAR_FROM_SAIL })
+        assertFalse(messages(far, SpacingRules()).any { it == IssueKind.TOO_FAR_FROM_SAIL })
     }
 
     @Test
     fun tentToPath_checksLanes() {
         val lane = BlockZone("auto-l", listOf(Vec2(12f, 0f), Vec2(14f, 0f), Vec2(14f, 30f), Vec2(12f, 30f)), kind = FreeAreaKind.LANE)
         val one = listOf(tent("a", 10f)) // 0.5 m from the lane
-        assertTrue(messages(one, SpacingRules(), listOf(lane)).any { "Weg" in it })
-        assertFalse(messages(one, SpacingRules(tentToPath = 0.3f), listOf(lane)).any { "Abstand zum Weg" in it })
+        assertTrue(messages(one, SpacingRules(), listOf(lane)).any { it == IssueKind.NEAR_PATH })
+        assertFalse(messages(one, SpacingRules(tentToPath = 0.3f), listOf(lane)).any { it == IssueKind.NEAR_PATH })
         // A zone that is not a lane has no path gap.
-        assertFalse(messages(one, SpacingRules(), listOf(lane.copy(kind = null))).any { "Abstand zum Weg" in it })
+        assertFalse(messages(one, SpacingRules(), listOf(lane.copy(kind = null))).any { it == IssueKind.NEAR_PATH })
     }
 
     @Test
@@ -65,8 +66,9 @@ class SpacingRulesTest {
                 .evaluate(
                     PlannerProject(parcel = Parcel(40f, 30f), assets = pair),
                     presets.map { if (it.id == "round_3x3") it.copy(spacing = SpacingOverride(toTents = gap)) else it },
-                ).messages
-                .any { "Laufweg" in it }
+                ).issues
+                .map { it.kind }
+                .any { it == IssueKind.NARROW_WALKWAY }
         assertFalse(withOwn(null), "camp default 1.5 m is met")
         assertTrue(withOwn(3f), "the tent type wants 3 m")
     }
@@ -85,18 +87,18 @@ class SpacingRulesTest {
     private fun withTypes(vararg types: TentPreset) = presets.map { p -> types.firstOrNull { it.id == p.id } ?: p }
 
     @Test
-    fun defaults_keepTheOldOnePointFiveMetreWarning() {
-        // Exactly 1.5 m counted as "under 1.5 m" before; 1.6 m did not.
-        assertTrue(messages(listOf(tent("a", 10f), tent("b", 14.5f)), SpacingRules()).any { "Laufweg" in it })
-        assertFalse(messages(listOf(tent("a", 10f), tent("b", 14.6f)), SpacingRules()).any { "Laufweg" in it })
+    fun defaults_keepTheOnePointFiveMetreWalkway() {
+        // Outline gap below 1.5 m warns, exactly 1.5 m is enough (main's outline-gap rule).
+        assertTrue(messages(listOf(tent("a", 10f), tent("b", 14.4f)), SpacingRules()).any { it == IssueKind.NARROW_WALKWAY })
+        assertFalse(messages(listOf(tent("a", 10f), tent("b", 14.6f)), SpacingRules()).any { it == IssueKind.NARROW_WALKWAY })
         assertTrue(SpacingRules() == PlannerProject().spacing)
     }
 
     @Test
     fun twoSails_useTheTentToTentGap() {
         val sails = listOf(sail.copy(id = "s1", position = Vec2(10f, 10f)), sail.copy(id = "s2", position = Vec2(17f, 10f))) // 1.0 m
-        assertTrue(messages(sails, SpacingRules(tentToTent = 1.5f, tentToSail = 0.5f)).any { "Laufweg" in it })
-        assertFalse(messages(sails, SpacingRules(tentToTent = 0.5f, tentToSail = 3f)).any { "Laufweg" in it })
+        assertTrue(messages(sails, SpacingRules(tentToTent = 1.5f, tentToSail = 0.5f)).any { it == IssueKind.NARROW_WALKWAY })
+        assertFalse(messages(sails, SpacingRules(tentToTent = 0.5f, tentToSail = 3f)).any { it == IssueKind.NARROW_WALKWAY })
     }
 
     @Test
@@ -133,7 +135,7 @@ class SpacingRulesTest {
         val near = listOf(tent("a", 14.5f), sail) // 1.0 m from the sail
         val ownSail = preset("sun_sail_6x6_flat").copy(spacing = SpacingOverride(toTents = 0.5f))
         val report = GeometryEngine.evaluate(PlannerProject(parcel = Parcel(40f, 30f), assets = near), withTypes(ownSail))
-        assertFalse(report.messages.any { "Laufweg" in it }, report.messages.toString())
+        assertFalse(report.issues.map { it.kind }.any { it == IssueKind.NARROW_WALKWAY }, report.issues.map { it.kind }.toString())
     }
 
     @Test
@@ -148,40 +150,40 @@ class SpacingRulesTest {
 
     @Test
     fun tentToSailMax_withoutSails_isQuiet_andSailsAreNotChecked() {
-        assertFalse(messages(listOf(tent("a", 5f)), SpacingRules(tentToSailMax = 0.1f)).any { "Zu weit" in it })
+        assertFalse(messages(listOf(tent("a", 5f)), SpacingRules(tentToSailMax = 0.1f)).any { it == IssueKind.TOO_FAR_FROM_SAIL })
         val twoSails = listOf(sail, sail.copy(id = "s2", position = Vec2(35f, 10f)))
-        assertFalse(messages(twoSails, SpacingRules(tentToSailMax = 0.1f)).any { "Zu weit" in it })
+        assertFalse(messages(twoSails, SpacingRules(tentToSailMax = 0.1f)).any { it == IssueKind.TOO_FAR_FROM_SAIL })
     }
 
     @Test
     fun tentToSailMax_usesTheNearestSail() {
         val sails = listOf(sail, sail.copy(id = "s2", position = Vec2(2f, 10f))) // second sail body -1..5
         // Tent at 7.5: 1.0 m from the second sail, far from the first.
-        assertFalse(messages(listOf(tent("a", 7.5f)) + sails, SpacingRules(tentToSailMax = 2f)).any { "Zu weit" in it })
+        assertFalse(messages(listOf(tent("a", 7.5f)) + sails, SpacingRules(tentToSailMax = 2f)).any { it == IssueKind.TOO_FAR_FROM_SAIL })
     }
 
     @Test
     fun pathWarning_forSails_usesSailToPath() {
         val lane = BlockZone("auto-l", listOf(Vec2(24f, 0f), Vec2(26f, 0f), Vec2(26f, 30f), Vec2(24f, 30f)), kind = FreeAreaKind.LANE)
         val one = listOf(sail) // sail body ends at 23: 1.0 m from the lane
-        assertTrue(messages(one, SpacingRules(sailToPath = 1.5f, tentToPath = 0f), listOf(lane)).any { "Abstand zum Weg" in it })
-        assertFalse(messages(one, SpacingRules(sailToPath = 0.5f, tentToPath = 5f), listOf(lane)).any { "Abstand zum Weg" in it })
+        assertTrue(messages(one, SpacingRules(sailToPath = 1.5f, tentToPath = 0f), listOf(lane)).any { it == IssueKind.NEAR_PATH })
+        assertFalse(messages(one, SpacingRules(sailToPath = 0.5f, tentToPath = 5f), listOf(lane)).any { it == IssueKind.NEAR_PATH })
     }
 
     @Test
     fun tentInsideLane_isAZoneProblemNotAPathGap() {
         val lane = BlockZone("auto-l", listOf(Vec2(9f, 0f), Vec2(11f, 0f), Vec2(11f, 30f), Vec2(9f, 30f)), kind = FreeAreaKind.LANE)
         val msgs = messages(listOf(tent("a", 10f)), SpacingRules(), listOf(lane))
-        assertTrue(msgs.any { "Sperrzone" in it })
-        assertFalse(msgs.any { "Abstand zum Weg" in it })
+        assertTrue(msgs.any { it == IssueKind.IN_NO_GO_ZONE })
+        assertFalse(msgs.any { it == IssueKind.NEAR_PATH })
     }
 
     @Test
     fun overlappingMargins_warn_unlessClothToCloth() {
         // Walls 0.5 m apart, 0.5 m margins each: the safety boxes overlap, the bodies don't.
         val close = listOf(tent("a", 10f), tent("b", 13.5f)).map { it.copy(safetyMarginMeters = 0.5f) }
-        assertTrue(messages(close, SpacingRules()).any { "Laufweg" in it })
-        assertFalse(messages(close, SpacingRules(tentToTent = 0f)).any { "Laufweg" in it })
+        assertTrue(messages(close, SpacingRules()).any { it == IssueKind.NARROW_WALKWAY })
+        assertFalse(messages(close, SpacingRules(tentToTent = 0f)).any { it == IssueKind.NARROW_WALKWAY })
         val report = GeometryEngine.evaluate(PlannerProject(parcel = Parcel(40f, 30f), assets = close), presets)
         assertTrue(report.hardCollisions.isEmpty(), "margins overlapping is a warning, not a collision")
     }
@@ -191,6 +193,6 @@ class SpacingRulesTest {
         // Diamond next to a square sail: touching, but not an edge pair the join check recognises.
         val square = sail.copy(id = "s1", position = Vec2(10f, 10f))
         val diamond = PlacedAsset(id = "s2", presetId = "sun_sail_6x6_diamond", position = Vec2(17.25f, 10f), safetyMarginMeters = 0f)
-        assertFalse(messages(listOf(square, diamond), SpacingRules()).any { "Laufweg" in it })
+        assertFalse(messages(listOf(square, diamond), SpacingRules()).any { it == IssueKind.NARROW_WALKWAY })
     }
 }

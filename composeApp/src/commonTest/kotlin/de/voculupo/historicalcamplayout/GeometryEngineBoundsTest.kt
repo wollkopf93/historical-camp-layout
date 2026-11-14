@@ -26,6 +26,7 @@ class GeometryEngineBoundsTest {
     fun evaluate_autoSetupZone_isOnlyWarning_userZoneIsHard() {
         val tent = PlacedAsset(id = "a", presetId = "round_3x3", position = Vec2(10f, 10f), showRopes = false)
         val square = listOf(Vec2(9f, 9f), Vec2(11f, 9f), Vec2(11f, 11f), Vec2(9f, 11f))
+
         fun report(zoneId: String) =
             GeometryEngine.evaluate(
                 PlannerProject(parcel = Parcel(30f, 30f), assets = listOf(tent), blockZones = listOf(BlockZone(zoneId, square))),
@@ -35,6 +36,20 @@ class GeometryEngineBoundsTest {
         assertTrue(report("auto-1").hardCollisions.isEmpty())
         assertEquals(setOf("a"), report("auto-1").warningCollisions)
         assertEquals(setOf("a"), report("user-1").hardCollisions)
+    }
+
+    @Test
+    fun walkwayWarning_usesOutlineGap_andChosenWalkway() {
+        // Diagonal neighbours: bounding boxes are only 0.7 m apart, the round outlines about 1.95 m.
+        val a = PlacedAsset(id = "a", presetId = "round_3x3", position = Vec2(10f, 10f), showRopes = false, safetyMarginMeters = 0f)
+        val b = a.copy(id = "b", position = Vec2(13.5f, 13.5f))
+        val project = PlannerProject(parcel = Parcel(30f, 30f), assets = listOf(a, b))
+
+        assertTrue(GeometryEngine.evaluate(project, presets).warningCollisions.isEmpty())
+        assertEquals(
+            setOf("a", "b"),
+            GeometryEngine.evaluate(project.copy(spacing = SpacingRules(tentToTent = 2.5f)), presets).warningCollisions,
+        )
     }
 
     @Test

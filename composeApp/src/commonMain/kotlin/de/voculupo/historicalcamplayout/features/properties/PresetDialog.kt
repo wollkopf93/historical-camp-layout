@@ -27,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import de.voculupo.historicalcamplayout.TentPreset
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerDomainOps
+import de.voculupo.historicalcamplayout.presetDisplayName
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.cancel
 import lagerplaner.composeapp.generated.resources.edit_tent_type
@@ -35,15 +36,6 @@ import lagerplaner.composeapp.generated.resources.own_spacing_hint
 import lagerplaner.composeapp.generated.resources.own_spacing_path
 import lagerplaner.composeapp.generated.resources.own_spacing_sails
 import lagerplaner.composeapp.generated.resources.own_spacing_tents
-import lagerplaner.composeapp.generated.resources.preset_copy_suffix
-import lagerplaner.composeapp.generated.resources.preset_depth
-import lagerplaner.composeapp.generated.resources.preset_is_sail
-import lagerplaner.composeapp.generated.resources.preset_margin
-import lagerplaner.composeapp.generated.resources.preset_name
-import lagerplaner.composeapp.generated.resources.preset_ropes
-import lagerplaner.composeapp.generated.resources.preset_ropes_hint
-import lagerplaner.composeapp.generated.resources.preset_save_as_new
-import lagerplaner.composeapp.generated.resources.preset_width
 import lagerplaner.composeapp.generated.resources.rope_n_stake
 import lagerplaner.composeapp.generated.resources.rope_remove
 import lagerplaner.composeapp.generated.resources.rope_slope_apply
@@ -53,6 +45,15 @@ import lagerplaner.composeapp.generated.resources.rope_slope_result
 import lagerplaner.composeapp.generated.resources.rope_slope_title
 import lagerplaner.composeapp.generated.resources.spacing_camp_default
 import lagerplaner.composeapp.generated.resources.take_over
+import lagerplaner.composeapp.generated.resources.type_copy_suffix
+import lagerplaner.composeapp.generated.resources.type_depth
+import lagerplaner.composeapp.generated.resources.type_is_sail
+import lagerplaner.composeapp.generated.resources.type_margin
+import lagerplaner.composeapp.generated.resources.type_name
+import lagerplaner.composeapp.generated.resources.type_ropes
+import lagerplaner.composeapp.generated.resources.type_ropes_hint
+import lagerplaner.composeapp.generated.resources.type_save_as_new
+import lagerplaner.composeapp.generated.resources.type_width
 import org.jetbrains.compose.resources.stringResource
 import kotlin.random.Random
 
@@ -67,14 +68,18 @@ internal fun PresetDialog(
     onConfirm: (TentPreset) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var draft by remember(preset.id) { mutableStateOf(preset) }
+    // Built-in types show their name in the app language; it is only stored when the user changes it.
+    val shownName = presetDisplayName(preset)
+    var draft by remember(preset.id) { mutableStateOf(preset.copy(name = shownName)) }
+
+    fun finalName(name: String) = if (name == shownName) preset.name else name
     // Rope helper: kept in the dialog only, it just fills in the peg distances.
     var ropeHeight by remember { mutableStateOf<Float?>(null) }
     var ropeSlope by remember { mutableStateOf<Float?>(SLOPE_DEFAULT_DEG) }
     // Bumped when ropes change from outside their own field (removal, slope helper) so the fields reload.
     var ropeRevision by remember { mutableIntStateOf(0) }
     val builtInSail = preset.id.startsWith("sun_sail_")
-    val copySuffix = stringResource(Res.string.preset_copy_suffix)
+    val copySuffix = stringResource(Res.string.type_copy_suffix)
     val valid = draft.name.isNotBlank() && draft.widthMeters > 0f && draft.heightMeters > 0f
 
     AlertDialog(
@@ -87,28 +92,28 @@ internal fun PresetDialog(
                     onValueChange = { draft = draft.copy(name = it.take(NAME_MAX)) },
                     singleLine = true,
                     isError = draft.name.isBlank(),
-                    label = { Text(stringResource(Res.string.preset_name)) },
+                    label = { Text(stringResource(Res.string.type_name)) },
                     modifier = Modifier.fillMaxWidth(),
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Column(Modifier.weight(1f)) {
-                        MetersField(Res.string.preset_width, draft.widthMeters) {
+                        MetersField(Res.string.type_width, draft.widthMeters) {
                             if (it!! > 0f) draft = PlannerDomainOps.resized(draft, it, draft.heightMeters)
                         }
                     }
                     Column(Modifier.weight(1f)) {
-                        MetersField(Res.string.preset_depth, draft.heightMeters) {
+                        MetersField(Res.string.type_depth, draft.heightMeters) {
                             if (it!! > 0f) draft = PlannerDomainOps.resized(draft, draft.widthMeters, it)
                         }
                     }
                 }
-                MetersField(Res.string.preset_margin, draft.defaultSafetyMarginMeters) {
+                MetersField(Res.string.type_margin, draft.defaultSafetyMarginMeters) {
                     draft =
                         draft.copy(defaultSafetyMarginMeters = it!!)
                 }
                 if (!builtInSail) {
                     Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text(stringResource(Res.string.preset_is_sail), modifier = Modifier.weight(1f))
+                        Text(stringResource(Res.string.type_is_sail), modifier = Modifier.weight(1f))
                         Switch(checked = draft.isSunSail, onCheckedChange = { draft = draft.copy(isSunSail = it) })
                     }
                 }
@@ -123,8 +128,8 @@ internal fun PresetDialog(
                 MetersField(Res.string.own_spacing_path, own.toPath, fallback) { draft = draft.copy(spacing = own.copy(toPath = it)) }
 
                 HorizontalDivider()
-                Text(stringResource(Res.string.preset_ropes, draft.ropeAnchors.size), style = MaterialTheme.typography.titleSmall)
-                Text(stringResource(Res.string.preset_ropes_hint), style = MaterialTheme.typography.bodySmall)
+                Text(stringResource(Res.string.type_ropes, draft.ropeAnchors.size), style = MaterialTheme.typography.titleSmall)
+                Text(stringResource(Res.string.type_ropes_hint), style = MaterialTheme.typography.bodySmall)
                 draft.ropeAnchors.forEachIndexed { i, rope ->
                     key(i, ropeRevision) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -186,12 +191,15 @@ internal fun PresetDialog(
                 OutlinedButton(
                     enabled = valid,
                     onClick = {
-                        val name = if (draft.name == preset.name) "${draft.name} $copySuffix" else draft.name
+                        val name = if (draft.name == shownName) "$shownName $copySuffix" else draft.name
                         val sail = draft.isSunSail || builtInSail
                         onConfirm(draft.copy(id = "custom_" + Random.nextLong().toULong().toString(36), name = name, isSunSail = sail))
                     },
-                ) { Text(stringResource(Res.string.preset_save_as_new)) }
-                Button(enabled = valid, onClick = { onConfirm(draft) }) { Text(stringResource(Res.string.take_over)) }
+                ) { Text(stringResource(Res.string.type_save_as_new)) }
+                Button(
+                    enabled = valid,
+                    onClick = { onConfirm(draft.copy(name = finalName(draft.name))) },
+                ) { Text(stringResource(Res.string.take_over)) }
             }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(Res.string.cancel)) } },

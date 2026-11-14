@@ -1,5 +1,7 @@
 package de.voculupo.historicalcamplayout
 
+import androidx.compose.ui.graphics.ImageBitmap
+
 /** Test double for [ProjectStorage]: keeps the "saved" project in memory so a second ViewModel can reload it. */
 class InMemoryStorage : ProjectStorage {
     @Volatile var saved: PlannerProject? = null
@@ -20,8 +22,5 @@ class InMemoryStorage : ProjectStorage {
 
     override fun loadInventory(): List<TentPreset>? = null
 
-    override fun exportProjectPng(
-        project: PlannerProject,
-        presets: List<TentPreset>,
-    ) = Unit
+    override fun exportProjectPng(image: ImageBitmap) = Unit
 }

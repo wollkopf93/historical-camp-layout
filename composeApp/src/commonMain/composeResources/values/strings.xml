@@ -39,6 +39,7 @@
     <string name="import_file">Import Datei</string>
     <string name="export_png">Export PNG</string>
     <string name="selection_title">Auswahl (%1$d)</string>
+    <string name="copy_suffix">(Kopie)</string>
     <string name="tent_name">Zeltname</string>
     <string name="tent_name_placeholder">z.B. Küchenzelt</string>
     <string name="rotation_deg">Rotation: %1$d°</string>
@@ -139,20 +140,59 @@
     <string name="own_spacing_sails">Abstand zu Sonnensegeln</string>
     <string name="own_spacing_path">Abstand zum Weg</string>
     <string name="spacing_camp_default">wie im Lager</string>
-    <string name="preset_name">Name</string>
-    <string name="preset_width">Breite</string>
-    <string name="preset_depth">Tiefe</string>
-    <string name="preset_margin">Sicherheitsabstand</string>
-    <string name="preset_is_sail">Ist ein Sonnensegel / Baldachin</string>
-    <string name="preset_ropes">Abspannseile (%1$d)</string>
-    <string name="preset_ropes_hint">Heringabstand = wie weit der Hering vom Abspannpunkt entfernt steht (von oben gesehen). Gilt für neu gesetzte Zelte und für gesetzte Zelte, deren Seile noch nicht angepasst wurden.</string>
+    <string name="type_name">Name</string>
+    <string name="type_width">Breite</string>
+    <string name="type_depth">Tiefe</string>
+    <string name="type_margin">Sicherheitsabstand</string>
+    <string name="type_is_sail">Ist ein Sonnensegel / Baldachin</string>
+    <string name="type_ropes">Abspannseile (%1$d)</string>
+    <string name="type_ropes_hint">Heringabstand = wie weit der Hering vom Abspannpunkt entfernt steht (von oben gesehen). Gilt für neu gesetzte Zelte und für gesetzte Zelte, deren Seile noch nicht angepasst wurden.</string>
     <string name="rope_n_stake">Seil %1$d: Heringabstand</string>
     <string name="rope_slope_title">Heringabstand aus Höhe und Neigung</string>
     <string name="rope_slope_height">Höhe Abspannpunkt</string>
     <string name="rope_slope_deg">Neigung zum Boden</string>
     <string name="rope_slope_result">Heringabstand: %1$s m</string>
     <string name="rope_slope_apply">Für alle Seile übernehmen</string>
-    <string name="preset_save_as_new">Als neuen Typ speichern</string>
+    <string name="type_save_as_new">Als neuen Typ speichern</string>
     <string name="rope_remove">Entfernen</string>
-    <string name="preset_copy_suffix">(eigen)</string>
+    <string name="type_copy_suffix">(eigen)</string>
+    <!-- Collision and spacing warnings: %1$s/%2$s are tent names -->
+    <string name="issue_outside_parcel">%1$s ragt aus der Parzelle.</string>
+    <string name="issue_sail_overlap">Sonnensegel überlappen: %1$s und %2$s.</string>
+    <string name="issue_collision">Kollision zwischen %1$s und %2$s.</string>
+    <string name="issue_rope_collision">Seil-Kollision: Seil ragt in %1$s oder %2$s.</string>
+    <string name="issue_entry_blocked">Eingang verstellt: %1$s und %2$s.</string>
+    <string name="issue_narrow_walkway">Laufweg zwischen %1$s und %2$s unter %3$s m (%4$s m).</string>
+    <string name="issue_in_no_go_zone">%1$s liegt in einer Sperrzone.</string>
+    <!-- Built-in tent presets, keyed preset_<id> -->
+    <string name="preset_saxon_2x4">Sachsenzelt 2x4</string>
+    <string name="preset_saxon_3x5">Sachsenzelt 3x5</string>
+    <string name="preset_saxon_4x6">Sachsenzelt 4x6</string>
+    <string name="preset_saxon_2x4_closed">Sachsenzelt 2x4 (Geschlossen)</string>
+    <string name="preset_saxon_3x5_closed">Sachsenzelt 3x5 (Geschlossen)</string>
+    <string name="preset_saxon_4x6_closed">Sachsenzelt 4x6 (Geschlossen)</string>
+    <string name="preset_saxon_niord_6">Sachsenzelt Niord 6m</string>
+    <string name="preset_a_tent_2x3_basic">Keilzelt 2x3 (Minimal)</string>
+    <string name="preset_a_tent_2_5x3_full">Keilzelt 2.5x3 (Sturm-Setup)</string>
+    <string name="preset_a_tent_3x4_frame">Keilzelt 3x4 (Holzgestell)</string>
+    <string name="preset_a_tent_4x5_pro">Keilzelt 4x5 (V-Abspannung)</string>
+    <string name="preset_oval_6x4">Speichenrad 6x4</string>
+    <string name="preset_round_4">Rundzelt 4m</string>
+    <string name="preset_round_3x3">Rundzelt 3x3</string>
+    <string name="preset_round_5">Rundzelt 5m</string>
+    <string name="preset_sun_sail_6x6_flat">Sonnensegel 6x6 (Flach/Dach)</string>
+    <string name="preset_sun_sail_6x6_diamond">Sonnensegel 6x6 (Diagonal/Raute)</string>
+    <string name="preset_sun_sail_6x2_flat">Sonnensegel 6x2 (Flach aufgebaut)</string>
+    <string name="preset_sun_sail_6x2_folded">Sonnensegel 6x2 (als 4x2, Seiten geklappt)</string>
+    <string name="preset_sun_sail_5x5_flat">Sonnensegel 5x5 (Flach/Dach)</string>
+    <string name="preset_sun_sail_5x5_diamond">Sonnensegel 5x5 (Diagonal/Raute)</string>
+    <string name="preset_sun_sail_5x3_flat">Sonnensegel 5x3 (Flach/Dach)</string>
+    <string name="preset_sun_sail_4x6">Sonnensegel 4x6</string>
+    <string name="preset_sun_sail_4x4_flat">Sonnensegel 4x4 (Flach/Dach)</string>
+    <string name="preset_sun_sail_4x4_diamond">Sonnensegel 4x4 (Diagonal/Raute)</string>
+    <string name="preset_sun_sail_3x3_flat">Sonnensegel 3x3 (Flach/Dach)</string>
+    <string name="preset_sun_sail_3x3_diamond">Sonnensegel 3x3 (Diagonal/Raute)</string>
+    <string name="preset_sun_sail_3x3_lean_to">Sonnensegel 3x3 (Schrägdach/Kröte)</string>
+    <string name="issue_too_far_from_sail">%1$s steht zu weit vom Sonnensegel: %3$s m, höchstens %2$s m.</string>
+    <string name="issue_near_path">Abstand zum Weg: %1$s unter %2$s m (%3$s m).</string>
 </resources>

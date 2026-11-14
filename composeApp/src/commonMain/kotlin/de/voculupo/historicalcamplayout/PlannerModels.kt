@@ -1,5 +1,6 @@
 ﻿package de.voculupo.historicalcamplayout.domain.model
 
+import de.voculupo.historicalcamplayout.CollisionIssue
 import de.voculupo.historicalcamplayout.GeometryHelper
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.Transient
@@ -208,7 +209,7 @@ data class PlannerUiState(
     val currentTool: PlannerToolMode = PlannerToolMode.Select,
     val activePresetId: String? = null,
     val recentPresetIds: List<String> = emptyList(),
-    val warnings: List<String> = emptyList(),
+    val warnings: List<CollisionIssue> = emptyList(),
     val warningAssetIds: Set<String> = emptySet(),
     val hardCollisionAssetIds: Set<String> = emptySet(),
     val hiddenRopeIndices: Map<String, Set<Int>> = emptyMap(),

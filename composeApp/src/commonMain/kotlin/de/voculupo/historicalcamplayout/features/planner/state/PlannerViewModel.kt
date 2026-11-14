@@ -1,5 +1,6 @@
 ﻿package de.voculupo.historicalcamplayout.features.planner.state
 
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.voculupo.historicalcamplayout.AssetRope
@@ -18,6 +19,7 @@ import de.voculupo.historicalcamplayout.data.storage.ProjectStorage
 import de.voculupo.historicalcamplayout.data.storage.StorageProvider
 import de.voculupo.historicalcamplayout.defaultPresets
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerDomainOps.constrainAssetCenterToParcel
+import de.voculupo.historicalcamplayout.hasDefaultLabel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -546,7 +548,8 @@ class PlannerViewModel(
         _uiState.update { it.copy(selectedAssetIds = it.selectedAssetIds - deletable, selectedRopeIndex = null) }
     }
 
-    fun duplicateSelection() {
+    /** @param copySuffix appended to typed names, in the app language (e.g. "(copy)"). */
+    fun duplicateSelection(copySuffix: String) {
         val state = _uiState.value
         val selected = state.project.assets.filter { it.id in state.selectedAssetIds }
         if (selected.isEmpty()) return
@@ -563,7 +566,8 @@ class PlannerViewModel(
                     }
                 asset.copy(
                     id = newId(),
-                    label = if (asset.label.isBlank()) asset.label else "${asset.label} (Kopie)",
+                    label =
+                        if (hasDefaultLabel(asset)) asset.label else "${asset.label} $copySuffix",
                     position = constrained,
                     // A copy starts unlocked so it can be moved away from the original.
                     isLocked = false,
@@ -637,8 +641,9 @@ class PlannerViewModel(
         recomputeWarnings()
     }
 
-    fun exportPng() {
-        storage.exportProjectPng(_uiState.value.project, _uiState.value.presets)
+    /** @param image the plan rendered by the canvas code (renderCampPng), so the export looks like the map. */
+    fun exportPng(image: ImageBitmap) {
+        storage.exportProjectPng(image)
     }
 
     fun saveInventory() {
@@ -722,7 +727,7 @@ class PlannerViewModel(
         val report = GeometryEngine.evaluate(state.project, state.presets)
         _uiState.update {
             it.copy(
-                warnings = report.messages,
+                warnings = report.issues,
                 warningAssetIds = report.warningCollisions,
                 hardCollisionAssetIds = report.hardCollisions,
                 hiddenRopeIndices = report.hiddenRopeIndices,

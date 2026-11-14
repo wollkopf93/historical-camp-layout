@@ -71,6 +71,8 @@ import de.voculupo.historicalcamplayout.features.planner.state.AutoLayout
 import de.voculupo.historicalcamplayout.features.planner.state.AutoLayoutResult
 import de.voculupo.historicalcamplayout.features.planner.state.BlockKey
 import de.voculupo.historicalcamplayout.features.planner.state.LayoutBlock
+import de.voculupo.historicalcamplayout.presetDisplayName
+import de.voculupo.historicalcamplayout.rememberPresetNames
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -189,12 +191,20 @@ internal fun AutoSetupDialog(
     onDismiss: () -> Unit,
 ) {
     val presetsById = remember(presets) { presets.associateBy { it.id } }
+    // AutoLayout reports left-out tents by their stored name; show them in the app language.
+    val presetNames = rememberPresetNames(presets)
+    val namesByStored =
+        remember(presets, presetNames) {
+            // Only translated built-ins; a user preset sharing a built-in's name must not shadow its translation.
+            presets.filter { presetNames.getValue(it.id) != it.name }.associate { it.name to presetNames.getValue(it.id) }
+        }
     // Saveable so rotating the device keeps the half-done setup.
     var req by rememberSaveable(
         stateSaver =
-            Saver({
-                PlannerJson.json.encodeToString(it)
-            }, { PlannerJson.json.decodeFromString<AutoSetupRequest>(it) }),
+            Saver(
+                save = { PlannerJson.json.encodeToString(it) },
+                restore = { PlannerJson.json.decodeFromString<AutoSetupRequest>(it) },
+            ),
     ) {
         mutableStateOf(
             (project.autoSetup ?: AutoSetupRequest(project.parcel, emptyList(), emptyList(), VisitorSide.BOTTOM, shape = RingShape.U_SHAPE))
@@ -287,7 +297,7 @@ internal fun AutoSetupDialog(
                             Preview(result, req, presetsById, userZones, onChange = { req = it }, modifier = canvasModifier)
                             // Fixed height: warnings coming and going must not shift the list under the user's finger.
                             Column(modifier = Modifier.fillMaxWidth().height(72.dp).verticalScroll(rememberScrollState())) {
-                                Warnings(result, req)
+                                Warnings(result, req, namesByStored)
                             }
                         }
                     }
@@ -376,7 +386,7 @@ private fun StepSailsAndAreas(
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(stringResource(Res.string.auto_setup_sails), style = MaterialTheme.typography.titleSmall)
         presets.filter(GeometryEngine::isSunSailPreset).forEach { p ->
-            CountRow(p.name, req.sailPresetIds.count { it == p.id }) { add ->
+            CountRow(presetDisplayName(p), req.sailPresetIds.count { it == p.id }) { add ->
                 // Pins belong to rings by index; a different sail count reshuffles the rings.
                 val sails = if (add) req.sailPresetIds + p.id else req.sailPresetIds.withoutLast(p.id)
                 onChange(req.copy(sailPresetIds = sails, clusterPins = emptyList()))
@@ -472,7 +482,7 @@ private fun StepTents(
         val ids = req.tentPresetIds
         val rings = req.tentRings.take(ids.size) + List((ids.size - req.tentRings.size).coerceAtLeast(0)) { null }
         presets.filterNot(GeometryEngine::isSunSailPreset).forEach { p ->
-            CountRow(p.name, ids.count { it == p.id }) { add ->
+            CountRow(presetDisplayName(p), ids.count { it == p.id }) { add ->
                 if (add) {
                     // New tents slot in by size, so the default order is biggest first.
                     val at = ids.indexOfFirst { (presetsById[it]?.area() ?: 0f) < p.area() }.let { if (it < 0) ids.size else it }
@@ -497,7 +507,11 @@ private fun StepTents(
         val down = stringResource(Res.string.move_down)
         ids.forEachIndexed { i, id ->
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("${i + 1}. ${presetsById[id]?.name ?: id}", modifier = Modifier.weight(1f), style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "${i + 1}. ${presetsById[id]?.let { presetDisplayName(it) } ?: id}",
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodySmall,
+                )
                 if (ringCount > 1) {
                     val ring = rings[i]?.takeIf { it < ringCount }
                     TextButton(onClick = {
@@ -704,6 +718,7 @@ private fun originY(
 private fun Warnings(
     result: AutoLayoutResult,
     req: AutoSetupRequest,
+    namesByStored: Map<String, String>,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val warn = MaterialTheme.colorScheme.error
@@ -716,7 +731,7 @@ private fun Warnings(
         }
         if (result.skipped.isNotEmpty()) {
             Text(
-                stringResource(Res.string.warn_skipped, result.skipped.size, result.skipped.joinToString()),
+                stringResource(Res.string.warn_skipped, result.skipped.size, result.skipped.joinToString { namesByStored[it] ?: it }),
                 color = warn,
                 style = MaterialTheme.typography.bodySmall,
             )

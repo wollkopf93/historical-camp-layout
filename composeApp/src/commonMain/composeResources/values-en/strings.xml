@@ -39,6 +39,7 @@
     <string name="import_file">Import file</string>
     <string name="export_png">Export PNG</string>
     <string name="selection_title">Selection (%1$d)</string>
+    <string name="copy_suffix">(copy)</string>
     <string name="tent_name">Tent name</string>
     <string name="tent_name_placeholder">e.g. Kitchen tent</string>
     <string name="rotation_deg">Rotation: %1$d°</string>
@@ -139,20 +140,59 @@
     <string name="own_spacing_sails">Gap to sun sails</string>
     <string name="own_spacing_path">Gap to path</string>
     <string name="spacing_camp_default">as in the camp</string>
-    <string name="preset_name">Name</string>
-    <string name="preset_width">Width</string>
-    <string name="preset_depth">Depth</string>
-    <string name="preset_margin">Safety margin</string>
-    <string name="preset_is_sail">Is a sun sail / canopy</string>
-    <string name="preset_ropes">Guy ropes (%1$d)</string>
-    <string name="preset_ropes_hint">Peg distance = how far the peg is from the attachment point, seen from above. Applies to newly placed tents and to placed tents whose ropes were not adjusted yet.</string>
+    <string name="type_name">Name</string>
+    <string name="type_width">Width</string>
+    <string name="type_depth">Depth</string>
+    <string name="type_margin">Safety margin</string>
+    <string name="type_is_sail">Is a sun sail / canopy</string>
+    <string name="type_ropes">Guy ropes (%1$d)</string>
+    <string name="type_ropes_hint">Peg distance = how far the peg is from the attachment point, seen from above. Applies to newly placed tents and to placed tents whose ropes were not adjusted yet.</string>
     <string name="rope_n_stake">Rope %1$d: peg distance</string>
     <string name="rope_slope_title">Peg distance from height and slope</string>
     <string name="rope_slope_height">Attachment height</string>
     <string name="rope_slope_deg">Slope to the ground</string>
     <string name="rope_slope_result">Peg distance: %1$s m</string>
     <string name="rope_slope_apply">Apply to all ropes</string>
-    <string name="preset_save_as_new">Save as new type</string>
+    <string name="type_save_as_new">Save as new type</string>
     <string name="rope_remove">Remove</string>
-    <string name="preset_copy_suffix">(own)</string>
+    <string name="type_copy_suffix">(own)</string>
+    <!-- Collision and spacing warnings: %1$s/%2$s are tent names -->
+    <string name="issue_outside_parcel">%1$s sticks out of the parcel.</string>
+    <string name="issue_sail_overlap">Sun sails overlap: %1$s and %2$s.</string>
+    <string name="issue_collision">Collision between %1$s and %2$s.</string>
+    <string name="issue_rope_collision">Rope collision: a rope reaches into %1$s or %2$s.</string>
+    <string name="issue_entry_blocked">Entry blocked: %1$s and %2$s.</string>
+    <string name="issue_narrow_walkway">Walkway between %1$s and %2$s is under %3$s m (%4$s m).</string>
+    <string name="issue_in_no_go_zone">%1$s is inside a no-go zone.</string>
+    <!-- Built-in tent presets, keyed preset_<id> -->
+    <string name="preset_saxon_2x4">Saxon tent 2x4</string>
+    <string name="preset_saxon_3x5">Saxon tent 3x5</string>
+    <string name="preset_saxon_4x6">Saxon tent 4x6</string>
+    <string name="preset_saxon_2x4_closed">Saxon tent 2x4 (closed)</string>
+    <string name="preset_saxon_3x5_closed">Saxon tent 3x5 (closed)</string>
+    <string name="preset_saxon_4x6_closed">Saxon tent 4x6 (closed)</string>
+    <string name="preset_saxon_niord_6">Saxon tent Niord 6m</string>
+    <string name="preset_a_tent_2x3_basic">Wedge tent 2x3 (minimal)</string>
+    <string name="preset_a_tent_2_5x3_full">Wedge tent 2.5x3 (storm setup)</string>
+    <string name="preset_a_tent_3x4_frame">Wedge tent 3x4 (wooden frame)</string>
+    <string name="preset_a_tent_4x5_pro">Wedge tent 4x5 (V guying)</string>
+    <string name="preset_oval_6x4">Spoke wheel tent 6x4</string>
+    <string name="preset_round_4">Round tent 4m</string>
+    <string name="preset_round_3x3">Round tent 3x3</string>
+    <string name="preset_round_5">Round tent 5m</string>
+    <string name="preset_sun_sail_6x6_flat">Sun sail 6x6 (flat/roof)</string>
+    <string name="preset_sun_sail_6x6_diamond">Sun sail 6x6 (diagonal/diamond)</string>
+    <string name="preset_sun_sail_6x2_flat">Sun sail 6x2 (pitched flat)</string>
+    <string name="preset_sun_sail_6x2_folded">Sun sail 6x2 (as 4x2, sides folded)</string>
+    <string name="preset_sun_sail_5x5_flat">Sun sail 5x5 (flat/roof)</string>
+    <string name="preset_sun_sail_5x5_diamond">Sun sail 5x5 (diagonal/diamond)</string>
+    <string name="preset_sun_sail_5x3_flat">Sun sail 5x3 (flat/roof)</string>
+    <string name="preset_sun_sail_4x6">Sun sail 4x6</string>
+    <string name="preset_sun_sail_4x4_flat">Sun sail 4x4 (flat/roof)</string>
+    <string name="preset_sun_sail_4x4_diamond">Sun sail 4x4 (diagonal/diamond)</string>
+    <string name="preset_sun_sail_3x3_flat">Sun sail 3x3 (flat/roof)</string>
+    <string name="preset_sun_sail_3x3_diamond">Sun sail 3x3 (diagonal/diamond)</string>
+    <string name="preset_sun_sail_3x3_lean_to">Sun sail 3x3 (lean-to)</string>
+    <string name="issue_too_far_from_sail">%1$s is too far from the sun sail: %3$s m, at most %2$s m.</string>
+    <string name="issue_near_path">Gap to path: %1$s under %2$s m (%3$s m).</string>
 </resources>

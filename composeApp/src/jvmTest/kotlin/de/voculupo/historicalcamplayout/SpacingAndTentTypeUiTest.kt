@@ -23,10 +23,6 @@ import lagerplaner.composeapp.generated.resources.auto_setup_short
 import lagerplaner.composeapp.generated.resources.cancel
 import lagerplaner.composeapp.generated.resources.edit_tent_type
 import lagerplaner.composeapp.generated.resources.next
-import lagerplaner.composeapp.generated.resources.preset_copy_suffix
-import lagerplaner.composeapp.generated.resources.preset_name
-import lagerplaner.composeapp.generated.resources.preset_save_as_new
-import lagerplaner.composeapp.generated.resources.preset_width
 import lagerplaner.composeapp.generated.resources.required_area
 import lagerplaner.composeapp.generated.resources.rope_remove
 import lagerplaner.composeapp.generated.resources.rope_slope_apply
@@ -36,6 +32,10 @@ import lagerplaner.composeapp.generated.resources.spacing_tent_sail_max
 import lagerplaner.composeapp.generated.resources.spacing_tent_tent
 import lagerplaner.composeapp.generated.resources.spacing_title
 import lagerplaner.composeapp.generated.resources.take_over
+import lagerplaner.composeapp.generated.resources.type_copy_suffix
+import lagerplaner.composeapp.generated.resources.type_name
+import lagerplaner.composeapp.generated.resources.type_save_as_new
+import lagerplaner.composeapp.generated.resources.type_width
 import lagerplaner.composeapp.generated.resources.width_m
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
@@ -157,10 +157,10 @@ class SpacingAndTentTypeUiTest {
         runApp(setup = { placePresetAt("round_4", Vec2(5f, 5f)) }) { vm ->
             val original = vm.type("round_4")
             click(Res.string.edit_tent_type)
-            click(Res.string.preset_save_as_new)
+            click(Res.string.type_save_as_new)
             val copy =
                 vm.uiState.value.presets
-                    .single { it.name == "${original.name} ${text(Res.string.preset_copy_suffix)}" }
+                    .single { it.name == "${original.name} ${text(Res.string.type_copy_suffix)}" }
             assertTrue(copy.id.startsWith("custom_"))
             assertEquals(original.copy(id = copy.id, name = copy.name, userModified = true), copy)
             assertEquals(original, vm.type("round_4"))
@@ -200,7 +200,7 @@ class SpacingAndTentTypeUiTest {
         runApp(setup = { placePresetAt("saxon_2x4", Vec2(8f, 8f)) }) { vm ->
             val before = vm.type("saxon_2x4")
             click(Res.string.edit_tent_type)
-            field(Res.string.preset_width).performTextReplacement("8")
+            field(Res.string.type_width).performTextReplacement("8")
             click(Res.string.take_over)
             val after = vm.type("saxon_2x4")
             assertEquals(8f, after.widthMeters)
@@ -213,7 +213,7 @@ class SpacingAndTentTypeUiTest {
         runApp(setup = { placePresetAt("round_4", Vec2(5f, 5f)) }) { vm ->
             val before = vm.uiState.value.presets
             click(Res.string.edit_tent_type)
-            field(Res.string.preset_name).performTextReplacement("Anders")
+            field(Res.string.type_name).performTextReplacement("Anders")
             click(Res.string.cancel)
             assertEquals(before, vm.uiState.value.presets)
         }
@@ -222,9 +222,9 @@ class SpacingAndTentTypeUiTest {
     fun tentEditor_emptyName_cannotBeSaved() =
         runApp(setup = { placePresetAt("round_4", Vec2(5f, 5f)) }) { _ ->
             click(Res.string.edit_tent_type)
-            field(Res.string.preset_name).performTextReplacement("")
+            field(Res.string.type_name).performTextReplacement("")
             waitForIdle()
             onNodeWithText(text(Res.string.take_over)).assertIsNotEnabled()
-            onNodeWithText(text(Res.string.preset_save_as_new)).assertIsNotEnabled()
+            onNodeWithText(text(Res.string.type_save_as_new)).assertIsNotEnabled()
         }
 }

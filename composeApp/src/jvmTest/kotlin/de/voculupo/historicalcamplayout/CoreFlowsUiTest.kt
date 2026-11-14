@@ -32,10 +32,10 @@ import lagerplaner.composeapp.generated.resources.auto_setup
 import lagerplaner.composeapp.generated.resources.auto_setup_short
 import lagerplaner.composeapp.generated.resources.edit_tent_type
 import lagerplaner.composeapp.generated.resources.own_spacing_tents
-import lagerplaner.composeapp.generated.resources.preset_name
 import lagerplaner.composeapp.generated.resources.spacing_tent_tent
 import lagerplaner.composeapp.generated.resources.spacing_title
 import lagerplaner.composeapp.generated.resources.take_over
+import lagerplaner.composeapp.generated.resources.type_name
 import lagerplaner.composeapp.generated.resources.undo
 import org.jetbrains.compose.resources.StringResource
 import org.jetbrains.compose.resources.getString
@@ -214,7 +214,7 @@ class CoreFlowsUiTest {
         runApp(setup = { placePresetAt("round_4", Vec2(5f, 5f)) }) { vm, _ ->
             onNodeWithText(text(Res.string.edit_tent_type)).performClick()
             waitForIdle()
-            onNode(hasSetTextAction() and hasText(text(Res.string.preset_name))).performTextReplacement("Küchenzelt")
+            onNode(hasSetTextAction() and hasText(text(Res.string.type_name))).performTextReplacement("Küchenzelt")
             onNode(hasSetTextAction() and hasText(text(Res.string.own_spacing_tents))).performTextReplacement("3")
             onNodeWithText(text(Res.string.take_over)).performClick()
             waitForIdle()

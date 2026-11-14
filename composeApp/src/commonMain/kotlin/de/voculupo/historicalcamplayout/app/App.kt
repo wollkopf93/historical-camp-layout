@@ -78,6 +78,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
@@ -87,6 +88,7 @@ import de.voculupo.historicalcamplayout.PlannerToolMode
 import de.voculupo.historicalcamplayout.PlannerUiState
 import de.voculupo.historicalcamplayout.features.inventory.InventoryPane
 import de.voculupo.historicalcamplayout.features.planner.canvas.PlannerCanvas
+import de.voculupo.historicalcamplayout.features.planner.canvas.renderCampPng
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
 import de.voculupo.historicalcamplayout.features.properties.AutoSetupDialog
 import de.voculupo.historicalcamplayout.features.properties.PresetDialog
@@ -94,12 +96,15 @@ import de.voculupo.historicalcamplayout.features.properties.PropertiesPane
 import de.voculupo.historicalcamplayout.features.properties.SpacingDialog
 import de.voculupo.historicalcamplayout.getPlatform
 import de.voculupo.historicalcamplayout.platform.PlatformBackHandler
+import de.voculupo.historicalcamplayout.rememberPresetNames
+import de.voculupo.historicalcamplayout.rememberWarningTexts
 import kotlinx.coroutines.delay
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.auto_setup_short
 import lagerplaner.composeapp.generated.resources.block_zone_hint
 import lagerplaner.composeapp.generated.resources.clear_block_zones
 import lagerplaner.composeapp.generated.resources.close
+import lagerplaner.composeapp.generated.resources.copy_suffix
 import lagerplaner.composeapp.generated.resources.delete
 import lagerplaner.composeapp.generated.resources.duplicate
 import lagerplaner.composeapp.generated.resources.edit_selection
@@ -241,7 +246,11 @@ fun App(
     viewModel: PlannerViewModel = viewModel { PlannerViewModel() },
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val presetNames = rememberPresetNames(state.presets)
+    val copySuffix = stringResource(Res.string.copy_suffix)
     val density = LocalDensity.current
+    val exportTextMeasurer = rememberTextMeasurer()
+    val exportPng = { viewModel.exportPng(renderCampPng(state.project, state.presets, presetNames, exportTextMeasurer, density)) }
     val rootFocusRequester = remember { FocusRequester() }
     var leftPaneWidthDp by remember { mutableFloatStateOf(340f) }
     var shiftPressed by remember { mutableStateOf(false) }
@@ -297,7 +306,7 @@ fun App(
                             ctrl && key == Key.Z && keyEvent.isShiftPressed -> viewModel.redo()
                             ctrl && key == Key.Z -> viewModel.undo()
                             ctrl && key == Key.Y -> viewModel.redo()
-                            ctrl && key == Key.D && hasSelection -> viewModel.duplicateSelection()
+                            ctrl && key == Key.D && hasSelection -> viewModel.duplicateSelection(copySuffix)
                             ctrl -> return@onKeyEvent false
                             key == Key.Delete && hasSelection -> viewModel.deleteSelection()
                             key == Key.R && hasSelection -> viewModel.rotateSelected(rotateStep).also { viewModel.commitHistory() }
@@ -354,7 +363,7 @@ fun App(
                     onProjectNameChange = viewModel::setProjectName,
                     onExportProjectFile = viewModel::exportProjectFile,
                     onImportProjectFile = viewModel::importProjectFile,
-                    onExportPng = viewModel::exportPng,
+                    onExportPng = exportPng,
                     onUndo = viewModel::undo,
                     onRedo = viewModel::redo,
                     onLabelChange = viewModel::setSelectedLabel,
@@ -369,10 +378,10 @@ fun App(
                     onRopeAngleChange = viewModel::setSelectedRopeAngleOffset,
                     onRopeAnchorXChange = viewModel::setSelectedRopeAnchorX,
                     onRopeAnchorYChange = viewModel::setSelectedRopeAnchorY,
-                    onSliderChangeFinished = viewModel::commitHistory,
+                    onSliderChangeFinish = viewModel::commitHistory,
                     onGroup = viewModel::groupSelection,
                     onUngroup = viewModel::ungroupSelection,
-                    onDuplicate = viewModel::duplicateSelection,
+                    onDuplicate = { viewModel.duplicateSelection(copySuffix) },
                     onDelete = viewModel::deleteSelection,
                     onEditPreset = { editingPresetId = it },
                 )
@@ -422,7 +431,7 @@ fun App(
                     onProjectNameChange = viewModel::setProjectName,
                     onExportProjectFile = viewModel::exportProjectFile,
                     onImportProjectFile = viewModel::importProjectFile,
-                    onExportPng = viewModel::exportPng,
+                    onExportPng = exportPng,
                     onUndo = viewModel::undo,
                     onRedo = viewModel::redo,
                     onLabelChange = viewModel::setSelectedLabel,
@@ -437,10 +446,10 @@ fun App(
                     onRopeAngleChange = viewModel::setSelectedRopeAngleOffset,
                     onRopeAnchorXChange = viewModel::setSelectedRopeAnchorX,
                     onRopeAnchorYChange = viewModel::setSelectedRopeAnchorY,
-                    onSliderChangeFinished = viewModel::commitHistory,
+                    onSliderChangeFinish = viewModel::commitHistory,
                     onGroup = viewModel::groupSelection,
                     onUngroup = viewModel::ungroupSelection,
-                    onDuplicate = viewModel::duplicateSelection,
+                    onDuplicate = { viewModel.duplicateSelection(copySuffix) },
                     onDelete = viewModel::deleteSelection,
                     onEditPreset = { editingPresetId = it },
                 )
@@ -559,7 +568,7 @@ private fun ExpandedLayout(
     onRopeAngleChange: (Float) -> Unit,
     onRopeAnchorXChange: (Float) -> Unit,
     onRopeAnchorYChange: (Float) -> Unit,
-    onSliderChangeFinished: () -> Unit,
+    onSliderChangeFinish: () -> Unit,
     onGroup: () -> Unit,
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
@@ -639,7 +648,7 @@ private fun ExpandedLayout(
                 onRopeAngleChange = onRopeAngleChange,
                 onRopeAnchorXChange = onRopeAnchorXChange,
                 onRopeAnchorYChange = onRopeAnchorYChange,
-                onSliderChangeFinished = onSliderChangeFinished,
+                onSliderChangeFinish = onSliderChangeFinish,
                 onGroup = onGroup,
                 onUngroup = onUngroup,
                 onDuplicate = onDuplicate,
@@ -703,7 +712,7 @@ private fun ExpandedLayout(
 
         if (state.warnings.isNotEmpty() && showWarningsPanel) {
             WarningsCard(
-                warnings = state.warnings,
+                warnings = rememberWarningTexts(state),
                 maxShown = 8,
                 onClick = { showWarningsPanel = false },
                 modifier =
@@ -772,7 +781,7 @@ private fun CompactLayout(
     onRopeAngleChange: (Float) -> Unit,
     onRopeAnchorXChange: (Float) -> Unit,
     onRopeAnchorYChange: (Float) -> Unit,
-    onSliderChangeFinished: () -> Unit,
+    onSliderChangeFinish: () -> Unit,
     onGroup: () -> Unit,
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
@@ -872,7 +881,7 @@ private fun CompactLayout(
                     .widthIn(max = 360.dp)
                     .zIndex(1f),
         ) {
-            WarningsCard(warnings = state.warnings, maxShown = 6, onClick = { showWarningsPanel = false })
+            WarningsCard(warnings = rememberWarningTexts(state), maxShown = 6, onClick = { showWarningsPanel = false })
         }
 
         Column(
@@ -894,7 +903,7 @@ private fun CompactLayout(
                     state = state,
                     onRotateBy = { degrees ->
                         onRotateSelectedBy(degrees)
-                        onSliderChangeFinished()
+                        onSliderChangeFinish()
                     },
                     onDuplicate = onDuplicate,
                     onToggleLock = onToggleLock,
@@ -1067,7 +1076,7 @@ private fun CompactLayout(
                             onRopeAngleChange = onRopeAngleChange,
                             onRopeAnchorXChange = onRopeAnchorXChange,
                             onRopeAnchorYChange = onRopeAnchorYChange,
-                            onSliderChangeFinished = onSliderChangeFinished,
+                            onSliderChangeFinish = onSliderChangeFinish,
                             onGroup = onGroup,
                             onUngroup = onUngroup,
                             onDuplicate = onDuplicate,

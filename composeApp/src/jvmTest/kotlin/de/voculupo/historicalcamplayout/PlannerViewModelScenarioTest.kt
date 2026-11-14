@@ -213,7 +213,7 @@ class PlannerViewModelScenarioTest {
         vm.placePresetAt("round_3x3", Vec2(13f, 15f))
         val before =
             vm.uiState.value.warnings
-                .count { "Laufweg" in it }
+                .count { it.kind == IssueKind.NARROW_WALKWAY }
 
         vm.setSpacing(SpacingRules(tentToTent = 10f))
         assertEquals(10f, vm.uiState.value.project.spacing.tentToTent)
@@ -225,7 +225,7 @@ class PlannerViewModelScenarioTest {
         )
         assertTrue(
             vm.uiState.value.warnings
-                .count { "Laufweg" in it } > before,
+                .count { it.kind == IssueKind.NARROW_WALKWAY } > before,
             "a wider walkway warns about the close pair",
         )
 
@@ -243,7 +243,7 @@ class PlannerViewModelScenarioTest {
         assertEquals(rules, vm.uiState.value.project.spacing)
         assertTrue(
             vm.uiState.value.warnings
-                .none { "Laufweg" in it },
+                .none { it.kind == IssueKind.NARROW_WALKWAY },
             vm.uiState.value.warnings
                 .toString(),
         )
@@ -309,7 +309,7 @@ class PlannerViewModelScenarioTest {
         vm.placePresetAt("round_3x3", Vec2(13f, 15f))
         assertTrue(
             vm.uiState.value.warnings
-                .none { "Laufweg" in it },
+                .none { it.kind == IssueKind.NARROW_WALKWAY },
         )
         val type =
             vm.uiState.value.presets
@@ -317,7 +317,7 @@ class PlannerViewModelScenarioTest {
         vm.savePreset(type.copy(spacing = SpacingOverride(toTents = 6f)))
         assertTrue(
             vm.uiState.value.warnings
-                .any { "Laufweg" in it },
+                .any { it.kind == IssueKind.NARROW_WALKWAY },
         )
     }
 }

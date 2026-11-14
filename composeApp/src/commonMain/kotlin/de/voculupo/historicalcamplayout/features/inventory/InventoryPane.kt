@@ -51,6 +51,7 @@ import de.voculupo.historicalcamplayout.TentShapeType
 import de.voculupo.historicalcamplayout.Vec2
 import de.voculupo.historicalcamplayout.features.planner.canvas.drawTentArt
 import de.voculupo.historicalcamplayout.getPlatform
+import de.voculupo.historicalcamplayout.rememberPresetNames
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.apply_area
 import lagerplaner.composeapp.generated.resources.block_zone_hint
@@ -94,8 +95,9 @@ internal fun InventoryPane(
     var presetFilter by remember { mutableStateOf("") }
     var categoryFilter by remember { mutableStateOf("Alle") }
     var showPresetsSection by remember { mutableStateOf(true) }
+    val presetNames = rememberPresetNames(state.presets)
     val visiblePresets =
-        remember(state.presets, presetFilter, categoryFilter) {
+        remember(state.presets, presetNames, presetFilter, categoryFilter) {
             val query = presetFilter.trim().lowercase()
             val queryFiltered =
                 if (query.isEmpty()) {
@@ -103,6 +105,7 @@ internal fun InventoryPane(
                 } else {
                     state.presets.filter { preset ->
                         preset.name.lowercase().contains(query) ||
+                            presetNames.getValue(preset.id).lowercase().contains(query) ||
                             preset.id.lowercase().contains(query) ||
                             preset.shape.name
                                 .lowercase()
@@ -176,7 +179,7 @@ internal fun InventoryPane(
                                             .pointerInput(preset.id) { detectTapGestures { onPresetSelect(preset.id) } },
                                 ) {
                                     Text(
-                                        preset.name,
+                                        presetNames.getValue(preset.id),
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                                         style = MaterialTheme.typography.bodySmall,
                                     )
@@ -193,7 +196,7 @@ internal fun InventoryPane(
                                             .pointerInput(preset.id) { detectTapGestures { onPresetSelect(preset.id) } },
                                 ) {
                                     Text(
-                                        preset.name,
+                                        presetNames.getValue(preset.id),
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                                         style = MaterialTheme.typography.bodySmall,
                                     )
@@ -238,7 +241,7 @@ internal fun InventoryPane(
                                                 detectDragGesturesAfterLongPress(
                                                     onDragStart = { localStart ->
                                                         dragCurrent = cardRootOrigin + localStart
-                                                        onPresetDragStart(preset.id, preset.name, dragCurrent)
+                                                        onPresetDragStart(preset.id, presetNames.getValue(preset.id), dragCurrent)
                                                     },
                                                     onDragEnd = {
                                                         onPresetDragEnd(preset.id, dragCurrent)
@@ -254,7 +257,7 @@ internal fun InventoryPane(
                                                 detectDragGestures(
                                                     onDragStart = { localStart ->
                                                         dragCurrent = cardRootOrigin + localStart
-                                                        onPresetDragStart(preset.id, preset.name, dragCurrent)
+                                                        onPresetDragStart(preset.id, presetNames.getValue(preset.id), dragCurrent)
                                                     },
                                                     onDragEnd = {
                                                         onPresetDragEnd(preset.id, dragCurrent)
@@ -275,7 +278,7 @@ internal fun InventoryPane(
                                 ) {
                                     PresetPreviewIcon(preset = preset)
                                     Column {
-                                        Text(preset.name, style = MaterialTheme.typography.titleSmall)
+                                        Text(presetNames.getValue(preset.id), style = MaterialTheme.typography.titleSmall)
                                         Text("${preset.widthMeters}m x ${preset.heightMeters}m", style = MaterialTheme.typography.bodySmall)
                                     }
                                 }
@@ -302,7 +305,7 @@ internal fun InventoryPane(
                                             detectDragGestures(
                                                 onDragStart = { localStart ->
                                                     dragCurrent = cardRootOrigin + localStart
-                                                    onPresetDragStart(preset.id, preset.name, dragCurrent)
+                                                    onPresetDragStart(preset.id, presetNames.getValue(preset.id), dragCurrent)
                                                 },
                                                 onDragEnd = {
                                                     onPresetDragEnd(preset.id, dragCurrent)
@@ -322,7 +325,7 @@ internal fun InventoryPane(
                                 ) {
                                     PresetPreviewIcon(preset = preset)
                                     Column {
-                                        Text(preset.name, style = MaterialTheme.typography.titleSmall)
+                                        Text(presetNames.getValue(preset.id), style = MaterialTheme.typography.titleSmall)
                                         Text("${preset.widthMeters}m x ${preset.heightMeters}m", style = MaterialTheme.typography.bodySmall)
                                     }
                                 }

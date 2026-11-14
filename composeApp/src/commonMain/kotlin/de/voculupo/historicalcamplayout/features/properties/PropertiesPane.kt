@@ -37,7 +37,10 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import de.voculupo.historicalcamplayout.GeometryEngine
 import de.voculupo.historicalcamplayout.PlannerUiState
+import de.voculupo.historicalcamplayout.assetDisplayLabel
 import de.voculupo.historicalcamplayout.features.inventory.CollapsibleHeader
+import de.voculupo.historicalcamplayout.presetDisplayName
+import de.voculupo.historicalcamplayout.rememberWarningTexts
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.active_rope
 import lagerplaner.composeapp.generated.resources.add_rope
@@ -103,7 +106,7 @@ internal fun PropertiesPane(
     onRopeAngleChange: (Float) -> Unit,
     onRopeAnchorXChange: (Float) -> Unit,
     onRopeAnchorYChange: (Float) -> Unit,
-    onSliderChangeFinished: () -> Unit,
+    onSliderChangeFinish: () -> Unit,
     onGroup: () -> Unit,
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
@@ -134,6 +137,8 @@ internal fun PropertiesPane(
     var showSelectionSection by remember { mutableStateOf(true) }
     var showWarningsSection by remember { mutableStateOf(false) }
     val selectedAsset = state.project.assets.firstOrNull { it.id in state.selectedAssetIds }
+    val warningTexts = rememberWarningTexts(state)
+    val selectedPresetName = state.presets.firstOrNull { it.id == selectedAsset?.presetId }?.let { presetDisplayName(it) }
     val selectedRope = selectedAsset?.ropes?.getOrNull(state.selectedRopeIndex ?: -1)
     val currentSelectRopeIndex by rememberUpdatedState(onSelectRopeIndex)
     val paneModifier =
@@ -165,8 +170,14 @@ internal fun PropertiesPane(
                 onToggle = { showSelectionSection = !showSelectionSection },
             )
             if (showSelectionSection && selectedAsset != null) {
+                // A blank label stays blank, so the field can be cleared to type a new name.
                 OutlinedTextField(
-                    value = selectedAsset.label,
+                    value =
+                        if (selectedPresetName != null && selectedAsset.label.isNotBlank()) {
+                            assetDisplayLabel(selectedAsset, selectedPresetName)
+                        } else {
+                            selectedAsset.label
+                        },
                     onValueChange = onLabelChange,
                     singleLine = true,
                     label = { Text(stringResource(Res.string.tent_name)) },
@@ -178,7 +189,7 @@ internal fun PropertiesPane(
                     value = selectedAsset.rotationDeg,
                     valueRange = 0f..360f,
                     onValueChange = onRotate,
-                    onValueChangeFinished = onSliderChangeFinished,
+                    onValueChangeFinished = onSliderChangeFinish,
                 )
                 val heights = selectedAsset.heightRange
                 Text(
@@ -223,7 +234,7 @@ internal fun PropertiesPane(
                         value = selectedRope.lengthMeters,
                         valueRange = 0.3f..6.0f,
                         onValueChange = onRopeScaleChange,
-                        onValueChangeFinished = onSliderChangeFinished,
+                        onValueChangeFinished = onSliderChangeFinish,
                     )
                     Text(
                         stringResource(Res.string.rope_angle, selectedRope.outwardAngleDeg.toInt()),
@@ -234,7 +245,7 @@ internal fun PropertiesPane(
                         value = selectedRope.outwardAngleDeg,
                         valueRange = -180f..180f,
                         onValueChange = onRopeAngleChange,
-                        onValueChangeFinished = onSliderChangeFinished,
+                        onValueChangeFinished = onSliderChangeFinish,
                     )
                     Text(
                         stringResource(Res.string.anchor_x, "%.2f".format(selectedRope.localX)),
@@ -245,7 +256,7 @@ internal fun PropertiesPane(
                         value = selectedRope.localX,
                         valueRange = -6f..6f,
                         onValueChange = onRopeAnchorXChange,
-                        onValueChangeFinished = onSliderChangeFinished,
+                        onValueChangeFinished = onSliderChangeFinish,
                     )
                     Text(
                         stringResource(Res.string.anchor_y, "%.2f".format(selectedRope.localY)),
@@ -256,7 +267,7 @@ internal fun PropertiesPane(
                         value = selectedRope.localY,
                         valueRange = -6f..6f,
                         onValueChange = onRopeAnchorYChange,
-                        onValueChangeFinished = onSliderChangeFinished,
+                        onValueChangeFinished = onSliderChangeFinish,
                     )
                 }
             } else if (showSelectionSection) {
@@ -356,13 +367,13 @@ internal fun PropertiesPane(
                 if (showWarningsSection) {
                     if (enableFullScroll) {
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                            state.warnings.take(8).forEach { warning ->
+                            warningTexts.take(8).forEach { warning ->
                                 Text("• $warning", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                             }
                         }
                     } else {
                         LazyColumn {
-                            items(state.warnings.take(8)) { warning ->
+                            items(warningTexts.take(8)) { warning ->
                                 Text("• $warning", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
                             }
                         }

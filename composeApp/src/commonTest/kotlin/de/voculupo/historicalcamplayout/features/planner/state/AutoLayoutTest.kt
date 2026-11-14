@@ -5,6 +5,7 @@ import de.voculupo.historicalcamplayout.BlockZone
 import de.voculupo.historicalcamplayout.FreeArea
 import de.voculupo.historicalcamplayout.FreeAreaKind
 import de.voculupo.historicalcamplayout.GeometryEngine
+import de.voculupo.historicalcamplayout.IssueKind
 import de.voculupo.historicalcamplayout.Parcel
 import de.voculupo.historicalcamplayout.PlacedAsset
 import de.voculupo.historicalcamplayout.PlannerJson
@@ -54,8 +55,14 @@ class AutoLayoutTest {
 
     private fun assertCleanAndInside(assets: List<PlacedAsset>) {
         val report = GeometryEngine.evaluate(PlannerProject(parcel = parcel, assets = assets), presets)
-        assertTrue(report.hardCollisions.isEmpty(), "hard collisions: ${report.messages}")
-        assertTrue(report.messages.none { "Laufweg" in it || "Parzelle" in it || "Eingang" in it }, "warnings: ${report.messages}")
+        assertTrue(report.hardCollisions.isEmpty(), "hard collisions: ${report.issues}")
+        assertTrue(
+            report.issues.none {
+                it.kind == IssueKind.NARROW_WALKWAY || it.kind == IssueKind.OUTSIDE_PARCEL ||
+                    it.kind == IssueKind.ENTRY_BLOCKED
+            },
+            "warnings: ${report.issues}",
+        )
     }
 
     /** Unit vector the tent entry (local -y) points to in world space. */
@@ -147,8 +154,13 @@ class AutoLayoutTest {
         val tents = mixedTents + "saxon_2x4" + "saxon_2x4"
         val result = run(AutoSetupRequest(small, tents, listOf("sun_sail_4x4_flat"), VisitorSide.BOTTOM))
         val r = report(result, small)
-        assertTrue(r.hardCollisions.isEmpty(), "hard collisions: ${r.messages}")
-        assertTrue(r.messages.none { "Parzelle" in it || "Eingang" in it }, "outside parcel / blocked entry: ${r.messages}")
+        assertTrue(r.hardCollisions.isEmpty(), "hard collisions: ${r.issues}")
+        assertTrue(
+            r.issues.none {
+                it.kind == IssueKind.OUTSIDE_PARCEL || it.kind == IssueKind.ENTRY_BLOCKED
+            },
+            "outside parcel / blocked entry: ${r.issues}",
+        )
         assertTrue(result.skipped.isNotEmpty() || result.walkwayMeters < 1.5f, "10 tents don't fit on 20x15 with 1.5 m walkways")
         assertEquals(tents.size, result.assets.count { !isSail(it) } + result.skipped.size)
         assertTrue(result.assets.any { it.presetId == tents.first() }, "highest priority tent is placed")
@@ -163,7 +175,7 @@ class AutoLayoutTest {
         assertTrue(zone.id.startsWith(AutoLayout.AUTO_PREFIX))
         assertTrue(zone.points.all { it.x in 0f..parcel.widthMeters && it.y in 0f..parcel.heightMeters })
         val r = report(result, parcel)
-        assertTrue(r.hardCollisions.isEmpty(), "hard collisions: ${r.messages}")
+        assertTrue(r.hardCollisions.isEmpty(), "hard collisions: ${r.issues}")
         assertTrue(result.skipped.isEmpty())
     }
 
@@ -210,7 +222,7 @@ class AutoLayoutTest {
         assertEquals(pin.x, sail.x, 0.01f)
         assertEquals(pin.y, sail.y, 0.01f)
         val r = report(result, parcel)
-        assertTrue(r.hardCollisions.isEmpty() && r.messages.none { "Parzelle" in it }, r.messages.toString())
+        assertTrue(r.hardCollisions.isEmpty() && r.issues.none { it.kind == IssueKind.OUTSIDE_PARCEL }, r.issues.toString())
     }
 
     @Test
@@ -284,8 +296,8 @@ class AutoLayoutTest {
             )
         assertTrue(cloth.assets.size >= roomy.assets.size, "cloth to cloth places ${cloth.assets.size}, roomy ${roomy.assets.size}")
         val r = report(cloth, tight)
-        assertTrue(r.hardCollisions.isEmpty(), "hard collisions: ${r.messages}")
-        assertTrue(r.messages.none { "Parzelle" in it }, r.messages.toString())
+        assertTrue(r.hardCollisions.isEmpty(), "hard collisions: ${r.issues}")
+        assertTrue(r.issues.none { it.kind == IssueKind.OUTSIDE_PARCEL }, r.issues.toString())
     }
 
     @Test
@@ -295,7 +307,7 @@ class AutoLayoutTest {
         val cloth = run(AutoSetupRequest(tight, tents, emptyList(), VisitorSide.TOP, spacing = SpacingRules(tentToTent = 0f)))
         assertTrue(cloth.assets.size >= 4, "cloth to cloth placed only ${cloth.assets.size}")
         val r = report(cloth, tight)
-        assertTrue(r.hardCollisions.isEmpty(), "hard collisions: ${r.messages}")
+        assertTrue(r.hardCollisions.isEmpty(), "hard collisions: ${r.issues}")
         val defaults = PlannerDomainOps.defaultRopes(presetsById.getValue("saxon_2x4")).map { it.outwardAngleDeg }
         assertTrue(
             cloth.assets.any { a -> a.ropes.map { it.outwardAngleDeg } != defaults },
@@ -315,8 +327,8 @@ class AutoLayoutTest {
         VisitorSide.entries.forEach { side ->
             val result = run(AutoSetupRequest(parcel, mixedTents, listOf("sun_sail_6x6_flat"), side, shape = RingShape.U_SHAPE))
             val r = report(result, parcel)
-            assertTrue(r.hardCollisions.isEmpty(), "$side hard collisions: ${r.messages}")
-            assertTrue(r.messages.none { "Parzelle" in it || "Laufweg" in it }, "$side: ${r.messages}")
+            assertTrue(r.hardCollisions.isEmpty(), "$side hard collisions: ${r.issues}")
+            assertTrue(r.issues.none { it.kind == IssueKind.OUTSIDE_PARCEL || it.kind == IssueKind.NARROW_WALKWAY }, "$side: ${r.issues}")
             assertTrue(result.skipped.isEmpty())
             val sail = result.assets.single(::isSail).position
             result.assets.filterNot(::isSail).forEach { tent ->
@@ -352,7 +364,7 @@ class AutoLayoutTest {
         val blocker = PlacedAsset(id = "b", presetId = "round_3x3", position = Vec2(10f, 5.2f))
         assertTrue(GeometryEngine.blocksEntry(front, saxon, blocker, presetsById.getValue("round_3x3")))
         val r = GeometryEngine.evaluate(PlannerProject(parcel = parcel, assets = listOf(front, blocker)), presets)
-        assertTrue(r.messages.any { "Eingang" in it }, r.messages.toString())
+        assertTrue(r.issues.any { it.kind == IssueKind.ENTRY_BLOCKED }, r.issues.toString())
     }
 
     @Test
@@ -431,7 +443,7 @@ class AutoLayoutTest {
         parcel: Parcel,
     ): Int {
         val r = report(result, parcel)
-        return r.hardCollisions.size + r.messages.count { "Eingang" in it || "Parzelle" in it }
+        return r.hardCollisions.size + r.issues.count { it.kind == IssueKind.ENTRY_BLOCKED || it.kind == IssueKind.OUTSIDE_PARCEL }
     }
 
     @Test
@@ -458,7 +470,7 @@ class AutoLayoutTest {
         cases.forEach { req ->
             val plain = run(req.copy(optimize = false))
             val tuned = run(req)
-            assertTrue(problems(tuned, req.parcel) <= problems(plain, req.parcel), "${req.shape}: ${report(tuned, req.parcel).messages}")
+            assertTrue(problems(tuned, req.parcel) <= problems(plain, req.parcel), "${req.shape}: ${report(tuned, req.parcel).issues}")
             assertEquals(plain.assets.size, tuned.assets.size)
         }
     }
@@ -530,8 +542,13 @@ class AutoLayoutTest {
             val result = AutoLayout.generate(req, byId) { "$it${n++}" }
             assertEquals(6, result.assets.size, "$shape skipped ${result.skipped}")
             val warnings =
-                GeometryEngine.evaluate(PlannerProject(parcel = parcel, assets = result.assets), byId.values.toList()).messages
-            assertTrue(warnings.none { "Laufweg" in it }, "$shape: $warnings")
+                GeometryEngine
+                    .evaluate(
+                        PlannerProject(parcel = parcel, assets = result.assets),
+                        byId.values.toList(),
+                    ).issues
+                    .map { it.kind }
+            assertTrue(warnings.none { it == IssueKind.NARROW_WALKWAY }, "$shape: $warnings")
         }
     }
 }

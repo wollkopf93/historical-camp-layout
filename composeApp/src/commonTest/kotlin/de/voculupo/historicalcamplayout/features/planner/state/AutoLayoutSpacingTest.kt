@@ -4,6 +4,7 @@ import de.voculupo.historicalcamplayout.AutoSetupRequest
 import de.voculupo.historicalcamplayout.FreeArea
 import de.voculupo.historicalcamplayout.FreeAreaKind
 import de.voculupo.historicalcamplayout.GeometryEngine
+import de.voculupo.historicalcamplayout.IssueKind
 import de.voculupo.historicalcamplayout.Parcel
 import de.voculupo.historicalcamplayout.PlacedAsset
 import de.voculupo.historicalcamplayout.PlannerProject
@@ -41,16 +42,17 @@ class AutoLayoutSpacingTest {
         byId: Map<String, TentPreset> = presetsById,
     ) = GeometryEngine
         .evaluate(PlannerProject(parcel = req.parcel, assets = r.assets, blockZones = r.zones, spacing = req.spacing), byId.values.toList())
-        .messages
+        .issues
+        .map { it.kind }
 
     private fun isSail(a: PlacedAsset) = GeometryEngine.isSunSailPreset(presetsById.getValue(a.presetId))
 
-    /** Shortest padded-box gap from any tent to any sail. */
+    /** Shortest gap from any tent to any sail, measured like the warnings: outline to outline minus both margins. */
     private fun closestToSail(r: AutoLayoutResult): Float {
-        val sails = r.assets.filter(::isSail).map { GeometryEngine.assetAabb(it, presetsById.getValue(it.presetId)) }
+        fun outline(a: PlacedAsset) = GeometryEngine.assetWorldOutline(a, presetsById.getValue(a.presetId))
+        val sails = r.assets.filter(::isSail)
         return r.assets.filterNot(::isSail).minOf { t ->
-            val b = GeometryEngine.assetAabb(t, presetsById.getValue(t.presetId))
-            sails.minOf { s -> maxOf(s.left - b.right, b.left - s.right, s.top - b.bottom, b.top - s.bottom) }
+            sails.minOf { s -> GeometryEngine.outlineDistance(outline(t), outline(s)) - t.safetyMarginMeters - s.safetyMarginMeters }
         }
     }
 
@@ -63,7 +65,12 @@ class AutoLayoutSpacingTest {
                 val r = generate(req)
                 assertTrue(r.skipped.isEmpty(), "$shape $walk skipped ${r.skipped}")
                 assertEquals(walk, r.walkwayMeters, "$shape $walk was squeezed")
-                val bad = messages(req, r).filter { "Laufweg" in it || "Kollision" in it || "Eingang" in it }
+                val bad =
+                    messages(req, r).filter {
+                        it == IssueKind.NARROW_WALKWAY ||
+                            (it == IssueKind.COLLISION || it == IssueKind.ROPE_COLLISION) ||
+                            it == IssueKind.ENTRY_BLOCKED
+                    }
                 assertTrue(bad.isEmpty(), "$shape $walk: $bad")
             }
         }
@@ -85,7 +92,7 @@ class AutoLayoutSpacingTest {
                     )
                 val r = generate(req)
                 assertTrue(r.skipped.isEmpty(), "$shape $gap skipped ${r.skipped}")
-                assertTrue(messages(req, r).none { "Laufweg" in it }, "$shape $gap: ${messages(req, r)}")
+                assertTrue(messages(req, r).none { it == IssueKind.NARROW_WALKWAY }, "$shape $gap: ${messages(req, r)}")
                 return closestToSail(r)
             }
             val near = run(0.5f)
@@ -112,7 +119,7 @@ class AutoLayoutSpacingTest {
             val r = generate(req)
             assertEquals(FreeAreaKind.LANE, r.zones.single { it.label == "Gasse" }.kind)
             assertTrue(r.skipped.isEmpty(), "$shape skipped ${r.skipped}")
-            assertTrue(messages(req, r).none { "Abstand zum Weg" in it }, "$shape: ${messages(req, r)}")
+            assertTrue(messages(req, r).none { it == IssueKind.NEAR_PATH }, "$shape: ${messages(req, r)}")
         }
     }
 
@@ -137,7 +144,7 @@ class AutoLayoutSpacingTest {
             val base =
                 AutoSetupRequest(big, tents, listOf(sail), VisitorSide.BOTTOM, shape = shape, spacing = SpacingRules(tentToSailMax = 6f))
 
-            fun far(r: AutoLayoutResult) = messages(base, r).count { "Zu weit" in it }
+            fun far(r: AutoLayoutResult) = messages(base, r).count { it == IssueKind.TOO_FAR_FROM_SAIL }
             val tuned = generate(base)
             val draft = generate(base.copy(optimize = false))
             assertTrue(far(tuned) <= far(draft), "$shape: optimizer ${far(tuned)} vs draft ${far(draft)} too far from the sail")
@@ -157,7 +164,7 @@ class AutoLayoutSpacingTest {
         val r = generate(req)
         assertTrue(r.walkwayMeters < 3f, "6 frame tents on 16 x 11 m can't keep 3 m")
         val report = GeometryEngine.evaluate(PlannerProject(parcel = req.parcel, assets = r.assets), presets)
-        assertTrue(report.hardCollisions.isEmpty(), report.messages.toString())
+        assertTrue(report.hardCollisions.isEmpty(), report.issues.map { it.kind }.toString())
     }
 
     @Test
@@ -167,7 +174,7 @@ class AutoLayoutSpacingTest {
         val req = AutoSetupRequest(Parcel(18f, 12f), List(6) { tight.id }, emptyList(), VisitorSide.TOP, shape = RingShape.U_SHAPE)
         val r = generate(req, byId)
         assertTrue(r.skipped.isEmpty(), "tents that want only 0.3 m fit: skipped ${r.skipped}")
-        assertTrue(messages(req, r, byId).none { "Laufweg" in it }, messages(req, r, byId).toString())
+        assertTrue(messages(req, r, byId).none { it == IssueKind.NARROW_WALKWAY }, messages(req, r, byId).toString())
     }
 
     @Test
@@ -241,8 +248,20 @@ class AutoLayoutSpacingTest {
                 )
             val r = generate(req, byId)
             val msgs = messages(req, r, byId)
-            val bad = msgs.filter { "Kollision" in it || "Parzelle" in it || "Eingang" in it || "Sperrzone" in it }.toMutableList()
-            if (r.walkwayMeters >= rules.tentToTent) bad += msgs.filter { "Laufweg" in it || "Abstand zum Weg" in it }
+            val always =
+                setOf(
+                    IssueKind.COLLISION,
+                    IssueKind.ROPE_COLLISION,
+                    IssueKind.OUTSIDE_PARCEL,
+                    IssueKind.ENTRY_BLOCKED,
+                    IssueKind.IN_NO_GO_ZONE,
+                )
+            val bad = msgs.filter { it in always }.map { it.name }.toMutableList()
+            if (r.walkwayMeters >=
+                rules.tentToTent
+            ) {
+                bad += msgs.filter { it == IssueKind.NARROW_WALKWAY || it == IssueKind.NEAR_PATH }.map { it.name }
+            }
             val placed = r.assets.count { !GeometryEngine.isSunSailPreset(byId.getValue(it.presetId)) }
             val skippedTents = r.skipped.count { name -> req.tentPresetIds.any { byId.getValue(it).name == name } }
             if (placed + skippedTents != req.tentPresetIds.size) bad += "lost tents: $placed + $skippedTents of ${req.tentPresetIds.size}"

@@ -1,0 +1,408 @@
+{
+    "name": "Summer camp",
+    "parcel": {
+        "widthMeters": 30.0,
+        "heightMeters": 22.0
+    },
+    "assets": [
+        {
+            "id": "3g000ew367nit",
+            "presetId": "sun_sail_6x6_flat",
+            "label": "Sonnensegel 6x6 (Flach/Dach)",
+            "position": {
+                "x": 16.429821,
+                "y": 11.960512
+            },
+            "rotationDeg": 180.0,
+            "heightRange": {
+                "minMeters": 2.0,
+                "maxMeters": 3.0
+            },
+            "ropes": [
+                {
+                    "localX": -3.0,
+                    "localY": -3.0,
+                    "lengthMeters": 2.5,
+                    "outwardAngleDeg": 210.0
+                },
+                {
+                    "localX": -3.0,
+                    "localY": -3.0,
+                    "lengthMeters": 2.5,
+                    "outwardAngleDeg": 240.0
+                },
+                {
+                    "localX": 3.0,
+                    "localY": -3.0,
+                    "lengthMeters": 2.5,
+                    "outwardAngleDeg": 300.0
+                },
+                {
+                    "localX": 3.0,
+                    "localY": -3.0,
+                    "lengthMeters": 2.5,
+                    "outwardAngleDeg": 330.0
+                },
+                {
+                    "localX": 3.0,
+                    "localY": 3.0,
+                    "lengthMeters": 2.5,
+                    "outwardAngleDeg": 30.0
+                },
+                {
+                    "localX": 3.0,
+                    "localY": 3.0,
+                    "lengthMeters": 2.5,
+                    "outwardAngleDeg": 60.0
+                },
+                {
+                    "localX": -3.0,
+                    "localY": 3.0,
+                    "lengthMeters": 2.5,
+                    "outwardAngleDeg": 120.0
+                },
+                {
+                    "localX": -3.0,
+                    "localY": 3.0,
+                    "lengthMeters": 2.5,
+                    "outwardAngleDeg": 150.0
+                },
+                {
+                    "localX": 0.0,
+                    "localY": -3.0,
+                    "lengthMeters": 2.0,
+                    "outwardAngleDeg": 255.0
+                },
+                {
+                    "localX": 0.0,
+                    "localY": -3.0,
+                    "lengthMeters": 2.0,
+                    "outwardAngleDeg": 285.0
+                },
+                {
+                    "localX": 3.0,
+                    "localY": 0.0,
+                    "lengthMeters": 2.0,
+                    "outwardAngleDeg": 345.0
+                },
+                {
+                    "localX": 3.0,
+                    "localY": 0.0,
+                    "lengthMeters": 2.0,
+                    "outwardAngleDeg": 15.0
+                },
+                {
+                    "localX": 0.0,
+                    "localY": 3.0,
+                    "lengthMeters": 2.0,
+                    "outwardAngleDeg": 75.0
+                },
+                {
+                    "localX": 0.0,
+                    "localY": 3.0,
+                    "lengthMeters": 2.0,
+                    "outwardAngleDeg": 105.0
+                },
+                {
+                    "localX": -3.0,
+                    "localY": 0.0,
+                    "lengthMeters": 2.0,
+                    "outwardAngleDeg": 165.0
+                },
+                {
+                    "localX": -3.0,
+                    "localY": 0.0,
+                    "lengthMeters": 2.0,
+                    "outwardAngleDeg": 195.0
+                }
+            ]
+        },
+        {
+            "id": "1wu0uvghx96ly",
+            "presetId": "saxon_4x6",
+            "label": "Sachsenzelt 4x6",
+            "position": {
+                "x": 17.267069,
+                "y": 2.142757
+            },
+            "rotationDeg": 180.0,
+            "safetyMarginMeters": 0.8,
+            "heightRange": {
+                "maxMeters": 2.5
+            },
+            "ropes": [
+                {
+                    "localX": -1.5,
+                    "localY": 0.0,
+                    "lengthMeters": 3.0,
+                    "outwardAngleDeg": 180.0
+                },
+                {
+                    "localX": 1.5,
+                    "localY": 0.0,
+                    "lengthMeters": 3.0
+                },
+                {
+                    "localX": 1.0,
+                    "localY": -3.5,
+                    "lengthMeters": 2.0,
+                    "outwardAngleDeg": -45.0
+                },
+                {
+                    "localX": -1.0,
+                    "localY": -3.5,
+                    "lengthMeters": 2.0,
+                    "outwardAngleDeg": 225.0
+                }
+            ]
+        },
+        {
+            "id": "l0jqpymxbq41",
+            "presetId": "round_5",
+            "label": "Rundzelt 5m",
+            "position": {
+                "x": 6.945162,
+                "y": 3.0863447
+            },
+            "rotationDeg": 135.0,
+            "heightRange": {
+                "maxMeters": 3.5
+            },
+            "ropes": [
+                {
+                    "localX": 0.0,
+                    "localY": -2.5,
+                    "lengthMeters": 1.8,
+                    "outwardAngleDeg": -90.0
+                },
+                {
+                    "localX": 2.5,
+                    "localY": 0.0,
+                    "lengthMeters": 1.8
+                },
+                {
+                    "localX": 0.0,
+                    "localY": 2.5,
+                    "lengthMeters": 1.8,
+                    "outwardAngleDeg": 90.0
+                },
+                {
+                    "localX": -2.5,
+                    "localY": 0.0,
+                    "lengthMeters": 1.8,
+                    "outwardAngleDeg": 180.0
+                }
+            ]
+        },
+        {
+            "id": "iwvaq3iu3o5i",
+            "presetId": "saxon_3x5",
+            "label": "Sachsenzelt 3x5",
+            "position": {
+                "x": 25.67631,
+                "y": 4.2392015
+            },
+            "rotationDeg": 225.0,
+            "safetyMarginMeters": 0.6,
+            "heightRange": {
+                "maxMeters": 2.2
+            },
+            "ropes": [
+                {
+                    "localX": -1.5,
+                    "localY": 0.0,
+                    "lengthMeters": 2.5,
+                    "outwardAngleDeg": 180.0
+                },
+                {
+                    "localX": 1.5,
+                    "localY": 0.0,
+                    "lengthMeters": 2.5
+                },
+                {
+                    "localX": 0.75,
+                    "localY": -2.7,
+                    "lengthMeters": 1.8,
+                    "outwardAngleDeg": -45.0
+                },
+                {
+                    "localX": -0.75,
+                    "localY": -2.7,
+                    "lengthMeters": 1.8,
+                    "outwardAngleDeg": 225.0
+                }
+            ]
+        },
+        {
+            "id": "hwbpvybqvaoq",
+            "presetId": "a_tent_3x4_frame",
+            "label": "Keilzelt 3x4 (Holzgestell)",
+            "position": {
+                "x": 27.054686,
+                "y": 10.792934
+            },
+            "rotationDeg": 270.0,
+            "safetyMarginMeters": 0.2,
+            "heightRange": {
+                "maxMeters": 2.3
+            }
+        },
+        {
+            "id": "1wigrnw9hc21d",
+            "presetId": "round_4",
+            "label": "Rundzelt 4m",
+            "position": {
+                "x": 4.2453175,
+                "y": 12.285069
+            },
+            "rotationDeg": 90.0,
+            "heightRange": {
+                "maxMeters": 2.6
+            },
+            "ropes": [
+                {
+                    "localX": 0.0,
+                    "localY": -2.0,
+                    "lengthMeters": 1.5,
+                    "outwardAngleDeg": -90.0
+                },
+                {
+                    "localX": 2.0,
+                    "localY": 0.0,
+                    "lengthMeters": 1.5
+                },
+                {
+                    "localX": 0.0,
+                    "localY": 2.0,
+                    "lengthMeters": 1.5,
+                    "outwardAngleDeg": 90.0
+                },
+                {
+                    "localX": -2.0,
+                    "localY": 0.0,
+                    "lengthMeters": 1.5,
+                    "outwardAngleDeg": 180.0
+                }
+            ]
+        },
+        {
+            "id": "aga5ass89lac",
+            "presetId": "saxon_2x4",
+            "label": "Sachsenzelt 2x4",
+            "position": {
+                "x": 26.791504,
+                "y": 17.5
+            },
+            "rotationDeg": 270.0,
+            "safetyMarginMeters": 0.5,
+            "ropes": [
+                {
+                    "localX": -1.0,
+                    "localY": 0.0,
+                    "lengthMeters": 2.0,
+                    "outwardAngleDeg": 180.0
+                },
+                {
+                    "localX": 1.0,
+                    "localY": 0.0,
+                    "lengthMeters": 2.0
+                },
+                {
+                    "localX": 0.5,
+                    "localY": -2.0,
+                    "lengthMeters": 1.5,
+                    "outwardAngleDeg": -45.0
+                },
+                {
+                    "localX": -0.5,
+                    "localY": -2.0,
+                    "lengthMeters": 1.5,
+                    "outwardAngleDeg": 225.0
+                }
+            ]
+        }
+    ],
+    "blockZones": [
+        {
+            "id": "auto-1y2gmx5z0exqa",
+            "points": [
+                {
+                    "x": 17.5,
+                    "y": 19.0
+                },
+                {
+                    "x": 17.366026,
+                    "y": 19.5
+                },
+                {
+                    "x": 17.0,
+                    "y": 19.866026
+                },
+                {
+                    "x": 16.5,
+                    "y": 20.0
+                },
+                {
+                    "x": 16.0,
+                    "y": 19.866026
+                },
+                {
+                    "x": 15.633974,
+                    "y": 19.5
+                },
+                {
+                    "x": 15.5,
+                    "y": 19.0
+                },
+                {
+                    "x": 15.633975,
+                    "y": 18.5
+                },
+                {
+                    "x": 16.0,
+                    "y": 18.133974
+                },
+                {
+                    "x": 16.5,
+                    "y": 18.0
+                },
+                {
+                    "x": 17.0,
+                    "y": 18.133974
+                },
+                {
+                    "x": 17.366026,
+                    "y": 18.5
+                }
+            ],
+            "label": "Fire",
+            "kind": "FIRE"
+        }
+    ],
+    "pixelsPerMeter": 30.0,
+    "autoSetup": {
+        "parcel": {
+            "widthMeters": 30.0,
+            "heightMeters": 22.0
+        },
+        "tentPresetIds": [
+            "saxon_4x6",
+            "round_5",
+            "saxon_3x5",
+            "a_tent_3x4_frame",
+            "round_4",
+            "saxon_2x4"
+        ],
+        "sailPresetIds": [
+            "sun_sail_6x6_flat"
+        ],
+        "visitorSide": "BOTTOM",
+        "freeAreas": [
+            {
+                "kind": "FIRE",
+                "label": "Fire",
+                "widthMeters": 2.0
+            }
+        ]
+    }
+}
