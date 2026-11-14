@@ -49,6 +49,7 @@ import de.voculupo.historicalcamplayout.PlannerUiState
 import de.voculupo.historicalcamplayout.TentPreset
 import de.voculupo.historicalcamplayout.TentShapeType
 import de.voculupo.historicalcamplayout.Vec2
+import de.voculupo.historicalcamplayout.features.planner.canvas.drawTentArt
 import de.voculupo.historicalcamplayout.getPlatform
 import lagerplaner.composeapp.generated.resources.Res
 import lagerplaner.composeapp.generated.resources.apply_area
@@ -362,8 +363,7 @@ private fun CategoryChip(
 
 @Composable
 private fun PresetPreviewIcon(preset: TentPreset) {
-    val bg = Color(0xFFEFE8D8)
-    val fg = Color(0xFF6F5F4A)
+    val bg = Color(0xFF7E9A52)
     val stroke = Color(0xFF3E3E3E)
     BoxWithConstraints(
         modifier =
@@ -401,16 +401,15 @@ private fun PresetPreviewIcon(preset: TentPreset) {
             val offsetX = (size.width - shapeW * scale) / 2f
             val offsetY = (size.height - shapeH * scale) / 2f
 
-            val path =
-                Path().apply {
-                    moveTo(offsetX + (points.first().x - minX) * scale, offsetY + (points.first().y - minY) * scale)
-                    points.drop(1).forEach { point ->
-                        lineTo(offsetX + (point.x - minX) * scale, offsetY + (point.y - minY) * scale)
-                    }
-                    close()
-                }
-            drawPath(path, fg)
-            drawPath(path, stroke, style = Stroke(width = 1.4f))
+            drawTentArt(
+                preset = preset,
+                outline = points,
+                center = Offset(offsetX - minX * scale, offsetY - minY * scale),
+                ppm = scale,
+                rotationDeg = 0f,
+                heightMeters = 0f,
+                tint = null,
+            )
             drawRect(stroke, style = Stroke(1f))
         }
     }

@@ -2,6 +2,9 @@
 
 import de.voculupo.historicalcamplayout.GeometryHelper
 import kotlinx.serialization.Serializable
+import kotlin.math.PI
+import kotlin.math.cos
+import kotlin.math.sin
 
 @Serializable
 enum class TentShapeType {
@@ -94,6 +97,8 @@ data class BlockZone(
     val id: String,
     val points: List<Vec2>,
     val label: String = "",
+    /** Set for zones the auto setup made from a free area; FIRE zones are drawn as a fire pit. */
+    val kind: FreeAreaKind? = null,
 )
 
 @Serializable
@@ -182,6 +187,48 @@ data class PlannerUiState(
     val canRedo: Boolean = false,
 )
 
+/**
+ * Saxon tent footprint: straight sides under the ridge, rounded (half-elliptic) ends where the end gores
+ * come down, and an optional porch sticking out at the front (-y, the entry side).
+ */
+private fun saxonOutline(
+    ridgeHalf: Float,
+    halfDepth: Float,
+    halfLength: Float,
+    porchHalfWidth: Float = 0f,
+    porchDepth: Float = 0f,
+): List<Vec2> {
+    val steps = 6
+    val rx = halfLength - ridgeHalf
+
+    fun arc(
+        sign: Float,
+        from: Float,
+        to: Float,
+    ) = (1 until steps).map { i ->
+        val a = from + (to - from) * i / steps
+        Vec2(sign * (ridgeHalf + rx * cos(a)), halfDepth * sin(a))
+    }
+    val quarter = (PI / 2).toFloat()
+    val porch =
+        if (porchDepth > 0f) {
+            listOf(
+                Vec2(porchHalfWidth, -halfDepth),
+                Vec2(porchHalfWidth, -halfDepth - porchDepth),
+                Vec2(-porchHalfWidth, -halfDepth - porchDepth),
+                Vec2(-porchHalfWidth, -halfDepth),
+            )
+        } else {
+            emptyList()
+        }
+    return listOf(Vec2(-ridgeHalf, halfDepth), Vec2(ridgeHalf, halfDepth)) +
+        arc(1f, quarter, -quarter) +
+        Vec2(ridgeHalf, -halfDepth) +
+        porch +
+        Vec2(-ridgeHalf, -halfDepth) +
+        arc(-1f, -quarter, quarter)
+}
+
 fun defaultPresets(): List<TentPreset> =
     listOf(
         // ==========================================
@@ -193,23 +240,7 @@ fun defaultPresets(): List<TentPreset> =
             shape = TentShapeType.SAXON,
             widthMeters = 4f,
             heightMeters = 3f,
-            polygonPoints =
-                listOf(
-                    Vec2(-1.0f, 1.0f),
-                    Vec2(1.0f, 1.0f),
-                    Vec2(1.5f, 0.5f),
-                    Vec2(2.0f, 0.0f),
-                    Vec2(1.5f, -0.5f),
-                    Vec2(1.0f, -1.0f),
-                    Vec2(0.5f, -1.0f),
-                    Vec2(0.5f, -2.0f),
-                    Vec2(-0.5f, -2.0f),
-                    Vec2(-0.5f, -1.0f),
-                    Vec2(-1.0f, -1.0f),
-                    Vec2(-1.5f, -0.5f),
-                    Vec2(-2.0f, 0.0f),
-                    Vec2(-1.5f, 0.5f),
-                ),
+            polygonPoints = saxonOutline(ridgeHalf = 1.0f, halfDepth = 1.0f, halfLength = 2.0f, porchHalfWidth = 0.5f, porchDepth = 1.0f),
             ropeAnchors =
                 listOf(
                     RopeAnchor(localX = -1.0f, localY = 0f, lengthMeters = 2.0f, outwardAngleDeg = 180f),
@@ -226,23 +257,7 @@ fun defaultPresets(): List<TentPreset> =
             shape = TentShapeType.SAXON,
             widthMeters = 5f,
             heightMeters = 4.2f,
-            polygonPoints =
-                listOf(
-                    Vec2(-1.5f, 1.5f),
-                    Vec2(1.5f, 1.5f),
-                    Vec2(2.0f, 0.8f),
-                    Vec2(2.5f, 0.0f),
-                    Vec2(2.0f, -0.8f),
-                    Vec2(1.5f, -1.5f),
-                    Vec2(0.75f, -1.5f),
-                    Vec2(0.75f, -2.7f),
-                    Vec2(-0.75f, -2.7f),
-                    Vec2(-0.75f, -1.5f),
-                    Vec2(-1.5f, -1.5f),
-                    Vec2(-2.0f, -0.8f),
-                    Vec2(-2.5f, 0.0f),
-                    Vec2(-2.0f, 0.8f),
-                ),
+            polygonPoints = saxonOutline(ridgeHalf = 1.5f, halfDepth = 1.5f, halfLength = 2.5f, porchHalfWidth = 0.75f, porchDepth = 1.2f),
             ropeAnchors =
                 listOf(
                     RopeAnchor(localX = -1.5f, localY = 0f, lengthMeters = 2.5f, outwardAngleDeg = 180f),
@@ -259,23 +274,7 @@ fun defaultPresets(): List<TentPreset> =
             shape = TentShapeType.SAXON,
             widthMeters = 6f,
             heightMeters = 5.5f,
-            polygonPoints =
-                listOf(
-                    Vec2(-1.5f, 2.0f),
-                    Vec2(1.5f, 2.0f),
-                    Vec2(2.5f, 1.0f),
-                    Vec2(3.0f, 0.0f),
-                    Vec2(2.5f, -1.0f),
-                    Vec2(1.5f, -2.0f),
-                    Vec2(1.0f, -2.0f),
-                    Vec2(1.0f, -3.5f),
-                    Vec2(-1.0f, -3.5f),
-                    Vec2(-1.0f, -2.0f),
-                    Vec2(-1.5f, -2.0f),
-                    Vec2(-2.5f, -1.0f),
-                    Vec2(-3.0f, 0.0f),
-                    Vec2(-2.5f, 1.0f),
-                ),
+            polygonPoints = saxonOutline(ridgeHalf = 1.5f, halfDepth = 2.0f, halfLength = 3.0f, porchHalfWidth = 1.0f, porchDepth = 1.5f),
             ropeAnchors =
                 listOf(
                     RopeAnchor(localX = -1.5f, localY = 0f, lengthMeters = 3.0f, outwardAngleDeg = 180f),
@@ -296,19 +295,7 @@ fun defaultPresets(): List<TentPreset> =
             shape = TentShapeType.SAXON,
             widthMeters = 4.0f,
             heightMeters = 2.0f,
-            polygonPoints =
-                listOf(
-                    Vec2(-1.0f, 1.0f),
-                    Vec2(1.0f, 1.0f),
-                    Vec2(1.5f, 0.7f),
-                    Vec2(2.0f, 0.0f),
-                    Vec2(1.5f, -0.7f),
-                    Vec2(1.0f, -1.0f),
-                    Vec2(-1.0f, -1.0f),
-                    Vec2(-1.5f, -0.7f),
-                    Vec2(-2.0f, 0.0f),
-                    Vec2(-1.5f, 0.7f),
-                ),
+            polygonPoints = saxonOutline(ridgeHalf = 1.0f, halfDepth = 1.0f, halfLength = 2.0f),
             ropeAnchors =
                 listOf(
                     RopeAnchor(-1.0f, 1.0f, 1.5f, -90f),
@@ -325,19 +312,7 @@ fun defaultPresets(): List<TentPreset> =
             shape = TentShapeType.SAXON,
             widthMeters = 5.0f,
             heightMeters = 3.0f,
-            polygonPoints =
-                listOf(
-                    Vec2(-1.0f, 1.5f),
-                    Vec2(1.0f, 1.5f),
-                    Vec2(1.8f, 1.2f),
-                    Vec2(2.5f, 0.0f),
-                    Vec2(1.8f, -1.2f),
-                    Vec2(1.0f, -1.5f),
-                    Vec2(-1.0f, -1.5f),
-                    Vec2(-1.8f, -1.2f),
-                    Vec2(-2.5f, 0.0f),
-                    Vec2(-1.8f, 1.2f),
-                ),
+            polygonPoints = saxonOutline(ridgeHalf = 1.0f, halfDepth = 1.5f, halfLength = 2.5f),
             ropeAnchors =
                 listOf(
                     RopeAnchor(-1.0f, 0f, 2.5f, 180f),
@@ -352,19 +327,7 @@ fun defaultPresets(): List<TentPreset> =
             shape = TentShapeType.SAXON,
             widthMeters = 6.0f,
             heightMeters = 4.0f,
-            polygonPoints =
-                listOf(
-                    Vec2(-1.5f, 2.0f),
-                    Vec2(1.5f, 2.0f),
-                    Vec2(2.5f, 1.5f),
-                    Vec2(3.0f, 0.0f),
-                    Vec2(2.5f, -1.5f),
-                    Vec2(1.5f, -2.0f),
-                    Vec2(-1.5f, -2.0f),
-                    Vec2(-2.5f, -1.5f),
-                    Vec2(-3.0f, 0.0f),
-                    Vec2(-2.5f, 1.5f),
-                ),
+            polygonPoints = saxonOutline(ridgeHalf = 1.5f, halfDepth = 2.0f, halfLength = 3.0f),
             ropeAnchors =
                 listOf(
                     RopeAnchor(-1.5f, 0f, 3.0f, 180f),
@@ -378,23 +341,7 @@ fun defaultPresets(): List<TentPreset> =
             shape = TentShapeType.SAXON,
             widthMeters = 6f,
             heightMeters = 4f,
-            polygonPoints =
-                listOf(
-                    Vec2(-1.5f, 1.25f),
-                    Vec2(1.5f, 1.25f),
-                    Vec2(2.5f, 0.8f),
-                    Vec2(3.0f, 0.0f),
-                    Vec2(2.5f, -0.8f),
-                    Vec2(1.5f, -1.25f),
-                    Vec2(0.75f, -1.25f),
-                    Vec2(0.75f, -2.75f),
-                    Vec2(-0.75f, -2.75f),
-                    Vec2(-0.75f, -1.25f),
-                    Vec2(-1.5f, -1.25f),
-                    Vec2(-2.5f, -0.8f),
-                    Vec2(-3.0f, 0.0f),
-                    Vec2(-2.5f, 0.8f),
-                ),
+            polygonPoints = saxonOutline(ridgeHalf = 1.5f, halfDepth = 1.25f, halfLength = 3.0f, porchHalfWidth = 0.75f, porchDepth = 1.5f),
             ropeAnchors =
                 listOf(
                     RopeAnchor(localX = -1.5f, localY = 0f, lengthMeters = 3.0f, outwardAngleDeg = 180f),

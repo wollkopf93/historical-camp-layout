@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageShader
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
@@ -32,6 +31,8 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -45,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
 import androidx.compose.ui.unit.sp
 import de.voculupo.historicalcamplayout.BlockZone
+import de.voculupo.historicalcamplayout.FreeAreaKind
 import de.voculupo.historicalcamplayout.GeometryEngine
 import de.voculupo.historicalcamplayout.PlacedAsset
 import de.voculupo.historicalcamplayout.PlannerProject
@@ -55,9 +57,6 @@ import de.voculupo.historicalcamplayout.TentShapeType
 import de.voculupo.historicalcamplayout.Vec2
 import de.voculupo.historicalcamplayout.app.PresetDropRequest
 import de.voculupo.historicalcamplayout.platform.platformScrollZoom
-import lagerplaner.composeapp.generated.resources.Res
-import lagerplaner.composeapp.generated.resources.parchment
-import org.jetbrains.compose.resources.imageResource
 import kotlin.math.atan2
 import kotlin.math.sqrt
 
@@ -100,8 +99,7 @@ internal fun PlannerCanvas(
     val currentShiftPressed by rememberUpdatedState(shiftPressed)
     val currentSuppressTap by rememberUpdatedState(suppressTapTemporarily)
     val isDarkTheme = false
-    val parchment = imageResource(Res.drawable.parchment)
-    val parchmentBrush = remember(parchment) { ShaderBrush(ImageShader(parchment, TileMode.Repeated, TileMode.Repeated)) }
+    val grassBrush = remember { ShaderBrush(ImageShader(grassTexture(), TileMode.Repeated, TileMode.Repeated)) }
     val textMeasurer = rememberTextMeasurer()
     var canvasRootRect by remember { mutableStateOf(Rect.Zero) }
     var activeRopeDrag by remember { mutableStateOf<Pair<Int, RopeDragPart>?>(null) }
@@ -454,7 +452,7 @@ internal fun PlannerCanvas(
         ) {
             val parcelSizePx = parcelSizePx(state.project)
             val parcelOrigin = centeredParcelOriginPx(Size(size.width, size.height), parcelSizePx) + canvasPanOffsetPx
-            drawParchment(parchmentBrush)
+            drawGround(grassBrush, state.project.pixelsPerMeter, parcelOrigin, isDarkTheme)
             drawGrid(state.project, parcelOrigin, size)
             drawParcelBounds(state.project, parcelOrigin)
             state.project.blockZones.forEach { drawBlockZone(it, state.project.pixelsPerMeter, parcelOrigin, textMeasurer) }
@@ -658,34 +656,44 @@ private fun DrawScope.drawParcelBounds(
 ) {
     val w = project.parcel.widthMeters * project.pixelsPerMeter
     val h = project.parcel.heightMeters * project.pixelsPerMeter
-    // Meadow tint + double ink border, like a field drawn on an old map.
-    drawRect(color = Color(0x1F6B7F3A), topLeft = origin, size = Size(w, h), style = Fill)
-    drawRect(color = PARCEL_INK, topLeft = origin, size = Size(w, h), style = Stroke(width = 3f))
-    val inset = 6f
-    if (w > inset * 4 && h > inset * 4) {
-        drawRect(
-            color = PARCEL_INK.copy(alpha = 0.55f),
-            topLeft = origin + Offset(inset, inset),
-            size = Size(w - inset * 2, h - inset * 2),
-            style = Stroke(width = 1f),
-        )
+    // Fresh meadow inside, marked out with a taut light string and corner stakes.
+    drawRect(color = Color(0x1AFFF8DC), topLeft = origin, size = Size(w, h))
+    drawRect(color = Color(0x55000000), topLeft = origin + Offset(1f, 1.5f), size = Size(w, h), style = Stroke(width = 2f))
+    drawRect(color = PARCEL_STRING, topLeft = origin, size = Size(w, h), style = Stroke(width = 2f))
+    listOf(origin, origin + Offset(w, 0f), origin + Offset(0f, h), origin + Offset(w, h)).forEach {
+        drawCircle(STAKE, radius = 4f, center = it)
     }
 }
 
-private val GRID_INK = Color(0x225A3E1B)
-private val PARCEL_INK = Color(0xFF4A3220)
+private val GRID_INK = Color(0x1CFFFFFF)
+private val PARCEL_STRING = Color(0xEEF4EBD0)
+private val ROPE = Color(0xFFD9C8A0)
+private val STAKE = Color(0xFF3B2A1A)
 
-/** Tiled parchment fixed to the screen (the grid and plan move over it), plus darkened edges for an aged-paper look. */
-private fun DrawScope.drawParchment(brush: Brush) {
-    drawRect(brush)
+/** Grass that moves and zooms with the plan, darker towards the screen edges, dimmed at night (dark theme). */
+private fun DrawScope.drawGround(
+    brush: Brush,
+    pixelsPerMeter: Float,
+    origin: Offset,
+    darkMode: Boolean,
+) {
+    val k = (pixelsPerMeter * GRASS_TILE_METERS / GRASS_TILE_PX).coerceIn(0.6f, 2f)
+    val tile = GRASS_TILE_PX * k
+    val shift = Offset(((origin.x % tile) + tile) % tile, ((origin.y % tile) + tile) % tile)
+    translate(shift.x - tile, shift.y - tile) {
+        scale(k, pivot = Offset.Zero) {
+            drawRect(brush, size = Size((size.width + tile * 2) / k, (size.height + tile * 2) / k))
+        }
+    }
     drawRect(
         Brush.radialGradient(
-            0.55f to Color.Transparent,
-            1f to Color(0x4A4A2C10),
+            0.5f to Color.Transparent,
+            1f to Color(0x55142008),
             center = center,
             radius = maxOf(size.width, size.height) * 0.75f,
         ),
     )
+    if (darkMode) drawRect(Color(0x66000000))
 }
 
 private fun DrawScope.drawBlockZone(
@@ -695,6 +703,26 @@ private fun DrawScope.drawBlockZone(
     textMeasurer: TextMeasurer,
 ) {
     if (zone.points.size < 3) return
+    if (zone.kind == FreeAreaKind.FIRE) {
+        val c =
+            Offset(
+                origin.x + zone.points
+                    .map { it.x }
+                    .average()
+                    .toFloat() * pixelsPerMeter,
+                origin.y + zone.points
+                    .map { it.y }
+                    .average()
+                    .toFloat() * pixelsPerMeter,
+            )
+        val r = zone.points.maxOf { (it.toOffsetPx(pixelsPerMeter, origin) - c).getDistance() }
+        drawCampfire(c, r)
+        if (zone.label.isNotBlank()) {
+            val layout = textMeasurer.measure(AnnotatedString(zone.label), style = TextStyle(color = Color(0xFFF4EBD0), fontSize = 12.sp))
+            drawText(layout, topLeft = Offset(c.x - layout.size.width / 2f, c.y + r + 2f))
+        }
+        return
+    }
     val path =
         Path().apply {
             moveTo(origin.x + zone.points.first().x * pixelsPerMeter, origin.y + zone.points.first().y * pixelsPerMeter)
@@ -810,124 +838,33 @@ private fun DrawScope.drawAsset(
     selectedRopeIndex: Int?,
     hiddenRopeIndices: Set<Int>,
 ) {
-    val bodyColor =
+    val tint =
         when {
-            hardCollision -> Color(0xAADD2C2C)
-            warning -> Color(0xAAD89A2B)
-            selectionHighlighted -> Color(0xDD8C2F1E)
-            preset.shape == TentShapeType.POLYGON -> Color(0xAA725F45)
-            else -> Color(0xCC6D5B44)
+            hardCollision -> Color(0x99DD2C2C)
+            warning -> Color(0x88E0A030)
+            selectionHighlighted -> Color(0x33C9962B)
+            else -> null
         }
     val outlineColor =
         when {
             hardCollision -> Color(0xFF8A0000)
             warning -> Color(0xFF8A6B00)
             selectionHighlighted -> Color(0xFF3A0E05)
-            else -> Color(0xFF3E3E3E)
+            else -> CANVAS_EDGE
         }
     val center = GeometryEngine.metersToOffset(asset.position, pixelsPerMeter) + origin
     drawSafetyBuffer(asset, preset, center, pixelsPerMeter)
     rotate(asset.rotationDeg, center) {
-        when (preset.shape) {
-            TentShapeType.CIRCLE -> {
-                drawCircle(bodyColor, radius = preset.widthMeters * pixelsPerMeter / 2f, center = center)
-                drawCircle(outlineColor, radius = preset.widthMeters * pixelsPerMeter / 2f, center = center, style = Stroke(2f))
-            }
-
-            TentShapeType.RECTANGLE -> {
-                val rect =
-                    Rect(
-                        center.x - preset.widthMeters * pixelsPerMeter / 2f,
-                        center.y - preset.heightMeters * pixelsPerMeter / 2f,
-                        center.x + preset.widthMeters * pixelsPerMeter / 2f,
-                        center.y + preset.heightMeters * pixelsPerMeter / 2f,
-                    )
-                drawRect(bodyColor, topLeft = rect.topLeft, size = rect.size)
-                drawRect(outlineColor, topLeft = rect.topLeft, size = rect.size, style = Stroke(2f))
-            }
-
-            TentShapeType.CAPSULE -> {
-                val radius = preset.heightMeters * pixelsPerMeter / 2f
-                val halfBody = (preset.widthMeters * pixelsPerMeter / 2f) - radius
-                drawRect(bodyColor, topLeft = Offset(center.x - halfBody, center.y - radius), size = Size(halfBody * 2f, radius * 2f))
-                drawCircle(bodyColor, radius = radius, center = Offset(center.x - halfBody, center.y))
-                drawCircle(bodyColor, radius = radius, center = Offset(center.x + halfBody, center.y))
-                drawLine(outlineColor, Offset(center.x - halfBody, center.y - radius), Offset(center.x + halfBody, center.y - radius), 2f)
-                drawLine(outlineColor, Offset(center.x - halfBody, center.y + radius), Offset(center.x + halfBody, center.y + radius), 2f)
-            }
-
-            TentShapeType.SAXON -> {
-                if (preset.polygonPoints.isNotEmpty()) {
-                    val points = preset.polygonPoints
-                    val path =
-                        Path().apply {
-                            moveTo(center.x + points.first().x * pixelsPerMeter, center.y + points.first().y * pixelsPerMeter)
-                            points.drop(1).forEach { lineTo(center.x + it.x * pixelsPerMeter, center.y + it.y * pixelsPerMeter) }
-                            close()
-                        }
-                    drawPath(path, bodyColor, style = Fill)
-                    drawPath(path, outlineColor, style = Stroke(2f))
-                } else {
-                    val radius = preset.heightMeters * pixelsPerMeter / 2f
-                    val halfBody = (preset.widthMeters * pixelsPerMeter / 2f) - radius
-                    drawRect(bodyColor, topLeft = Offset(center.x - halfBody, center.y - radius), size = Size(halfBody * 2f, radius * 2f))
-                    drawCircle(bodyColor, radius = radius, center = Offset(center.x - halfBody, center.y))
-                    drawCircle(bodyColor, radius = radius, center = Offset(center.x + halfBody, center.y))
-                    drawLine(
-                        outlineColor,
-                        Offset(center.x - halfBody, center.y - radius),
-                        Offset(center.x + halfBody, center.y - radius),
-                        2f,
-                    )
-                    drawLine(
-                        outlineColor,
-                        Offset(center.x - halfBody, center.y + radius),
-                        Offset(center.x + halfBody, center.y + radius),
-                        2f,
-                    )
-                }
-            }
-
-            TentShapeType.A_FRAME -> {
-                val halfW = preset.widthMeters * pixelsPerMeter / 2f
-                val halfH = preset.heightMeters * pixelsPerMeter / 2f
-
-                // 1. Die Plane (Rechteck) - benutzt die lokale Variable bodyColor
-                drawRect(
-                    color = bodyColor,
-                    topLeft = Offset(center.x - halfW, center.y - halfH),
-                    size = Size(halfW * 2f, halfH * 2f),
-                )
-
-                // 2. Die Firstlinie (Giebel) - benutzt die lokale Variable outlineColor
-                drawLine(
-                    color = outlineColor,
-                    start = Offset(center.x, center.y - halfH),
-                    end = Offset(center.x, center.y + halfH),
-                    strokeWidth = 2.5f,
-                )
-
-                // 3. Die Outline (Rahmen)
-                drawRect(
-                    color = outlineColor,
-                    topLeft = Offset(center.x - halfW, center.y - halfH),
-                    size = Size(halfW * 2f, halfH * 2f),
-                    style = Stroke(2f),
-                )
-            }
-
-            TentShapeType.POLYGON -> {
-                val points = preset.polygonPoints.ifEmpty { listOf(Vec2(-2f, -2f), Vec2(2f, -2f), Vec2(2f, 2f), Vec2(-2f, 2f)) }
-                val path =
-                    Path().apply {
-                        moveTo(center.x + points.first().x * pixelsPerMeter, center.y + points.first().y * pixelsPerMeter)
-                        points.drop(1).forEach { lineTo(center.x + it.x * pixelsPerMeter, center.y + it.y * pixelsPerMeter) }
-                        close()
-                    }
-                drawPath(path, bodyColor, style = Fill)
-                drawPath(path, outlineColor, style = Stroke(2f))
-            }
-        }
+        drawTentArt(
+            preset = preset,
+            outline = GeometryEngine.localOutlinePoints(preset),
+            center = center,
+            ppm = pixelsPerMeter,
+            rotationDeg = asset.rotationDeg,
+            heightMeters = asset.heightRange.maxMeters,
+            tint = tint,
+            edge = outlineColor,
+        )
         if (selectionHighlighted) {
             drawSelectionHighlightRing(
                 preset = preset,
@@ -941,20 +878,19 @@ private fun DrawScope.drawAsset(
         GeometryEngine.visibleRopeSegments(asset, hiddenRopeIndices).forEach { (idx, rope) ->
             val isSelectedRope = selectedRopeIndex == idx
             drawLine(
-                color = if (isSelectedRope) Color(0xFF1B4D9B) else Color(0xFF444444),
+                color = if (isSelectedRope) Color(0xFF1B4D9B) else ROPE,
                 start = rope.start.toOffsetPx(pixelsPerMeter, origin),
                 end = rope.end.toOffsetPx(pixelsPerMeter, origin),
-                strokeWidth = if (isSelectedRope) 2.8f * ropeUiScale else 1.8f * ropeUiScale,
+                strokeWidth = if (isSelectedRope) 2.8f * ropeUiScale else 1.5f * ropeUiScale,
                 cap = StrokeCap.Round,
-                pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f * ropeUiScale, 6f * ropeUiScale)),
             )
             drawCircle(
-                color = if (isSelectedRope) Color(0xFF1B4D9B) else Color(0xFF555555),
+                color = if (isSelectedRope) Color(0xFF1B4D9B) else ROPE,
                 center = rope.start.toOffsetPx(pixelsPerMeter, origin),
-                radius = if (isSelectedRope) 5.5f * ropeUiScale else 4f * ropeUiScale,
+                radius = if (isSelectedRope) 5.5f * ropeUiScale else 2.5f * ropeUiScale,
             )
             drawCircle(
-                color = if (isSelectedRope) Color(0xFF1B4D9B) else Color(0xFF7A1F1F),
+                color = if (isSelectedRope) Color(0xFF1B4D9B) else STAKE,
                 center = rope.end.toOffsetPx(pixelsPerMeter, origin),
                 radius = if (isSelectedRope) 6.5f * ropeUiScale else 4.5f * ropeUiScale,
             )
@@ -968,7 +904,7 @@ private fun DrawScope.drawSafetyBuffer(
     center: Offset,
     pixelsPerMeter: Float,
 ) {
-    val bufferColor = Color(0x22555555)
+    val bufferColor = Color(0x24FFFFFF)
     val marginPx = asset.safetyMarginMeters * pixelsPerMeter
     rotate(asset.rotationDeg, center) {
         when (preset.shape) {

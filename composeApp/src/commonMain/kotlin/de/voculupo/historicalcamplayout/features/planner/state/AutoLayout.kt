@@ -350,7 +350,13 @@ internal object AutoLayout {
             } else {
                 val block = Block(BlockKey(false, i), area.position, emptyList(), emptyList(), emptyList())
                 anchors[block] = centre
-                val zone = BlockZone(AUTO_PREFIX + newId(""), circle(r).map { Vec2(centre.x + it.x, centre.y + it.y) }, area.label)
+                val zone =
+                    BlockZone(
+                        AUTO_PREFIX + newId(""),
+                        circle(r).map { Vec2(centre.x + it.x, centre.y + it.y) },
+                        area.label,
+                        FreeAreaKind.FIRE,
+                    )
                 zonesOut += zone
                 zoneOwner[zone.id] = block
                 obstacles += zoneObstacle(zone.points, block)
