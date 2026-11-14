@@ -91,7 +91,15 @@ internal object LayoutRefiner {
         val cloth = walk <= 0f
         val shapes = tents.map { shape(it, preset(it)) }.toMutableList()
 
-        fun nearestCentre(p: Vec2) = centres.minByOrNull { hypot(it.x - p.x, it.y - p.y) }
+        // A ring tent belongs to its own sail(s), even when another ring's sail is closer.
+        fun centreOf(
+            a: PlacedAsset,
+            p: Vec2,
+        ): Vec2? {
+            val own = sails.filter { it.groupId != null && it.groupId == a.groupId }
+            if (own.isEmpty()) return centres.minByOrNull { hypot(it.x - p.x, it.y - p.y) }
+            return Vec2(own.map { it.position.x }.average().toFloat(), own.map { it.position.y }.average().toFloat())
+        }
 
         fun pair(
             a: Shape,
@@ -123,7 +131,8 @@ internal object LayoutRefiner {
             }
             // Cloth to cloth: walls may touch, so measure the walls rather than the safety boxes.
             val g = if (cloth) gap(a.box, b.box) else gap(a.padded, b.padded)
-            if (g < walk) c += WALK_STEP + WALK * (walk - g)
+            // +1 cm: the app counts exactly the walkway as too short.
+            if (g < walk + 0.01f) c += WALK_STEP + WALK * (walk - g)
             return c
         }
 
@@ -153,7 +162,7 @@ internal object LayoutRefiner {
             val over =
                 max(0f, -s.box.left) + max(0f, -s.box.top) + max(0f, s.box.right - p.widthMeters) + max(0f, s.box.bottom - p.heightMeters)
             if (over > 0f) c += HARD + HARD * over
-            val centre = nearestCentre(a.position)
+            val centre = centreOf(a, a.position)
             val entry = GeometryEngine.entryWorld(a, preset(a))
             if (centre != null && entry != null) {
                 val (_, out) = entry
@@ -183,7 +192,7 @@ internal object LayoutRefiner {
             a: PlacedAsset,
             p: Vec2,
         ): Float {
-            val centre = nearestCentre(p) ?: return a.rotationDeg
+            val centre = centreOf(a, p) ?: return a.rotationDeg
             return snap(kotlin.math.atan2(p.y - centre.y, p.x - centre.x) * 180f / kotlin.math.PI.toFloat() - 90f)
         }
 
