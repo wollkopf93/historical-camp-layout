@@ -20,8 +20,17 @@ android {
             libs.versions.android.targetSdk
                 .get()
                 .toInt()
-        versionCode = 1
-        versionName = "1.0"
+        // CI passes these from the release tag; local builds keep the defaults.
+        versionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
+        versionName = System.getenv("APP_VERSION") ?: "1.0"
+    }
+    signingConfigs {
+        create("release") {
+            System.getenv("ANDROID_KEYSTORE_PATH")?.let { storeFile = rootProject.file(it) }
+            storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+            keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+        }
     }
     packaging {
         resources {
@@ -31,6 +40,10 @@ android {
     buildTypes {
         getByName("release") {
             isMinifyEnabled = false
+            // Without a keystore (local builds) the release APK stays unsigned.
+            if (System.getenv("ANDROID_KEYSTORE_PATH") != null) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {

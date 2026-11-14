@@ -107,7 +107,7 @@ compose.desktop {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             // Product name for desktop distributions.
             packageName = "Lagerplaner"
-            packageVersion = "1.0.0"
+            packageVersion = System.getenv("APP_VERSION") ?: "1.0.0"
             description = "Zelt- und Lagerflaechenplanung fuer Maerkte"
             copyright = "(c) Benedikt Konrad"
             vendor = "Benedikt Konrad"
