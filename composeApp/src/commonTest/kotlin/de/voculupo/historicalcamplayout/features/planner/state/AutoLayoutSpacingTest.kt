@@ -273,4 +273,14 @@ class AutoLayoutSpacingTest {
     private companion object {
         const val RANDOM_CASES = 150
     }
+
+    @Test
+    fun requiredParcel_staysWithinTheParcelLimit_andReturnsQuickly() {
+        // Too much for 500 m: the search must give up instead of scanning ever larger parcels.
+        val lonely = presetsById.getValue("a_tent_3x4_frame").copy(spacing = SpacingOverride(toTents = 400f))
+        val req = AutoSetupRequest(Parcel(20f, 20f), List(3) { lonely.id }, emptyList(), VisitorSide.TOP, shape = RingShape.SPREAD)
+        val start = System.currentTimeMillis()
+        assertEquals(null, AutoLayout.requiredParcel(req, presetsById + (lonely.id to lonely)))
+        assertTrue(System.currentTimeMillis() - start < 30_000, "area search took too long")
+    }
 }

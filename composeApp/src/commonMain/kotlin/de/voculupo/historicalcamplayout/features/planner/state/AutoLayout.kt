@@ -207,7 +207,7 @@ internal object AutoLayout {
         var hi = 1f
         while (!fits(Parcel(w0 * hi, h0 * hi))) {
             hi *= 2f
-            if (hi > MAX_AREA_GROWTH) return null
+            if (hi > MAX_AREA_GROWTH || max(w0, h0) * hi > Parcel.MAX_METERS) return null
         }
         var lo = 0f
         while ((hi - lo) * max(w0, h0) > AREA_STEP) {

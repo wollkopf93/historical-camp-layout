@@ -132,7 +132,7 @@
     <string name="required_area">Benötigte Fläche ermitteln</string>
     <string name="required_area_busy">Fläche wird gesucht …</string>
     <string name="required_area_hint">Größe noch unbekannt? Erst Segel und Zelte wählen, dann die kleinste passende Fläche ermitteln lassen.</string>
-    <string name="required_area_none">Keine passende Fläche gefunden (bis 16-fache Größe).</string>
+    <string name="required_area_none">Keine passende Fläche gefunden (bis 16-fache Größe, höchstens 500 m je Seite).</string>
     <string name="edit_tent_type">Zelttyp bearbeiten</string>
     <string name="own_spacing">Eigene Abstände</string>
     <string name="own_spacing_hint">Leer lassen, um die Abstände des Lagers zu nutzen. Gilt für alle Zelte dieses Typs.</string>

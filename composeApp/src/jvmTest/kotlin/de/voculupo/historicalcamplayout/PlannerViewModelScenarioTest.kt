@@ -320,4 +320,56 @@ class PlannerViewModelScenarioTest {
                 .any { it.kind == IssueKind.NARROW_WALKWAY },
         )
     }
+
+    // --- Found by the monkey test: tents must never end up hanging over the parcel edge ---
+
+    private fun PlannerViewModel.inside(): Boolean {
+        val s = uiState.value
+        val byId = s.presets.associateBy { it.id }
+        return s.project.assets.all { a ->
+            val b = GeometryEngine.assetBodyAabb(a, byId.getValue(a.presetId))
+            b.left >= -0.001f && b.top >= -0.001f && b.right <= s.project.parcel.widthMeters + 0.001f &&
+                b.bottom <= s.project.parcel.heightMeters + 0.001f
+        }
+    }
+
+    @Test
+    fun rotatingAtTheEdge_keepsTheTentInside_andRestartMovesNothing() {
+        val storage = InMemoryStorage()
+        val vm = PlannerViewModel(storage)
+        vm.placePresetAt("sun_sail_6x2_flat", Vec2(22f, 1f)) // long side along the top edge
+        vm.setSelectedRotation(90f) // now 6 m deep at y = 1
+        vm.commitHistory()
+        assertTrue(vm.inside(), "slider rotation pushed it back in")
+        vm.rotateSelected(45f)
+        assertTrue(vm.inside(), "gesture rotation pushed it back in")
+        assertEquals(90f + 45f, vm.assets().single().rotationDeg)
+        vm.saveProject()
+        assertEquals(vm.assets(), PlannerViewModel(storage).assets(), "nothing jumps on restart")
+    }
+
+    @Test
+    fun autoSetupOnASmallerParcel_movesKeptTentsInside() {
+        val vm = PlannerViewModel(InMemoryStorage())
+        vm.updateParcel(60f, 40f)
+        vm.placePresetAt("round_4", Vec2(55f, 35f))
+        vm.autoSetup(AutoSetupRequest(Parcel(20f, 15f), listOf("round_3x3"), emptyList(), VisitorSide.TOP, replaceExisting = false))
+        assertTrue(vm.inside(), vm.assets().toString())
+    }
+
+    @Test
+    fun placingFarOutside_landsExactlyInside() {
+        val vm = PlannerViewModel(InMemoryStorage())
+        vm.placePresetAt("saxon_4x6_closed", Vec2(1e6f, 1e6f)) // floats are coarse out there
+        assertTrue(vm.inside(), vm.assets().toString())
+    }
+
+    @Test
+    fun parcelLargerThanTheLimit_isRejected() {
+        val vm = PlannerViewModel(InMemoryStorage())
+        vm.updateParcel(Parcel.MAX_METERS + 1f, 20f)
+        assertEquals(Parcel(), vm.uiState.value.project.parcel)
+        vm.updateParcel(Parcel.MAX_METERS, 20f)
+        assertEquals(Parcel.MAX_METERS, vm.uiState.value.project.parcel.widthMeters)
+    }
 }

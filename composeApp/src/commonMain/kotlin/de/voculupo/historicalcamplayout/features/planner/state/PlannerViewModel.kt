@@ -232,7 +232,7 @@ class PlannerViewModel(
         widthMeters: Float,
         heightMeters: Float,
     ) {
-        if (widthMeters <= 0.5f || heightMeters <= 0.5f) return
+        if (widthMeters <= 0.5f || heightMeters <= 0.5f || widthMeters > Parcel.MAX_METERS || heightMeters > Parcel.MAX_METERS) return
         val presetsById = _uiState.value.presets.associateBy { it.id }
         mutateProject {
             val resized = copy(parcel = parcel.copy(widthMeters = widthMeters, heightMeters = heightMeters))
@@ -258,7 +258,13 @@ class PlannerViewModel(
         val presetsById = state.presets.associateBy { it.id }
         // Hand-drawn zones stay and are avoided; zones from an earlier auto setup are replaced.
         val userZones = state.project.blockZones.filterNot { it.id.startsWith(AutoLayout.AUTO_PREFIX) }
-        val kept = if (request.replaceExisting) emptyList() else state.project.assets
+        // Kept tents move onto the new parcel first, so the draft plans around where they will really stand.
+        val kept =
+            if (request.replaceExisting) {
+                emptyList()
+            } else {
+                clampAssetsToParcel(state.project.copy(parcel = request.parcel), presetsById).assets
+            }
         val result = AutoLayout.generate(request, presetsById, userZones, kept) { newId(it) }
         mutateProject {
             // Placed tents stay loose so each can be moved on its own.
@@ -414,13 +420,24 @@ class PlannerViewModel(
     /** Two-finger rotate on the canvas; called per gesture frame, so it is a live edit. */
     fun rotateSelected(deltaDeg: Float) {
         updateSelectedUnlocked(live = true) { asset ->
-            asset.copy(rotationDeg = (asset.rotationDeg + deltaDeg + 360f) % 360f)
+            rotatedInside(asset, (asset.rotationDeg + deltaDeg + 360f) % 360f)
         }
+    }
+
+    /** Turning near the edge pushes the tent back in, like dragging does, so it never hangs over the parcel. */
+    private fun rotatedInside(
+        asset: PlacedAsset,
+        rotationDeg: Float,
+    ): PlacedAsset {
+        val state = _uiState.value
+        val preset = state.presets.firstOrNull { it.id == asset.presetId } ?: return asset.copy(rotationDeg = rotationDeg)
+        val position = constrainAssetCenterToParcel(asset.position, preset, state.project.parcel, rotationDeg)
+        return asset.copy(rotationDeg = rotationDeg, position = position)
     }
 
     /** Rotation slider; live until [commitHistory]. */
     fun setSelectedRotation(value: Float) {
-        updateSelectedUnlocked(live = true) { it.copy(rotationDeg = value) }
+        updateSelectedUnlocked(live = true) { rotatedInside(it, value) }
     }
 
     /** Label text field (called per keystroke); live until the next commit. */

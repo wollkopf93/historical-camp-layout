@@ -237,8 +237,8 @@ internal fun AutoSetupDialog(
     ) {
         widthInput = w
         heightInput = h
-        val width = w.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
-        val height = h.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+        val width = parsePositive(w)
+        val height = parsePositive(h)
         if (width != null && height != null) req = req.copy(parcel = Parcel(width, height), clusterPins = emptyList())
     }
 
@@ -809,7 +809,8 @@ private fun CountRow(
     }
 }
 
-private fun parsePositive(text: String) = text.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f }
+/** Metres for parcel and area sizes: above 0 and at most [Parcel.MAX_METERS]. */
+private fun parsePositive(text: String) = text.replace(',', '.').toFloatOrNull()?.takeIf { it > 0f && it <= Parcel.MAX_METERS }
 
 private fun fmt(v: Float): String = ((v * 10).roundToInt() / 10f).toString()
 

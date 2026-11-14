@@ -36,7 +36,15 @@ data class Vec2(
 data class Parcel(
     val widthMeters: Float = 25f,
     val heightMeters: Float = 15f,
-)
+) {
+    companion object {
+        /**
+         * Largest side the app accepts. Far beyond any camp pitch; the auto setup scans the parcel, so a typo
+         * like 99999 would otherwise keep it busy for minutes.
+         */
+        const val MAX_METERS = 500f
+    }
+}
 
 @Serializable
 data class RopeAnchor(

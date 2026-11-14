@@ -92,11 +92,13 @@ internal object PlannerDomainOps {
         parcel: Parcel,
         rotationDeg: Float = 0f,
     ): Vec2 {
-        val probe = PlacedAsset(id = "probe", presetId = preset.id, position = position, rotationDeg = rotationDeg)
+        // Far-off points first come roughly inside: at huge coordinates floats are too coarse for the exact shift.
+        val rough = Vec2(position.x.coerceIn(0f, parcel.widthMeters), position.y.coerceIn(0f, parcel.heightMeters))
+        val probe = PlacedAsset(id = "probe", presetId = preset.id, position = rough, rotationDeg = rotationDeg)
         val body = GeometryEngine.assetBodyAabb(probe, preset)
         return Vec2(
-            position.x + shiftInside(body.left, body.right, parcel.widthMeters),
-            position.y + shiftInside(body.top, body.bottom, parcel.heightMeters),
+            rough.x + shiftInside(body.left, body.right, parcel.widthMeters),
+            rough.y + shiftInside(body.top, body.bottom, parcel.heightMeters),
         )
     }
 
