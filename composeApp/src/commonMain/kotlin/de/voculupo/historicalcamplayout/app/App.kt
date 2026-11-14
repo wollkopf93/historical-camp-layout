@@ -90,6 +90,7 @@ import de.voculupo.historicalcamplayout.features.planner.canvas.PlannerCanvas
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
 import de.voculupo.historicalcamplayout.features.properties.AutoSetupDialog
 import de.voculupo.historicalcamplayout.features.properties.PropertiesPane
+import de.voculupo.historicalcamplayout.features.properties.SpacingDialog
 import de.voculupo.historicalcamplayout.getPlatform
 import de.voculupo.historicalcamplayout.platform.PlatformBackHandler
 import kotlinx.coroutines.delay
@@ -135,6 +136,7 @@ import lagerplaner.composeapp.generated.resources.reset
 import lagerplaner.composeapp.generated.resources.reset_project
 import lagerplaner.composeapp.generated.resources.rotate_left
 import lagerplaner.composeapp.generated.resources.rotate_right
+import lagerplaner.composeapp.generated.resources.spacing_title
 import lagerplaner.composeapp.generated.resources.toggle_theme
 import lagerplaner.composeapp.generated.resources.tool_block_zone
 import lagerplaner.composeapp.generated.resources.tool_measure
@@ -249,6 +251,7 @@ fun App(
     // Lives here, not in the properties pane: on phones that pane is a bottom sheet that closes when
     // the dialog takes focus, which would take the dialog down with it.
     var showAutoSetup by rememberSaveable { mutableStateOf(false) }
+    var showSpacing by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(suppressTapTemporarily) {
         if (suppressTapTemporarily) {
@@ -342,6 +345,7 @@ fun App(
                     onDragEnd = viewModel::finishInteractionWithGridSnap,
                     onResetProject = viewModel::resetProject,
                     onOpenAutoSetup = { showAutoSetup = true },
+                    onOpenSpacing = { showSpacing = true },
                     onParcelUpdate = viewModel::updateParcel,
                     onZoomReset = viewModel::resetZoom,
                     onClearZones = viewModel::clearBlockZones,
@@ -408,6 +412,7 @@ fun App(
                     onDragEnd = viewModel::finishInteractionWithGridSnap,
                     onResetProject = viewModel::resetProject,
                     onOpenAutoSetup = { showAutoSetup = true },
+                    onOpenSpacing = { showSpacing = true },
                     onParcelUpdate = viewModel::updateParcel,
                     onZoomReset = viewModel::resetZoom,
                     onClearZones = viewModel::clearBlockZones,
@@ -464,6 +469,16 @@ fun App(
                 onDismiss = { showAutoSetup = false },
             )
         }
+        if (showSpacing) {
+            SpacingDialog(
+                rules = state.project.spacing,
+                onConfirm = {
+                    showSpacing = false
+                    viewModel.setSpacing(it)
+                },
+                onDismiss = { showSpacing = false },
+            )
+        }
     }
 }
 
@@ -508,6 +523,7 @@ private fun ExpandedLayout(
     onDragEnd: () -> Unit,
     onResetProject: () -> Unit,
     onOpenAutoSetup: () -> Unit,
+    onOpenSpacing: () -> Unit,
     onParcelUpdate: (Float, Float) -> Unit,
     onZoomReset: () -> Unit,
     onClearZones: () -> Unit,
@@ -652,6 +668,7 @@ private fun ExpandedLayout(
                     Spacer(Modifier.width(6.dp))
                     Text(stringResource(Res.string.auto_setup_short))
                 }
+                TextButton(onClick = onOpenSpacing) { Text(stringResource(Res.string.spacing_title)) }
                 FileMenu(onExportProjectFile, onImportProjectFile, onExportPng, onResetProject)
                 if (state.warnings.isNotEmpty()) {
                     WarningsButton(count = state.warnings.size, onClick = { showWarningsPanel = !showWarningsPanel })
@@ -717,6 +734,7 @@ private fun CompactLayout(
     onDragEnd: () -> Unit,
     onResetProject: () -> Unit,
     onOpenAutoSetup: () -> Unit,
+    onOpenSpacing: () -> Unit,
     onParcelUpdate: (Float, Float) -> Unit,
     onZoomReset: () -> Unit,
     onClearZones: () -> Unit,
@@ -907,6 +925,10 @@ private fun CompactLayout(
                                     MenuItem(Res.string.tool_block_zone) {
                                         moreOpen = false
                                         onTool(PlannerToolMode.BlockZone)
+                                    }
+                                    MenuItem(Res.string.spacing_title) {
+                                        moreOpen = false
+                                        onOpenSpacing()
                                     }
                                     MenuItem(Res.string.zoom_reset) {
                                         moreOpen = false

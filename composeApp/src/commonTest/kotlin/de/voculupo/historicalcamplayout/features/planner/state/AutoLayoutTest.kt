@@ -10,6 +10,7 @@ import de.voculupo.historicalcamplayout.PlacedAsset
 import de.voculupo.historicalcamplayout.PlannerJson
 import de.voculupo.historicalcamplayout.PlannerProject
 import de.voculupo.historicalcamplayout.RingShape
+import de.voculupo.historicalcamplayout.SpacingRules
 import de.voculupo.historicalcamplayout.Vec2
 import de.voculupo.historicalcamplayout.VisitorSide
 import de.voculupo.historicalcamplayout.data.storage.toJsonString
@@ -258,8 +259,28 @@ class AutoLayoutTest {
         // Frame tents have no guy ropes, so cloth to cloth really means touching walls.
         val tight = Parcel(16f, 11f)
         val tents = List(6) { "a_tent_3x4_frame" }
-        val roomy = run(AutoSetupRequest(tight, tents, emptyList(), VisitorSide.TOP, walkwayMeters = 1.5f, shape = RingShape.HALF_CIRCLE))
-        val cloth = run(AutoSetupRequest(tight, tents, emptyList(), VisitorSide.TOP, walkwayMeters = 0f, shape = RingShape.HALF_CIRCLE))
+        val roomy =
+            run(
+                AutoSetupRequest(
+                    tight,
+                    tents,
+                    emptyList(),
+                    VisitorSide.TOP,
+                    spacing = SpacingRules(tentToTent = 1.5f),
+                    shape = RingShape.HALF_CIRCLE,
+                ),
+            )
+        val cloth =
+            run(
+                AutoSetupRequest(
+                    tight,
+                    tents,
+                    emptyList(),
+                    VisitorSide.TOP,
+                    spacing = SpacingRules(tentToTent = 0f),
+                    shape = RingShape.HALF_CIRCLE,
+                ),
+            )
         assertTrue(cloth.assets.size >= roomy.assets.size, "cloth to cloth places ${cloth.assets.size}, roomy ${roomy.assets.size}")
         val r = report(cloth, tight)
         assertTrue(r.hardCollisions.isEmpty(), "hard collisions: ${r.messages}")
@@ -270,7 +291,7 @@ class AutoLayoutTest {
     fun clothToClothSwingsGuyRopesBehindNeighbours() {
         val tight = Parcel(14f, 10f)
         val tents = List(6) { "saxon_2x4" }
-        val cloth = run(AutoSetupRequest(tight, tents, emptyList(), VisitorSide.TOP, walkwayMeters = 0f))
+        val cloth = run(AutoSetupRequest(tight, tents, emptyList(), VisitorSide.TOP, spacing = SpacingRules(tentToTent = 0f)))
         assertTrue(cloth.assets.size >= 4, "cloth to cloth placed only ${cloth.assets.size}")
         val r = report(cloth, tight)
         assertTrue(r.hardCollisions.isEmpty(), "hard collisions: ${r.messages}")

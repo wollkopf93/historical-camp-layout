@@ -11,6 +11,7 @@ import de.voculupo.historicalcamplayout.PlacedAsset
 import de.voculupo.historicalcamplayout.PlannerProject
 import de.voculupo.historicalcamplayout.PlannerToolMode
 import de.voculupo.historicalcamplayout.PlannerUiState
+import de.voculupo.historicalcamplayout.SpacingRules
 import de.voculupo.historicalcamplayout.TentPreset
 import de.voculupo.historicalcamplayout.Vec2
 import de.voculupo.historicalcamplayout.data.storage.ProjectStorage
@@ -259,10 +260,19 @@ class PlannerViewModel(
         val result = AutoLayout.generate(request, presetsById, userZones, kept) { newId(it) }
         mutateProject {
             // Placed tents stay loose so each can be moved on its own.
-            copy(parcel = request.parcel, assets = kept + result.assets.map { it.copy(groupId = null) }, blockZones = userZones + result.zones, autoSetup = request)
+            copy(
+                parcel = request.parcel,
+                assets = kept + result.assets.map { it.copy(groupId = null) },
+                blockZones = userZones + result.zones,
+                autoSetup = request,
+                spacing = request.spacing,
+            )
         }
         _uiState.update { it.copy(selectedAssetIds = emptySet(), selectedRopeIndex = null) }
     }
+
+    /** Spacing rules for the warnings; the stored auto setup follows so reopening it shows the same gaps. */
+    fun setSpacing(rules: SpacingRules) = mutateProject { copy(spacing = rules, autoSetup = autoSetup?.copy(spacing = rules)) }
 
     fun resetProject() {
         val fresh = PlannerProject()

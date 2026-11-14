@@ -119,4 +119,13 @@
     <string name="zoom_out">Zoom out</string>
     <string name="zoom_reset">Reset zoom</string>
     <string name="optimize_layout">Fine-tune spacing and entries</string>
+    <string name="take_over">Apply</string>
+    <string name="spacing_title">Spacing</string>
+    <string name="spacing_hint">Measured between the tents' safety margins. Used by the warnings and the auto setup. Path = lane from the auto setup.</string>
+    <string name="spacing_tent_tent">Tent ↔ tent</string>
+    <string name="spacing_tent_sail">Tent ↔ sun sail, at least</string>
+    <string name="spacing_tent_sail_max">Tent ↔ sun sail, at most</string>
+    <string name="spacing_unlimited">any</string>
+    <string name="spacing_tent_path">Tent ↔ path</string>
+    <string name="spacing_sail_path">Sun sail ↔ path</string>
 </resources>

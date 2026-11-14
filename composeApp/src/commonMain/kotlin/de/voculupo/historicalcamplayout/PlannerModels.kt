@@ -136,6 +136,20 @@ data class FreeArea(
     val position: Vec2? = null,
 )
 
+/**
+ * Wanted gaps in metres, measured between safety margins like the walkway warning. "Path" is a lane
+ * (free area of kind LANE). Tents around a sail warn when closer than [tentToSail] or, if set,
+ * farther than [tentToSailMax].
+ */
+@Serializable
+data class SpacingRules(
+    val tentToTent: Float = 1.5f,
+    val tentToSail: Float = 1.5f,
+    val tentToSailMax: Float? = null,
+    val tentToPath: Float = 1.5f,
+    val sailToPath: Float = 1.5f,
+)
+
 /** Everything the auto setup sheet asks for; stored on the project so it can be reopened and edited. */
 @Serializable
 data class AutoSetupRequest(
@@ -152,7 +166,8 @@ data class AutoSetupRequest(
     val clusterPins: List<Vec2?> = emptyList(),
     /** Parallel to [tentPresetIds]: ring index the tent must go to; null = automatic. */
     val tentRings: List<Int?> = emptyList(),
-    val walkwayMeters: Float = 1.5f,
+    /** Gaps the draft keeps; copied to [PlannerProject.spacing] when the draft is applied. */
+    val spacing: SpacingRules = SpacingRules(),
     /** Fine-tune the rule-based draft with an optimizer (spacing, doors, staying near the sail). */
     val optimize: Boolean = true,
 )
@@ -166,6 +181,8 @@ data class PlannerProject(
     val pixelsPerMeter: Float = 50f,
     val gridMeters: Float = 0.5f,
     val autoSetup: AutoSetupRequest? = null,
+    /** Gaps the warnings check (and the auto setup keeps). */
+    val spacing: SpacingRules = SpacingRules(),
 )
 
 data class PlannerUiState(

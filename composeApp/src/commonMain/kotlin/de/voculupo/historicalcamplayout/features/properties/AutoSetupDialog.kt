@@ -32,9 +32,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -184,9 +184,15 @@ internal fun AutoSetupDialog(
 ) {
     val presetsById = remember(presets) { presets.associateBy { it.id } }
     // Saveable so rotating the device keeps the half-done setup.
-    var req by rememberSaveable(stateSaver = Saver({ PlannerJson.json.encodeToString(it) }, { PlannerJson.json.decodeFromString<AutoSetupRequest>(it) })) {
+    var req by rememberSaveable(
+        stateSaver =
+            Saver({
+                PlannerJson.json.encodeToString(it)
+            }, { PlannerJson.json.decodeFromString<AutoSetupRequest>(it) }),
+    ) {
         mutableStateOf(
-            project.autoSetup ?: AutoSetupRequest(project.parcel, emptyList(), emptyList(), VisitorSide.BOTTOM, shape = RingShape.U_SHAPE),
+            (project.autoSetup ?: AutoSetupRequest(project.parcel, emptyList(), emptyList(), VisitorSide.BOTTOM, shape = RingShape.U_SHAPE))
+                .copy(spacing = project.spacing),
         )
     }
     var widthInput by rememberSaveable { mutableStateOf(fmt(req.parcel.widthMeters)) }
@@ -196,7 +202,7 @@ internal fun AutoSetupDialog(
     val kept = if (req.replaceExisting) emptyList() else project.assets
     // Computed off the main thread: the optimizer needs a moment on phones, taps must stay smooth.
     val result by produceState(
-        AutoLayoutResult(emptyList(), emptyList(), emptyList(), req.walkwayMeters, emptyList()),
+        AutoLayoutResult(emptyList(), emptyList(), emptyList(), req.spacing.tentToTent, emptyList()),
         req,
         presetsById,
         userZones,
@@ -503,9 +509,10 @@ private fun StepArrange(
             req.shape,
         ) { onChange(req.copy(shape = it)) }
         val cloth = stringResource(Res.string.walkway_cloth)
-        ChipRow(Res.string.walkway, walkways.map { it to if (it == 0f) cloth else "${fmt(it)} m" }, req.walkwayMeters) {
-            onChange(req.copy(walkwayMeters = it))
+        ChipRow(Res.string.walkway, walkways.map { it to if (it == 0f) cloth else "${fmt(it)} m" }, req.spacing.tentToTent) {
+            onChange(req.copy(spacing = req.spacing.copy(tentToTent = it)))
         }
+        SpacingEditor(req.spacing, { onChange(req.copy(spacing = it)) }, withTentToTent = false)
         SwitchRow(stringResource(Res.string.optimize_layout), req.optimize) { onChange(req.copy(optimize = it)) }
         SwitchRow(stringResource(Res.string.auto_setup_replace), req.replaceExisting) { onChange(req.copy(replaceExisting = it)) }
         Text(stringResource(Res.string.drag_preview_hint), style = MaterialTheme.typography.bodySmall)
@@ -667,7 +674,7 @@ private fun Warnings(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         val warn = MaterialTheme.colorScheme.error
-        if (result.walkwayMeters < req.walkwayMeters) {
+        if (result.walkwayMeters < req.spacing.tentToTent) {
             Text(
                 stringResource(Res.string.warn_compressed, fmt(result.walkwayMeters)),
                 color = warn,
@@ -681,7 +688,7 @@ private fun Warnings(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
-        if (result.skipped.isEmpty() && result.walkwayMeters >= req.walkwayMeters && result.assets.isNotEmpty()) {
+        if (result.skipped.isEmpty() && result.walkwayMeters >= req.spacing.tentToTent && result.assets.isNotEmpty()) {
             Text(stringResource(Res.string.all_fits), style = MaterialTheme.typography.bodySmall)
         }
     }

@@ -178,6 +178,7 @@ object GeometryEngine {
         val warn = mutableSetOf<String>()
         val messages = mutableListOf<String>()
         val geometries = buildGeometries(project, presets)
+        val rules = project.spacing
 
         geometries.forEach { geo ->
             // Parcel border warnings should refer to the physical tent footprint,
@@ -220,10 +221,42 @@ object GeometryEngine {
                     warn += a.asset.id
                     warn += b.asset.id
                     messages += "Eingang verstellt: ${a.preset.name} und ${b.preset.name}."
-                } else if (distance in 0.001f..1.5f) {
-                    warn += a.asset.id
-                    warn += b.asset.id
-                    messages += "Laufweg zwischen ${a.preset.name} und ${b.preset.name} unter 1.5m (${formatFloat(distance, 2)}m)."
+                } else {
+                    val need = rules.between(a.preset, b.preset)
+                    if (distance >= 0.001f && distance <= need) {
+                        warn += a.asset.id
+                        warn += b.asset.id
+                        messages +=
+                            "Laufweg zwischen ${a.preset.name} und ${b.preset.name} unter ${formatFloat(
+                                need,
+                                1,
+                            )}m (${formatFloat(distance, 2)}m)."
+                    }
+                }
+            }
+        }
+
+        rules.tentToSailMax?.let { max ->
+            val sails = geometries.filter { isSunSailPreset(it.preset) }
+            if (sails.isEmpty()) return@let
+            geometries.filterNot { isSunSailPreset(it.preset) }.forEach { tent ->
+                val nearest = sails.minOf { aabbDistanceMeters(tent.paddedAabb, it.paddedAabb) }
+                if (nearest > max) {
+                    warn += tent.asset.id
+                    messages += "Zu weit vom Sonnensegel: ${tent.preset.name} (${formatFloat(nearest, 2)}m, max ${formatFloat(max, 1)}m)."
+                }
+            }
+        }
+
+        project.blockZones.filter { it.kind == FreeAreaKind.LANE && it.points.size >= 3 }.forEach { lane ->
+            val laneBox =
+                Rect(lane.points.minOf { it.x }, lane.points.minOf { it.y }, lane.points.maxOf { it.x }, lane.points.maxOf { it.y })
+            geometries.forEach { geo ->
+                val need = rules.toPath(geo.preset)
+                val distance = aabbDistanceMeters(geo.paddedAabb, laneBox)
+                if (distance < need && !polygonsIntersect(assetWorldOutline(geo.asset, geo.preset), lane.points)) {
+                    warn += geo.asset.id
+                    messages += "Abstand zum Weg: ${geo.preset.name} unter ${formatFloat(need, 1)}m (${formatFloat(distance, 2)}m)."
                 }
             }
         }

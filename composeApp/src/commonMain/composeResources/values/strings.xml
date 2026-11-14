@@ -119,4 +119,13 @@
     <string name="zoom_out">Verkleinern</string>
     <string name="zoom_reset">Zoom zurücksetzen</string>
     <string name="optimize_layout">Feinschliff: Abstände und Eingänge optimieren</string>
+    <string name="take_over">Übernehmen</string>
+    <string name="spacing_title">Abstände</string>
+    <string name="spacing_hint">Gemessen zwischen den Sicherheitsabständen der Zelte. Gilt für die Warnungen und den automatischen Aufbau. Weg = Gasse aus dem automatischen Aufbau.</string>
+    <string name="spacing_tent_tent">Zelt ↔ Zelt</string>
+    <string name="spacing_tent_sail">Zelt ↔ Sonnensegel, mindestens</string>
+    <string name="spacing_tent_sail_max">Zelt ↔ Sonnensegel, höchstens</string>
+    <string name="spacing_unlimited">beliebig</string>
+    <string name="spacing_tent_path">Zelt ↔ Weg</string>
+    <string name="spacing_sail_path">Sonnensegel ↔ Weg</string>
 </resources>
