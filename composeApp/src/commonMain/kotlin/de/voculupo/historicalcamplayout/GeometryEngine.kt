@@ -3,6 +3,7 @@
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Path
+import de.voculupo.historicalcamplayout.features.planner.state.AutoLayout
 import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.cos
@@ -167,9 +168,11 @@ object GeometryEngine {
         hidden: Set<Int>,
     ): List<IndexedValue<RopeSegment>> = ropeSegments(asset).withIndex().filterNot { it.index in hidden }
 
+    /** @param autoZonesHard false (app): zones the auto setup drew are only a warning, so tents can still be rearranged. */
     fun evaluate(
         project: PlannerProject,
         presets: List<TentPreset>,
+        autoZonesHard: Boolean = false,
     ): CollisionReport {
         val hard = mutableSetOf<String>()
         val warn = mutableSetOf<String>()
@@ -231,7 +234,7 @@ object GeometryEngine {
             geometries.forEach { geo ->
                 val assetPolygon = assetWorldOutline(geo.asset, geo.preset)
                 if (polygonsIntersect(assetPolygon, zonePolygon)) {
-                    hard += geo.asset.id
+                    if (autoZonesHard || !zone.id.startsWith(AutoLayout.AUTO_PREFIX)) hard += geo.asset.id else warn += geo.asset.id
                     messages += "Sperrzone verletzt: ${geo.preset.name} liegt in einer Sperrzone."
                 }
             }

@@ -141,6 +141,7 @@ internal object AutoLayout {
                 GeometryEngine.evaluate(
                     PlannerProject(parcel = parcel, assets = all, blockZones = result.zones + obstacleZones),
                     presets,
+                    autoZonesHard = true,
                 )
             val bad = report.hardCollisions.toMutableSet()
             all.forEach { a ->

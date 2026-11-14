@@ -23,6 +23,21 @@ class GeometryEngineBoundsTest {
     }
 
     @Test
+    fun evaluate_autoSetupZone_isOnlyWarning_userZoneIsHard() {
+        val tent = PlacedAsset(id = "a", presetId = "round_3x3", position = Vec2(10f, 10f), showRopes = false)
+        val square = listOf(Vec2(9f, 9f), Vec2(11f, 9f), Vec2(11f, 11f), Vec2(9f, 11f))
+        fun report(zoneId: String) =
+            GeometryEngine.evaluate(
+                PlannerProject(parcel = Parcel(30f, 30f), assets = listOf(tent), blockZones = listOf(BlockZone(zoneId, square))),
+                presets,
+            )
+
+        assertTrue(report("auto-1").hardCollisions.isEmpty())
+        assertEquals(setOf("a"), report("auto-1").warningCollisions)
+        assertEquals(setOf("a"), report("user-1").hardCollisions)
+    }
+
+    @Test
     fun constrainToParcel_usesRotatedFootprint() {
         // Sun sail 6x2 rotated 90° reaches 3 m above its center, so it must sit at y >= 3.
         val clamped =
