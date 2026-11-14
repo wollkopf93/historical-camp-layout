@@ -32,9 +32,9 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -184,7 +184,13 @@ internal fun AutoSetupDialog(
 ) {
     val presetsById = remember(presets) { presets.associateBy { it.id } }
     // Saveable so rotating the device keeps the half-done setup.
-    var req by rememberSaveable(stateSaver = Saver({ PlannerJson.json.encodeToString(it) }, { PlannerJson.json.decodeFromString<AutoSetupRequest>(it) })) {
+    var req by rememberSaveable(
+        stateSaver =
+            Saver(
+                save = { PlannerJson.json.encodeToString(it) },
+                restore = { PlannerJson.json.decodeFromString<AutoSetupRequest>(it) },
+            ),
+    ) {
         mutableStateOf(
             project.autoSetup ?: AutoSetupRequest(project.parcel, emptyList(), emptyList(), VisitorSide.BOTTOM, shape = RingShape.U_SHAPE),
         )

@@ -101,7 +101,7 @@ internal fun PropertiesPane(
     onRopeAngleChange: (Float) -> Unit,
     onRopeAnchorXChange: (Float) -> Unit,
     onRopeAnchorYChange: (Float) -> Unit,
-    onSliderChangeFinished: () -> Unit,
+    onSliderChangeFinish: () -> Unit,
     onGroup: () -> Unit,
     onUngroup: () -> Unit,
     onDuplicate: () -> Unit,
@@ -175,7 +175,7 @@ internal fun PropertiesPane(
                     value = selectedAsset.rotationDeg,
                     valueRange = 0f..360f,
                     onValueChange = onRotate,
-                    onValueChangeFinished = onSliderChangeFinished,
+                    onValueChangeFinished = onSliderChangeFinish,
                 )
                 val heights = selectedAsset.heightRange
                 Text(
@@ -219,7 +219,7 @@ internal fun PropertiesPane(
                         value = selectedRope.lengthMeters,
                         valueRange = 0.3f..6.0f,
                         onValueChange = onRopeScaleChange,
-                        onValueChangeFinished = onSliderChangeFinished,
+                        onValueChangeFinished = onSliderChangeFinish,
                     )
                     Text(
                         stringResource(Res.string.rope_angle, selectedRope.outwardAngleDeg.toInt()),
@@ -230,7 +230,7 @@ internal fun PropertiesPane(
                         value = selectedRope.outwardAngleDeg,
                         valueRange = -180f..180f,
                         onValueChange = onRopeAngleChange,
-                        onValueChangeFinished = onSliderChangeFinished,
+                        onValueChangeFinished = onSliderChangeFinish,
                     )
                     Text(
                         stringResource(Res.string.anchor_x, "%.2f".format(selectedRope.localX)),
@@ -241,7 +241,7 @@ internal fun PropertiesPane(
                         value = selectedRope.localX,
                         valueRange = -6f..6f,
                         onValueChange = onRopeAnchorXChange,
-                        onValueChangeFinished = onSliderChangeFinished,
+                        onValueChangeFinished = onSliderChangeFinish,
                     )
                     Text(
                         stringResource(Res.string.anchor_y, "%.2f".format(selectedRope.localY)),
@@ -252,7 +252,7 @@ internal fun PropertiesPane(
                         value = selectedRope.localY,
                         valueRange = -6f..6f,
                         onValueChange = onRopeAnchorYChange,
-                        onValueChangeFinished = onSliderChangeFinished,
+                        onValueChangeFinished = onSliderChangeFinish,
                     )
                 }
             } else if (showSelectionSection) {
