@@ -173,6 +173,74 @@ internal object AutoLayout {
         )
     }
 
+    /** Parcel sizes the area search tries: half metres, like pitches are measured out. */
+    private const val AREA_STEP = 0.5f
+    private const val MAX_AREA_GROWTH = 16f
+    private const val MAX_ROUNDING_TRIES = 8
+
+    /**
+     * Smallest parcel (in [AREA_STEP]s) on which everything in [req] fits with the chosen gaps: no tent
+     * left out, no walkway squeezed. Keeps the shape of the current parcel while growing, then trims width
+     * and depth one after the other. Pins are dropped (they are absolute positions). Null when nothing is
+     * chosen or even a [MAX_AREA_GROWTH] times bigger parcel is not enough.
+     */
+    fun requiredParcel(
+        req: AutoSetupRequest,
+        presetsById: Map<String, TentPreset>,
+        obstacleZones: List<BlockZone> = emptyList(),
+        obstacleAssets: List<PlacedAsset> = emptyList(),
+    ): Parcel? {
+        if (req.tentPresetIds.isEmpty() && req.sailPresetIds.isEmpty() && req.freeAreas.isEmpty()) return null
+        // The optimizer only polishes; whether things fit is decided by the draft.
+        val base = req.copy(optimize = false, clusterPins = emptyList(), freeAreas = req.freeAreas.map { it.copy(position = null) })
+
+        fun fits(p: Parcel): Boolean {
+            var n = 0
+            val r = generate(base.copy(parcel = p), presetsById, obstacleZones, obstacleAssets) { "$it${n++}" }
+            return r.skipped.isEmpty() && r.walkwayMeters >= req.spacing.tentToTent
+        }
+
+        fun up(v: Float) = ceil(v / AREA_STEP) * AREA_STEP
+        val w0 = max(req.parcel.widthMeters, AREA_STEP)
+        val h0 = max(req.parcel.heightMeters, AREA_STEP)
+        var hi = 1f
+        while (!fits(Parcel(w0 * hi, h0 * hi))) {
+            hi *= 2f
+            if (hi > MAX_AREA_GROWTH) return null
+        }
+        var lo = 0f
+        while ((hi - lo) * max(w0, h0) > AREA_STEP) {
+            val mid = (lo + hi) / 2f
+            if (fits(Parcel(w0 * mid, h0 * mid))) hi = mid else lo = mid
+        }
+        // Rounding up can move rings around; only sizes that were checked are kept.
+        var w = up(w0 * hi)
+        var h = up(h0 * hi)
+        var tries = 0
+        while (!fits(Parcel(w, h))) {
+            if (++tries > MAX_ROUNDING_TRIES) return Parcel(w0 * hi, h0 * hi)
+            w += AREA_STEP
+            h += AREA_STEP
+        }
+
+        fun trim(
+            v: Float,
+            ok: (Float) -> Boolean,
+        ): Float {
+            var bad = 0f
+            var good = v
+            while (good - bad > AREA_STEP) {
+                val mid = up((bad + good) / 2f)
+                if (mid >= good) break
+                if (ok(mid)) good = mid else bad = mid
+            }
+            return good
+        }
+        w = trim(w) { fits(Parcel(it, h)) }
+        h = trim(h) { fits(Parcel(w, it)) }
+        return Parcel(w, h)
+    }
+
     /** Rings the request produces: one per sail (or one for joined sails); at least one. */
     fun ringCount(
         req: AutoSetupRequest,

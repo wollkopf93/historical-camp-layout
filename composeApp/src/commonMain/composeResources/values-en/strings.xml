@@ -128,4 +128,8 @@
     <string name="spacing_unlimited">any</string>
     <string name="spacing_tent_path">Tent ↔ path</string>
     <string name="spacing_sail_path">Sun sail ↔ path</string>
+    <string name="required_area">Find required area</string>
+    <string name="required_area_busy">Searching area …</string>
+    <string name="required_area_hint">Size not known yet? Pick sails and tents first, then let the app find the smallest area that fits.</string>
+    <string name="required_area_none">No area found that fits (up to 16 times the size).</string>
 </resources>

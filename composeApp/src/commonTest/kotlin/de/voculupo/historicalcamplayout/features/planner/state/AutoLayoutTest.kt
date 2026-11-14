@@ -486,4 +486,27 @@ class AutoLayoutTest {
         assertTrue(spread(tuned) < spread(plain), "tuned ${spread(tuned)} vs plain ${spread(plain)}")
         assertTrue(report(tuned, req.parcel).hardCollisions.isEmpty())
     }
+
+    @Test
+    fun requiredParcel_isTheSmallestThatFits() {
+        val req =
+            AutoSetupRequest(
+                Parcel(10f, 8f),
+                mixedTents.take(5),
+                listOf("sun_sail_6x6_flat"),
+                VisitorSide.BOTTOM,
+                shape = RingShape.U_SHAPE,
+            )
+        val found = assertNotNull(AutoLayout.requiredParcel(req, presetsById))
+
+        fun fits(p: Parcel) = run(req.copy(parcel = p, optimize = false)).let { it.skipped.isEmpty() && it.walkwayMeters >= 1.5f }
+        assertTrue(fits(found), "found $found must fit")
+        assertTrue(!fits(found.copy(widthMeters = found.widthMeters - 1f)), "1 m narrower than $found still fits")
+        assertTrue(!fits(found.copy(heightMeters = found.heightMeters - 1f)), "1 m shallower than $found still fits")
+    }
+
+    @Test
+    fun requiredParcel_nothingChosen_isNull() {
+        assertEquals(null, AutoLayout.requiredParcel(AutoSetupRequest(parcel, emptyList(), emptyList(), VisitorSide.TOP), presetsById))
+    }
 }

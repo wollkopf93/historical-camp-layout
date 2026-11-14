@@ -32,6 +32,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -71,6 +72,7 @@ import de.voculupo.historicalcamplayout.features.planner.state.AutoLayoutResult
 import de.voculupo.historicalcamplayout.features.planner.state.BlockKey
 import de.voculupo.historicalcamplayout.features.planner.state.LayoutBlock
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
@@ -101,6 +103,10 @@ import lagerplaner.composeapp.generated.resources.move_down
 import lagerplaner.composeapp.generated.resources.move_up
 import lagerplaner.composeapp.generated.resources.next
 import lagerplaner.composeapp.generated.resources.optimize_layout
+import lagerplaner.composeapp.generated.resources.required_area
+import lagerplaner.composeapp.generated.resources.required_area_busy
+import lagerplaner.composeapp.generated.resources.required_area_hint
+import lagerplaner.composeapp.generated.resources.required_area_none
 import lagerplaner.composeapp.generated.resources.reset_positions
 import lagerplaner.composeapp.generated.resources.ring_auto
 import lagerplaner.composeapp.generated.resources.ring_n
@@ -226,6 +232,28 @@ internal fun AutoSetupDialog(
         if (width != null && height != null) req = req.copy(parcel = Parcel(width, height), clusterPins = emptyList())
     }
 
+    // Area search: runs many drafts, so off the main thread; the result becomes the parcel size.
+    val scope = rememberCoroutineScope()
+    var areaSearch by remember { mutableStateOf(AreaSearch.Idle) }
+    val findArea = {
+        areaSearch = AreaSearch.Running
+        val current = req
+        scope.launch {
+            val found = withContext(Dispatchers.Default) { AutoLayout.requiredParcel(current, presetsById, userZones, kept) }
+            if (found == null) {
+                areaSearch = AreaSearch.NotFound
+            } else {
+                areaSearch = AreaSearch.Idle
+                setParcel(fmt(found.widthMeters), fmt(found.heightMeters))
+                req = req.copy(freeAreas = req.freeAreas.map { it.copy(position = null) })
+            }
+        }
+        Unit
+    }
+    val areaButton: @Composable () -> Unit = {
+        RequiredAreaButton(areaSearch, enabled = req.tentPresetIds.isNotEmpty() || req.sailPresetIds.isNotEmpty(), onClick = findArea)
+    }
+
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
             shape = MaterialTheme.shapes.large,
@@ -248,10 +276,10 @@ internal fun AutoSetupDialog(
                     HorizontalDivider()
                     val content: @Composable () -> Unit = {
                         when (step) {
-                            0 -> StepPlace(widthInput, heightInput, req, ::setParcel) { req = it }
+                            0 -> StepPlace(widthInput, heightInput, req, ::setParcel, areaButton) { req = it }
                             1 -> StepSailsAndAreas(req, presets) { req = it }
                             2 -> StepTents(req, presets, presetsById) { req = it }
-                            else -> StepArrange(req) { req = it }
+                            else -> StepArrange(req, areaButton) { req = it }
                         }
                     }
                     val preview: @Composable (Modifier) -> Unit = { canvasModifier ->
@@ -309,9 +337,12 @@ private fun StepPlace(
     heightInput: String,
     req: AutoSetupRequest,
     onParcel: (String, String) -> Unit,
+    areaButton: @Composable () -> Unit,
     onChange: (AutoSetupRequest) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(stringResource(Res.string.required_area_hint), style = MaterialTheme.typography.bodySmall)
+        areaButton()
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             OutlinedTextField(
                 value = widthInput,
@@ -498,9 +529,11 @@ private fun StepTents(
 @Composable
 private fun StepArrange(
     req: AutoSetupRequest,
+    areaButton: @Composable () -> Unit,
     onChange: (AutoSetupRequest) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        areaButton()
         ChipRow(
             Res.string.auto_setup_shape,
             shapeLabels.map { (v, l) ->
@@ -690,6 +723,29 @@ private fun Warnings(
         }
         if (result.skipped.isEmpty() && result.walkwayMeters >= req.spacing.tentToTent && result.assets.isNotEmpty()) {
             Text(stringResource(Res.string.all_fits), style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+private enum class AreaSearch { Idle, Running, NotFound }
+
+/** "How much space do I need?": sets the parcel to the smallest size the chosen camp fits on. */
+@Composable
+private fun RequiredAreaButton(
+    search: AreaSearch,
+    enabled: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        OutlinedButton(onClick = onClick, enabled = enabled && search != AreaSearch.Running) {
+            Text(stringResource(if (search == AreaSearch.Running) Res.string.required_area_busy else Res.string.required_area))
+        }
+        if (search == AreaSearch.NotFound) {
+            Text(
+                stringResource(Res.string.required_area_none),
+                color = MaterialTheme.colorScheme.error,
+                style = MaterialTheme.typography.bodySmall,
+            )
         }
     }
 }
