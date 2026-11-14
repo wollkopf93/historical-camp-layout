@@ -648,11 +648,33 @@ class PlannerViewModel(
     /** Adds or replaces a tent type (by id); marked as user-edited so built-in updates don't overwrite it. */
     fun savePreset(preset: TentPreset) {
         val saved = preset.copy(userModified = true)
+        val old = _uiState.value.presets.firstOrNull { it.id == saved.id }
         _uiState.update { state ->
             val others = state.presets.filterNot { it.id == saved.id }
             state.copy(presets = (others + saved).sortedBy { it.name })
         }
         saveInventory()
+        if (old == null) return recomputeWarnings()
+        // Placed tents still on the old defaults follow the type; ones the user tuned keep their own values.
+        mutateProject {
+            copy(
+                assets =
+                    assets.map { a ->
+                        if (a.presetId != old.id) return@map a
+                        a.copy(
+                            ropes = if (a.ropes == defaultRopes(old)) defaultRopes(saved) else a.ropes,
+                            safetyMarginMeters =
+                                if (a.safetyMarginMeters ==
+                                    old.defaultSafetyMarginMeters
+                                ) {
+                                    saved.defaultSafetyMarginMeters
+                                } else {
+                                    a.safetyMarginMeters
+                                },
+                        )
+                    },
+            )
+        }
         recomputeWarnings()
     }
 

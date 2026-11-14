@@ -139,4 +139,20 @@
     <string name="own_spacing_sails">Gap to sun sails</string>
     <string name="own_spacing_path">Gap to path</string>
     <string name="spacing_camp_default">as in the camp</string>
+    <string name="preset_name">Name</string>
+    <string name="preset_width">Width</string>
+    <string name="preset_depth">Depth</string>
+    <string name="preset_margin">Safety margin</string>
+    <string name="preset_is_sail">Is a sun sail / canopy</string>
+    <string name="preset_ropes">Guy ropes (%1$d)</string>
+    <string name="preset_ropes_hint">Peg distance = how far the peg is from the attachment point, seen from above. Applies to newly placed tents and to placed tents whose ropes were not adjusted yet.</string>
+    <string name="rope_n_stake">Rope %1$d: peg distance</string>
+    <string name="rope_slope_title">Peg distance from height and slope</string>
+    <string name="rope_slope_height">Attachment height</string>
+    <string name="rope_slope_deg">Slope to the ground</string>
+    <string name="rope_slope_result">Peg distance: %1$s m</string>
+    <string name="rope_slope_apply">Apply to all ropes</string>
+    <string name="preset_save_as_new">Save as new type</string>
+    <string name="rope_remove">Remove</string>
+    <string name="preset_copy_suffix">(own)</string>
 </resources>

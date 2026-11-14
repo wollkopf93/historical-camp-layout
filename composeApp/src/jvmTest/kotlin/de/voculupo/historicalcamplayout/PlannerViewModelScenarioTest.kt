@@ -170,4 +170,38 @@ class PlannerViewModelScenarioTest {
                 .isEmpty(),
         )
     }
+
+    @Test
+    fun editingTentType_updatesUntouchedPlacedTents_andSaveAsNewAddsType() {
+        val vm = PlannerViewModel(InMemoryStorage())
+        vm.placePresetAt("saxon_2x4", Vec2(5f, 5f))
+        vm.placePresetAt("saxon_2x4", Vec2(15f, 5f))
+        vm.selectRopeIndex(0)
+        vm.setSelectedRopeLengthScale(0.5f) // the second tent's first rope is tuned by hand
+        val type =
+            vm.uiState.value.presets
+                .first { it.id == "saxon_2x4" }
+
+        vm.savePreset(type.copy(ropeAnchors = type.ropeAnchors.map { it.copy(lengthMeters = 3f) }))
+
+        val (untouched, tuned) = vm.assets()
+        assertTrue(untouched.ropes.all { it.lengthMeters == 3f }, "untouched tent follows the type")
+        assertEquals(0.5f, tuned.ropes.first().lengthMeters, "hand-tuned rope stays")
+        assertTrue(
+            vm.uiState.value.presets
+                .first { it.id == "saxon_2x4" }
+                .userModified,
+        )
+
+        vm.savePreset(type.copy(id = "custom_1", name = "Mein Zelt"))
+        assertTrue(
+            vm.uiState.value.presets
+                .any { it.id == "custom_1" && it.name == "Mein Zelt" },
+        )
+        assertTrue(
+            vm.uiState.value.presets
+                .any { it.id == "saxon_2x4" },
+            "the original stays",
+        )
+    }
 }

@@ -7,6 +7,8 @@ import de.voculupo.historicalcamplayout.PlacedAsset
 import de.voculupo.historicalcamplayout.PlannerProject
 import de.voculupo.historicalcamplayout.TentPreset
 import de.voculupo.historicalcamplayout.Vec2
+import kotlin.math.PI
+import kotlin.math.tan
 
 internal object PlannerDomainOps {
     fun rememberRecentPreset(
@@ -37,6 +39,32 @@ internal object PlannerDomainOps {
                 outwardAngleDeg = anchor.outwardAngleDeg ?: 0f,
             )
         }
+
+    /** The tent type at a new size: outline and rope anchors are stretched along with it. */
+    fun resized(
+        preset: TentPreset,
+        widthMeters: Float,
+        heightMeters: Float,
+    ): TentPreset {
+        if (widthMeters == preset.widthMeters && heightMeters == preset.heightMeters) return preset
+        val sx = widthMeters / preset.widthMeters
+        val sy = heightMeters / preset.heightMeters
+        return preset.copy(
+            widthMeters = widthMeters,
+            heightMeters = heightMeters,
+            polygonPoints = preset.polygonPoints.map { Vec2(it.x * sx, it.y * sy) },
+            ropeAnchors = preset.ropeAnchors.map { it.copy(localX = it.localX * sx, localY = it.localY * sy) },
+        )
+    }
+
+    /**
+     * How far from the attachment point the peg goes (seen from above) for a rope tied [heightMeters] up
+     * that should meet the ground at [slopeDeg] (45 = as far out as high; flatter = farther).
+     */
+    fun stakeDistance(
+        heightMeters: Float,
+        slopeDeg: Float,
+    ): Float = heightMeters / tan(slopeDeg * PI.toFloat() / 180f)
 
     fun normalizeDegrees(value: Float): Float {
         var d = value % 360f

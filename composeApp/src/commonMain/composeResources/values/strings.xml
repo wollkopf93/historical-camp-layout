@@ -139,4 +139,20 @@
     <string name="own_spacing_sails">Abstand zu Sonnensegeln</string>
     <string name="own_spacing_path">Abstand zum Weg</string>
     <string name="spacing_camp_default">wie im Lager</string>
+    <string name="preset_name">Name</string>
+    <string name="preset_width">Breite</string>
+    <string name="preset_depth">Tiefe</string>
+    <string name="preset_margin">Sicherheitsabstand</string>
+    <string name="preset_is_sail">Ist ein Sonnensegel / Baldachin</string>
+    <string name="preset_ropes">Abspannseile (%1$d)</string>
+    <string name="preset_ropes_hint">Heringabstand = wie weit der Hering vom Abspannpunkt entfernt steht (von oben gesehen). Gilt für neu gesetzte Zelte und für gesetzte Zelte, deren Seile noch nicht angepasst wurden.</string>
+    <string name="rope_n_stake">Seil %1$d: Heringabstand</string>
+    <string name="rope_slope_title">Heringabstand aus Höhe und Neigung</string>
+    <string name="rope_slope_height">Höhe Abspannpunkt</string>
+    <string name="rope_slope_deg">Neigung zum Boden</string>
+    <string name="rope_slope_result">Heringabstand: %1$s m</string>
+    <string name="rope_slope_apply">Für alle Seile übernehmen</string>
+    <string name="preset_save_as_new">Als neuen Typ speichern</string>
+    <string name="rope_remove">Entfernen</string>
+    <string name="preset_copy_suffix">(eigen)</string>
 </resources>

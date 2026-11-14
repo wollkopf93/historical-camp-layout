@@ -60,6 +60,8 @@ internal fun MetersField(
     label: StringResource,
     value: Float?,
     placeholder: StringResource? = null,
+    suffix: String = "m",
+    labelArg: Any? = null,
     onValue: (Float?) -> Unit,
 ) {
     val optional = placeholder != null
@@ -75,9 +77,9 @@ internal fun MetersField(
         },
         singleLine = true,
         isError = !valid,
-        label = { Text(stringResource(label)) },
+        label = { Text(if (labelArg == null) stringResource(label) else stringResource(label, labelArg)) },
         placeholder = { placeholder?.let { Text(stringResource(it)) } },
-        suffix = { Text("m") },
+        suffix = { Text(suffix) },
         modifier = Modifier.fillMaxWidth(),
     )
 }

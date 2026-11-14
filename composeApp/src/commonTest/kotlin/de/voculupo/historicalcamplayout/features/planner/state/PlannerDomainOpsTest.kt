@@ -91,4 +91,22 @@ class PlannerDomainOpsTest {
             widthMeters = diameter,
             heightMeters = diameter,
         )
+
+    @Test
+    fun resized_stretchesOutlineAndRopeAnchors() {
+        val saxon =
+            de.voculupo.historicalcamplayout
+                .defaultPresets()
+                .first { it.id == "saxon_2x4" }
+        val big = PlannerDomainOps.resized(saxon, 8f, 6f) // twice as wide and deep
+        assertEquals(saxon.polygonPoints.map { Vec2(it.x * 2f, it.y * 2f) }, big.polygonPoints)
+        assertEquals(saxon.ropeAnchors.map { it.localX * 2f to it.localY * 2f }, big.ropeAnchors.map { it.localX to it.localY })
+        assertEquals(saxon.ropeAnchors.map { it.lengthMeters }, big.ropeAnchors.map { it.lengthMeters }, "peg distances stay")
+    }
+
+    @Test
+    fun stakeDistance_followsTheSlope() {
+        assertEquals(2f, PlannerDomainOps.stakeDistance(2f, 45f), 0.001f)
+        assertEquals(3.464f, PlannerDomainOps.stakeDistance(2f, 30f), 0.001f) // flatter rope, peg farther out
+    }
 }
