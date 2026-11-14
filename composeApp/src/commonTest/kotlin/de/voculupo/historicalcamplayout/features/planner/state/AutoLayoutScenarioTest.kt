@@ -140,7 +140,8 @@ class AutoLayoutScenarioTest {
         val rnd = Random(5)
         val failures = mutableListOf<String>()
         repeat(ROOMY_CASES) { n ->
-            val tents = List(2 + rnd.nextInt(10)) { tentIds[rnd.nextInt(tentIds.size)] }
+            // Up to 8 tents: 11 large ones in a half circle really need more than 60 x 50 m.
+            val tents = List(2 + rnd.nextInt(7)) { tentIds[rnd.nextInt(tentIds.size)] }
             val sails = List(rnd.nextInt(3)) { sailIds[rnd.nextInt(sailIds.size)] }
             val req =
                 AutoSetupRequest(
