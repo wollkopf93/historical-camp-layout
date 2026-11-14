@@ -9,12 +9,12 @@ class PresetNamesTest {
 
     @Test
     fun storedDefaultLabel_followsAppLanguage() {
-        assertEquals("Saxon tent 4x6", assetDisplayLabel(tent.copy(label = saxon.name), saxon, "Saxon tent 4x6"))
-        assertEquals("Saxon tent 4x6", assetDisplayLabel(tent.copy(label = ""), saxon, "Saxon tent 4x6"))
+        assertEquals("Saxon tent 4x6", assetDisplayLabel(tent.copy(label = saxon.name), "Saxon tent 4x6"))
+        assertEquals("Saxon tent 4x6", assetDisplayLabel(tent.copy(label = ""), "Saxon tent 4x6"))
     }
 
     @Test
     fun typedLabel_staysAsTyped() {
-        assertEquals("Küche", assetDisplayLabel(tent.copy(label = "Küche"), saxon, "Saxon tent 4x6"))
+        assertEquals("Küche", assetDisplayLabel(tent.copy(label = "Küche"), "Saxon tent 4x6"))
     }
 }

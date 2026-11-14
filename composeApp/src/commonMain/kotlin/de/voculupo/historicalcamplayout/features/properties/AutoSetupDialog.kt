@@ -187,7 +187,11 @@ internal fun AutoSetupDialog(
     val presetsById = remember(presets) { presets.associateBy { it.id } }
     // AutoLayout reports left-out tents by their stored name; show them in the app language.
     val presetNames = rememberPresetNames(presets)
-    val namesByStored = remember(presets, presetNames) { presets.associate { it.name to presetNames.getValue(it.id) } }
+    val namesByStored =
+        remember(presets, presetNames) {
+            // Only translated built-ins; a user preset sharing a built-in's name must not shadow its translation.
+            presets.filter { presetNames.getValue(it.id) != it.name }.associate { it.name to presetNames.getValue(it.id) }
+        }
     // Saveable so rotating the device keeps the half-done setup.
     var req by rememberSaveable(
         stateSaver =

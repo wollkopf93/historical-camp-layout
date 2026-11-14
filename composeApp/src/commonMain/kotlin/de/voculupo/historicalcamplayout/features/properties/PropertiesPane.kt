@@ -135,8 +135,7 @@ internal fun PropertiesPane(
     var showWarningsSection by remember { mutableStateOf(false) }
     val selectedAsset = state.project.assets.firstOrNull { it.id in state.selectedAssetIds }
     val warningTexts = rememberWarningTexts(state)
-    val selectedPreset = state.presets.firstOrNull { it.id == selectedAsset?.presetId }
-    val selectedPresetName = selectedPreset?.let { presetDisplayName(it) }
+    val selectedPresetName = state.presets.firstOrNull { it.id == selectedAsset?.presetId }?.let { presetDisplayName(it) }
     val selectedRope = selectedAsset?.ropes?.getOrNull(state.selectedRopeIndex ?: -1)
     val currentSelectRopeIndex by rememberUpdatedState(onSelectRopeIndex)
     val paneModifier =
@@ -168,10 +167,11 @@ internal fun PropertiesPane(
                 onToggle = { showSelectionSection = !showSelectionSection },
             )
             if (showSelectionSection && selectedAsset != null) {
+                // A blank label stays blank, so the field can be cleared to type a new name.
                 OutlinedTextField(
                     value =
-                        if (selectedPreset != null && selectedPresetName != null) {
-                            assetDisplayLabel(selectedAsset, selectedPreset, selectedPresetName)
+                        if (selectedPresetName != null && selectedAsset.label.isNotBlank()) {
+                            assetDisplayLabel(selectedAsset, selectedPresetName)
                         } else {
                             selectedAsset.label
                         },

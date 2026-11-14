@@ -1,5 +1,6 @@
 ﻿package de.voculupo.historicalcamplayout.features.planner.state
 
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import de.voculupo.historicalcamplayout.AssetRope
@@ -542,7 +543,8 @@ class PlannerViewModel(
         _uiState.update { it.copy(selectedAssetIds = it.selectedAssetIds - deletable, selectedRopeIndex = null) }
     }
 
-    fun duplicateSelection() {
+    /** @param copySuffix appended to typed names, in the app language (e.g. "(copy)"). */
+    fun duplicateSelection(copySuffix: String) {
         val state = _uiState.value
         val selected = state.project.assets.filter { it.id in state.selectedAssetIds }
         if (selected.isEmpty()) return
@@ -560,13 +562,7 @@ class PlannerViewModel(
                 asset.copy(
                     id = newId(),
                     label =
-                        if (asset.label.isBlank() ||
-                            (preset != null && hasDefaultLabel(asset, preset))
-                        ) {
-                            asset.label
-                        } else {
-                            "${asset.label} (Kopie)"
-                        },
+                        if (hasDefaultLabel(asset)) asset.label else "${asset.label} $copySuffix",
                     position = constrained,
                     // A copy starts unlocked so it can be moved away from the original.
                     isLocked = false,
@@ -640,10 +636,9 @@ class PlannerViewModel(
         recomputeWarnings()
     }
 
-    /** @param presetNames preset id to name in the app language, so the image matches what the canvas shows. */
-    fun exportPng(presetNames: Map<String, String> = emptyMap()) {
-        val presets = _uiState.value.presets.map { it.copy(name = presetNames[it.id] ?: it.name) }
-        storage.exportProjectPng(_uiState.value.project, presets)
+    /** @param image the plan rendered by the canvas code (renderCampPng), so the export looks like the map. */
+    fun exportPng(image: ImageBitmap) {
+        storage.exportProjectPng(image)
     }
 
     fun saveInventory() {

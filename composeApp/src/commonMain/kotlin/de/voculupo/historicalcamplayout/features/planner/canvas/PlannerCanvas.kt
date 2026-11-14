@@ -21,12 +21,15 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Canvas
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageShader
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.TileMode
+import androidx.compose.ui.graphics.drawscope.CanvasDrawScope
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Fill
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -44,6 +47,8 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.sp
 import de.voculupo.historicalcamplayout.BlockZone
 import de.voculupo.historicalcamplayout.FreeAreaKind
@@ -57,6 +62,7 @@ import de.voculupo.historicalcamplayout.TentShapeType
 import de.voculupo.historicalcamplayout.Vec2
 import de.voculupo.historicalcamplayout.app.PresetDropRequest
 import de.voculupo.historicalcamplayout.assetDisplayLabel
+import de.voculupo.historicalcamplayout.buildPngExportScene
 import de.voculupo.historicalcamplayout.platform.platformScrollZoom
 import de.voculupo.historicalcamplayout.rememberPresetNames
 import kotlin.math.atan2
@@ -455,53 +461,20 @@ internal fun PlannerCanvas(
         ) {
             val parcelSizePx = parcelSizePx(state.project)
             val parcelOrigin = centeredParcelOriginPx(Size(size.width, size.height), parcelSizePx) + canvasPanOffsetPx
-            drawGround(grassBrush, state.project.pixelsPerMeter, parcelOrigin, isDarkTheme)
-            drawGrid(state.project, parcelOrigin, size)
-            drawParcelBounds(state.project, parcelOrigin)
-            state.project.blockZones.forEach { drawBlockZone(it, state.project.pixelsPerMeter, parcelOrigin, textMeasurer) }
-            val directSelectedIds = state.selectedAssetIds
-            val selectedGroupIds =
-                state.project.assets
-                    .asSequence()
-                    .filter { it.id in directSelectedIds }
-                    .mapNotNull { it.groupId }
-                    .toSet()
-
-            fun isSelectionHighlighted(asset: PlacedAsset): Boolean =
-                asset.id in directSelectedIds ||
-                    (asset.groupId != null && asset.groupId in selectedGroupIds)
-            state.project.assets.sortedBy { it.heightRange.maxMeters }.forEach { asset ->
-                val preset = presetsById[asset.presetId] ?: return@forEach
-                val selectionHighlighted = isSelectionHighlighted(asset)
-                val hard = asset.id in state.hardCollisionAssetIds
-                val warn = asset.id in state.warningAssetIds
-                drawAsset(
-                    asset,
-                    preset,
-                    state.project.pixelsPerMeter,
-                    selectionHighlighted,
-                    warn,
-                    hard,
-                    parcelOrigin,
-                    state.selectedRopeIndex,
-                    state.hiddenRopeIndices[asset.id].orEmpty(),
-                )
-                if (asset.id in directSelectedIds) {
-                    drawAnchorSlots(asset, preset, state.project.pixelsPerMeter, parcelOrigin)
-                }
-                drawEntryArrow(asset, preset, state.project.pixelsPerMeter, parcelOrigin)
-                drawAssetLabel(
-                    asset,
-                    preset,
-                    presetNames[preset.id] ?: preset.name,
-                    state.project.pixelsPerMeter,
-                    parcelOrigin,
-                    selectionHighlighted,
-                    textMeasurer,
-                    isDarkTheme,
-                )
-            }
-            drawParcelDimensionGuides(state.project, parcelOrigin, textMeasurer, isDarkTheme)
+            drawCampPlan(
+                project = state.project,
+                presetsById = presetsById,
+                presetNames = presetNames,
+                hiddenRopeIndices = state.hiddenRopeIndices,
+                origin = parcelOrigin,
+                grassBrush = grassBrush,
+                textMeasurer = textMeasurer,
+                darkMode = isDarkTheme,
+                selectedAssetIds = state.selectedAssetIds,
+                selectedRopeIndex = state.selectedRopeIndex,
+                hardCollisionAssetIds = state.hardCollisionAssetIds,
+                warningAssetIds = state.warningAssetIds,
+            )
             drawMeasurement(
                 pixelsPerMeter = state.project.pixelsPerMeter,
                 start = state.measurementStart,
@@ -537,6 +510,78 @@ private fun pickRopeHandleHit(
     )
 }
 
+/** The plan as the canvas shows it; the PNG export draws the same thing without selection or warnings. */
+private fun DrawScope.drawCampPlan(
+    project: PlannerProject,
+    presetsById: Map<String, TentPreset>,
+    presetNames: Map<String, String>,
+    hiddenRopeIndices: Map<String, Set<Int>>,
+    origin: Offset,
+    grassBrush: Brush,
+    textMeasurer: TextMeasurer,
+    darkMode: Boolean = false,
+    selectedAssetIds: Set<String> = emptySet(),
+    selectedRopeIndex: Int? = null,
+    hardCollisionAssetIds: Set<String> = emptySet(),
+    warningAssetIds: Set<String> = emptySet(),
+) {
+    val ppm = project.pixelsPerMeter
+    drawGround(grassBrush, ppm, origin, darkMode)
+    drawGrid(project, origin, size)
+    drawParcelBounds(project, origin)
+    project.blockZones.forEach { drawBlockZone(it, ppm, origin, textMeasurer) }
+    val selectedGroupIds =
+        project.assets
+            .filter { it.id in selectedAssetIds }
+            .mapNotNull { it.groupId }
+            .toSet()
+    project.assets.sortedBy { it.heightRange.maxMeters }.forEach { asset ->
+        val preset = presetsById[asset.presetId] ?: return@forEach
+        val highlighted = asset.id in selectedAssetIds || (asset.groupId != null && asset.groupId in selectedGroupIds)
+        drawAsset(
+            asset,
+            preset,
+            ppm,
+            highlighted,
+            asset.id in warningAssetIds,
+            asset.id in hardCollisionAssetIds,
+            origin,
+            selectedRopeIndex,
+            hiddenRopeIndices[asset.id].orEmpty(),
+        )
+        if (asset.id in selectedAssetIds) drawAnchorSlots(asset, preset, ppm, origin)
+        drawEntryArrow(asset, preset, ppm, origin)
+        drawAssetLabel(asset, preset, presetNames.getValue(preset.id), ppm, origin, highlighted, textMeasurer, darkMode)
+    }
+    drawParcelDimensionGuides(project, origin, textMeasurer, darkMode)
+}
+
+/** Renders the whole plan off-screen in the canvas look, sized to fit every tent and rope. */
+internal fun renderCampPng(
+    project: PlannerProject,
+    presets: List<TentPreset>,
+    presetNames: Map<String, String>,
+    textMeasurer: TextMeasurer,
+    density: Density,
+): ImageBitmap {
+    val frame = buildPngExportScene(project, presets)
+    val image = ImageBitmap(frame.widthPx, frame.heightPx)
+    val scaled = project.copy(pixelsPerMeter = frame.pixelsPerMeter)
+    val size = Size(frame.widthPx.toFloat(), frame.heightPx.toFloat())
+    CanvasDrawScope().draw(density, LayoutDirection.Ltr, Canvas(image), size) {
+        drawCampPlan(
+            project = scaled,
+            presetsById = presets.associateBy { it.id },
+            presetNames = presetNames,
+            hiddenRopeIndices = GeometryEngine.joinHiddenRopeIndices(scaled, presets),
+            origin = frame.parcel.topLeft,
+            grassBrush = ShaderBrush(ImageShader(grassTexture(), TileMode.Repeated, TileMode.Repeated)),
+            textMeasurer = textMeasurer,
+        )
+    }
+    return image
+}
+
 private fun DrawScope.drawAssetLabel(
     asset: PlacedAsset,
     preset: TentPreset,
@@ -547,7 +592,7 @@ private fun DrawScope.drawAssetLabel(
     textMeasurer: TextMeasurer,
     darkMode: Boolean,
 ) {
-    val raw = assetDisplayLabel(asset, preset, presetName).trim()
+    val raw = assetDisplayLabel(asset, presetName).trim()
     if (raw.isEmpty()) return
     val label = if (raw.length > 30) raw.take(29) + "…" else raw
     val meta = "${preset.shape.name} • ${"%.1f".format(preset.widthMeters)} x ${"%.1f".format(preset.heightMeters)} m"
@@ -1034,12 +1079,18 @@ private fun DrawScope.drawParcelDimensionGuides(
 ) {
     val widthPx = project.parcel.widthMeters * project.pixelsPerMeter
     val heightPx = project.parcel.heightMeters * project.pixelsPerMeter
-    val topY = (origin.y - 20f).coerceAtLeast(8f)
     val leftX = (origin.x - 20f).coerceAtLeast(8f)
 
     val guideColor = if (darkMode) Color(0xBFAFA087) else Color(0xAA4A5A4A)
     val guideTextColor = if (darkMode) Color(0xFFE6DCC9) else Color(0xFF2F261A)
     val guideBgColor = if (darkMode) Color(0xCC3A3329) else Color(0xDDF2EADB)
+    val widthLabel =
+        textMeasurer.measure(
+            AnnotatedString("${"%.1f".format(project.parcel.widthMeters)} m"),
+            style = TextStyle(color = guideTextColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
+        )
+    // The width label sits above the guide line; keep it inside the image when the parcel touches the top edge.
+    val topY = (origin.y - 20f).coerceAtLeast(widthLabel.size.height + 8f)
 
     drawLine(
         color = guideColor,
@@ -1050,11 +1101,6 @@ private fun DrawScope.drawParcelDimensionGuides(
     drawLine(guideColor, Offset(origin.x, topY - 6f), Offset(origin.x, topY + 6f), 2f)
     drawLine(guideColor, Offset(origin.x + widthPx, topY - 6f), Offset(origin.x + widthPx, topY + 6f), 2f)
 
-    val widthLabel =
-        textMeasurer.measure(
-            AnnotatedString("${"%.1f".format(project.parcel.widthMeters)} m"),
-            style = TextStyle(color = guideTextColor, fontSize = 12.sp, fontWeight = FontWeight.SemiBold),
-        )
     drawRoundRect(
         color = guideBgColor,
         topLeft =

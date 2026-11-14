@@ -1,5 +1,6 @@
 ﻿package de.voculupo.historicalcamplayout
 
+import androidx.compose.ui.graphics.ImageBitmap
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
@@ -16,10 +17,8 @@ interface ProjectStorage {
 
     fun loadInventory(): List<TentPreset>?
 
-    fun exportProjectPng(
-        project: PlannerProject,
-        presets: List<TentPreset>,
-    )
+    /** Saves an image the planner canvas already rendered (see renderCampPng). */
+    fun exportProjectPng(image: ImageBitmap)
 }
 
 expect object ProjectStorageProvider {

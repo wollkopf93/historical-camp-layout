@@ -39,6 +39,7 @@
     <string name="import_file">Import Datei</string>
     <string name="export_png">Export PNG</string>
     <string name="selection_title">Auswahl (%1$d)</string>
+    <string name="copy_suffix">(Kopie)</string>
     <string name="tent_name">Zeltname</string>
     <string name="tent_name_placeholder">z.B. Küchenzelt</string>
     <string name="rotation_deg">Rotation: %1$d°</string>

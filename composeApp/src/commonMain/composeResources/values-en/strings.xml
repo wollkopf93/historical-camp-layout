@@ -39,6 +39,7 @@
     <string name="import_file">Import file</string>
     <string name="export_png">Export PNG</string>
     <string name="selection_title">Selection (%1$d)</string>
+    <string name="copy_suffix">(copy)</string>
     <string name="tent_name">Tent name</string>
     <string name="tent_name_placeholder">e.g. Kitchen tent</string>
     <string name="rotation_deg">Rotation: %1$d°</string>

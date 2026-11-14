@@ -105,7 +105,7 @@ internal fun InventoryPane(
                 } else {
                     state.presets.filter { preset ->
                         preset.name.lowercase().contains(query) ||
-                            presetNames[preset.id].orEmpty().lowercase().contains(query) ||
+                            presetNames.getValue(preset.id).lowercase().contains(query) ||
                             preset.id.lowercase().contains(query) ||
                             preset.shape.name
                                 .lowercase()
@@ -179,7 +179,7 @@ internal fun InventoryPane(
                                             .pointerInput(preset.id) { detectTapGestures { onPresetSelect(preset.id) } },
                                 ) {
                                     Text(
-                                        presetNames[preset.id] ?: preset.name,
+                                        presetNames.getValue(preset.id),
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                                         style = MaterialTheme.typography.bodySmall,
                                     )
@@ -196,7 +196,7 @@ internal fun InventoryPane(
                                             .pointerInput(preset.id) { detectTapGestures { onPresetSelect(preset.id) } },
                                 ) {
                                     Text(
-                                        presetNames[preset.id] ?: preset.name,
+                                        presetNames.getValue(preset.id),
                                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
                                         style = MaterialTheme.typography.bodySmall,
                                     )
@@ -241,7 +241,7 @@ internal fun InventoryPane(
                                                 detectDragGesturesAfterLongPress(
                                                     onDragStart = { localStart ->
                                                         dragCurrent = cardRootOrigin + localStart
-                                                        onPresetDragStart(preset.id, presetNames[preset.id] ?: preset.name, dragCurrent)
+                                                        onPresetDragStart(preset.id, presetNames.getValue(preset.id), dragCurrent)
                                                     },
                                                     onDragEnd = {
                                                         onPresetDragEnd(preset.id, dragCurrent)
@@ -257,7 +257,7 @@ internal fun InventoryPane(
                                                 detectDragGestures(
                                                     onDragStart = { localStart ->
                                                         dragCurrent = cardRootOrigin + localStart
-                                                        onPresetDragStart(preset.id, presetNames[preset.id] ?: preset.name, dragCurrent)
+                                                        onPresetDragStart(preset.id, presetNames.getValue(preset.id), dragCurrent)
                                                     },
                                                     onDragEnd = {
                                                         onPresetDragEnd(preset.id, dragCurrent)
@@ -278,7 +278,7 @@ internal fun InventoryPane(
                                 ) {
                                     PresetPreviewIcon(preset = preset)
                                     Column {
-                                        Text(presetNames[preset.id] ?: preset.name, style = MaterialTheme.typography.titleSmall)
+                                        Text(presetNames.getValue(preset.id), style = MaterialTheme.typography.titleSmall)
                                         Text("${preset.widthMeters}m x ${preset.heightMeters}m", style = MaterialTheme.typography.bodySmall)
                                     }
                                 }
@@ -305,7 +305,7 @@ internal fun InventoryPane(
                                             detectDragGestures(
                                                 onDragStart = { localStart ->
                                                     dragCurrent = cardRootOrigin + localStart
-                                                    onPresetDragStart(preset.id, presetNames[preset.id] ?: preset.name, dragCurrent)
+                                                    onPresetDragStart(preset.id, presetNames.getValue(preset.id), dragCurrent)
                                                 },
                                                 onDragEnd = {
                                                     onPresetDragEnd(preset.id, dragCurrent)
@@ -325,7 +325,7 @@ internal fun InventoryPane(
                                 ) {
                                     PresetPreviewIcon(preset = preset)
                                     Column {
-                                        Text(presetNames[preset.id] ?: preset.name, style = MaterialTheme.typography.titleSmall)
+                                        Text(presetNames.getValue(preset.id), style = MaterialTheme.typography.titleSmall)
                                         Text("${preset.widthMeters}m x ${preset.heightMeters}m", style = MaterialTheme.typography.bodySmall)
                                     }
                                 }

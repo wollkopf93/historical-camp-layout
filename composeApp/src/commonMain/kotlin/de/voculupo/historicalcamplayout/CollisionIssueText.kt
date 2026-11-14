@@ -15,10 +15,9 @@ import org.jetbrains.compose.resources.stringResource
 @Composable
 fun rememberWarningTexts(state: PlannerUiState): List<String> {
     val presetNames = rememberPresetNames(state.presets)
-    val presetsById = state.presets.associateBy { it.id }
     val assetNames =
         state.project.assets.associate { asset ->
-            asset.id to (presetsById[asset.presetId]?.let { assetDisplayLabel(asset, it, presetNames.getValue(it.id)) } ?: asset.label)
+            asset.id to (presetNames[asset.presetId]?.let { assetDisplayLabel(asset, it) } ?: asset.label)
         }
     return state.warnings.map { issueText(it, assetNames) }
 }
