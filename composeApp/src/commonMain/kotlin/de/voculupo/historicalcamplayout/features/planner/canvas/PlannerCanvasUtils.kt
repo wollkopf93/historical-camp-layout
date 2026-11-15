@@ -37,6 +37,22 @@ internal fun centeredParcelOriginPx(
     return Offset(x, y)
 }
 
+/** Limits the map pan so at least half the parcel (or half the screen, for a big parcel) stays visible. */
+internal fun clampCanvasPan(
+    pan: Offset,
+    canvasSizePx: Size,
+    parcelSizePx: Size,
+): Offset {
+    val centered = centeredParcelOriginPx(canvasSizePx, parcelSizePx)
+    val keepX = minOf(parcelSizePx.width, canvasSizePx.width) / 2f
+    val keepY = minOf(parcelSizePx.height, canvasSizePx.height) / 2f
+    // Parcel spans [centered + pan, centered + pan + parcelSize]; keep keepX/keepY of it inside the canvas.
+    return Offset(
+        pan.x.coerceIn(keepX - parcelSizePx.width - centered.x, canvasSizePx.width - keepX - centered.x),
+        pan.y.coerceIn(keepY - parcelSizePx.height - centered.y, canvasSizePx.height - keepY - centered.y),
+    )
+}
+
 internal fun Vec2.toOffsetPx(
     pixelsPerMeter: Float = 1f,
     originPx: Offset = Offset.Zero,

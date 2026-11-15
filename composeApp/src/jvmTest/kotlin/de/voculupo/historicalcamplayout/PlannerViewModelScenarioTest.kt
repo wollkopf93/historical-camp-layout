@@ -5,6 +5,7 @@ import de.voculupo.historicalcamplayout.FreeArea
 import de.voculupo.historicalcamplayout.FreeAreaKind
 import de.voculupo.historicalcamplayout.VisitorSide
 import de.voculupo.historicalcamplayout.features.planner.state.PlannerViewModel
+import kotlin.math.abs
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
@@ -371,5 +372,27 @@ class PlannerViewModelScenarioTest {
         assertEquals(Parcel(), vm.uiState.value.project.parcel)
         vm.updateParcel(Parcel.MAX_METERS, 20f)
         assertEquals(Parcel.MAX_METERS, vm.uiState.value.project.parcel.widthMeters)
+    }
+
+    /** Regression: an auto-setup tent nudged a few cm jumped to the 0.5 m grid on release and hit its neighbours. */
+    @Test
+    fun afterAutoSetup_smallDragKeepsExactSpot_biggerDragMovesInGridSteps() {
+        val vm = PlannerViewModel(InMemoryStorage())
+        vm.autoSetup(AutoSetupRequest(Parcel(60f, 50f), List(6) { "saxon_2x4" }, listOf("sun_sail_6x6_flat"), VisitorSide.BOTTOM))
+        val offGrid = { v: Float -> abs(v * 2f - kotlin.math.round(v * 2f)) > 0.01f }
+        val tent = assertNotNull(vm.assets().firstOrNull { offGrid(it.position.x) || offGrid(it.position.y) }, "auto setup left every tent on the grid")
+        val warningsBefore = vm.uiState.value.warnings
+        vm.setSelection(setOf(tent.id))
+
+        vm.dragSelection(Vec2(0.1f, 0.05f))
+        vm.finishInteractionWithGridSnap()
+        assertEquals(tent.position, vm.assets().first { it.id == tent.id }.position, "a nudge below half a grid step snaps back")
+        assertEquals(warningsBefore, vm.uiState.value.warnings)
+
+        vm.dragSelection(Vec2(0.6f, 0f))
+        vm.finishInteractionWithGridSnap()
+        val moved = vm.assets().first { it.id == tent.id }.position
+        assertEquals(tent.position.x + 0.5f, moved.x, 0.001f)
+        assertEquals(tent.position.y, moved.y, 0.001f)
     }
 }

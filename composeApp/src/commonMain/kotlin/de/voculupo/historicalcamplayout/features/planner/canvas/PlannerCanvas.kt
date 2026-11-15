@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.input.pointer.changedToDownIgnoreConsumed
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.positionInRoot
@@ -66,6 +67,8 @@ import de.voculupo.historicalcamplayout.buildPngExportScene
 import de.voculupo.historicalcamplayout.platform.platformScrollZoom
 import de.voculupo.historicalcamplayout.rememberPresetNames
 import kotlin.math.atan2
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.sqrt
 
 @Composable
@@ -115,7 +118,12 @@ internal fun PlannerCanvas(
     var activeAssetDrag by remember { mutableStateOf(false) }
     var activeCanvasPan by remember { mutableStateOf(false) }
     var canvasPanOffsetPx by remember { mutableStateOf(Offset.Zero) }
+    // New parcel (auto setup, import, reset): re-centre instead of keeping a pan that may point at empty grass.
+    LaunchedEffect(state.project.parcel) { canvasPanOffsetPx = Offset.Zero }
     var multiTouchActive by remember { mutableStateOf(false) }
+    // detectDragGestures starts after the touch slop; moves are measured from here so the tent stays under the finger.
+    var fingerDownPx by remember { mutableStateOf<Offset?>(null) }
+    var lastDragPx by remember { mutableStateOf(Offset.Zero) }
     var pinchZoomPpm by remember { mutableStateOf(state.project.pixelsPerMeter) }
     var lastCommittedZoomPpm by remember { mutableStateOf(state.project.pixelsPerMeter) }
     val ropeUiScale = (state.project.pixelsPerMeter / 50f).coerceIn(1f, 2.4f)
@@ -178,6 +186,7 @@ internal fun PlannerCanvas(
                             while (true) {
                                 val event = awaitPointerEvent()
                                 val pressed = event.changes.filter { it.pressed }
+                                if (pressed.size == 1 && pressed[0].changedToDownIgnoreConsumed()) fingerDownPx = pressed[0].position
                                 if (pressed.size < 2) {
                                     if (multiTouchActive && rotateMode) onDragEnd()
                                     multiTouchActive = false
@@ -240,7 +249,12 @@ internal fun PlannerCanvas(
                                         val anchoredPan =
                                             centroid - GeometryEngine.metersToOffset(worldAtCentroid, newPpm) - newCenteredOrigin
 
-                                        canvasPanOffsetPx = if (allowMultiTouchCanvasPan) anchoredPan + pan else anchoredPan
+                                        canvasPanOffsetPx =
+                                            clampCanvasPan(
+                                                if (allowMultiTouchCanvasPan) anchoredPan + pan else anchoredPan,
+                                                canvasSize,
+                                                newParcelSize,
+                                            )
 
                                         if (kotlin.math.abs(zoom - 1f) > 0.001f) {
                                             pinchZoomPpm = newPpm
@@ -388,9 +402,11 @@ internal fun PlannerCanvas(
                         fun hitAssetAt(pointMeters: Vec2): PlacedAsset? =
                             hitAssetAtMeters(pointMeters, currentState, currentPresetsById, touchAssetHitSlopPx)
                         detectDragGestures(
-                            onDragStart = { start ->
+                            onDragStart = { slopPosition ->
                                 if (currentState.currentTool != PlannerToolMode.Select) return@detectDragGestures
                                 if (multiTouchActive) return@detectDragGestures
+                                val start = fingerDownPx ?: slopPosition
+                                lastDragPx = start
                                 activeAssetDrag = false
                                 activeCanvasPan = false
                                 val startMeters =
@@ -411,7 +427,10 @@ internal fun PlannerCanvas(
                                         }
                                     }
                                 }
-                                val hitAsset = hitAssetAt(startMeters)
+                                // Grab slop only around the selection; in a dense camp it would otherwise turn every pan into a move.
+                                val hitAsset =
+                                    hitAssetAtMeters(startMeters, currentState, currentPresetsById, 0f)
+                                        ?: hitAssetAt(startMeters)?.takeIf { it.id in currentState.selectedAssetIds }
                                 if (hitAsset != null) {
                                     if (hitAsset.id !in currentState.selectedAssetIds) onSelection(setOf(hitAsset.id))
                                     activeAssetDrag = true
@@ -438,18 +457,26 @@ internal fun PlannerCanvas(
                                     }
                                     change.consume()
                                 } else if (currentState.currentTool == PlannerToolMode.Select && activeAssetDrag) {
-                                    onDrag(GeometryEngine.offsetToMeters(dragAmount, currentState.project.pixelsPerMeter))
+                                    onDrag(GeometryEngine.offsetToMeters(change.position - lastDragPx, currentState.project.pixelsPerMeter))
+                                    lastDragPx = change.position
                                     change.consume()
                                 } else if (currentState.currentTool == PlannerToolMode.Select && activeCanvasPan) {
-                                    canvasPanOffsetPx += dragAmount
+                                    canvasPanOffsetPx =
+                                        clampCanvasPan(
+                                            canvasPanOffsetPx + dragAmount,
+                                            currentCanvasSize(),
+                                            parcelSizePx(currentState.project),
+                                        )
                                     change.consume()
                                 }
                             },
                             onDragEnd = {
+                                // A map pan (or Measure/BlockZone drag) must not snap or commit the selection.
+                                val movedSomething = activeAssetDrag || activeRopeDrag != null
                                 activeRopeDrag = null
                                 activeAssetDrag = false
                                 activeCanvasPan = false
-                                onDragEnd()
+                                if (movedSomething) onDragEnd()
                             },
                             onDragCancel = {
                                 activeRopeDrag = null
@@ -686,19 +713,38 @@ private fun DrawScope.drawGrid(
     origin: Offset,
     canvasSizePx: Size,
 ) {
-    val spacing = project.gridMeters * project.pixelsPerMeter
-    if (spacing < 8f) return
-    var x = ((origin.x % spacing) + spacing) % spacing
-    while (x <= canvasSizePx.width) {
-        drawLine(GRID_INK, Offset(x, 0f), Offset(x, canvasSizePx.height), 1f)
-        x += spacing
+    val ppm = project.pixelsPerMeter
+    val widthPx = project.parcel.widthMeters * ppm
+    val heightPx = project.parcel.heightMeters * ppm
+
+    // Lines only inside the parcel and on screen; index-based so long rows don't drift from float sums.
+    fun lines(
+        stepMeters: Float,
+        color: Color,
+        strokePx: Float,
+    ) {
+        val step = stepMeters * ppm
+        if (step <= 0f) return
+        val firstX = maxOf(1, ceil(-origin.x / step).toInt())
+        val lastX = minOf(ceil(widthPx / step).toInt() - 1, floor((canvasSizePx.width - origin.x) / step).toInt())
+        for (i in firstX..lastX) {
+            val x = origin.x + i * step
+            drawLine(color, Offset(x, origin.y), Offset(x, origin.y + heightPx), strokePx)
+        }
+        val firstY = maxOf(1, ceil(-origin.y / step).toInt())
+        val lastY = minOf(ceil(heightPx / step).toInt() - 1, floor((canvasSizePx.height - origin.y) / step).toInt())
+        for (i in firstY..lastY) {
+            val y = origin.y + i * step
+            drawLine(color, Offset(origin.x, y), Offset(origin.x + widthPx, y), strokePx)
+        }
     }
-    var y = ((origin.y % spacing) + spacing) % spacing
-    while (y <= canvasSizePx.height) {
-        drawLine(GRID_INK, Offset(0f, y), Offset(canvasSizePx.width, y), 1f)
-        y += spacing
-    }
+    // Fine lines fade out between 8 and 20 px apart, so zoomed out only the 5 m lines remain to count by.
+    val minorAlpha = ((project.gridMeters * ppm - 8f) / 12f).coerceIn(0f, 1f)
+    if (minorAlpha > 0f) lines(project.gridMeters, GRID_INK.copy(alpha = GRID_INK.alpha * minorAlpha), 1f)
+    lines(MAJOR_GRID_METERS, GRID_MAJOR_INK, 1.5f)
 }
+
+private const val MAJOR_GRID_METERS = 5f
 
 private fun DrawScope.drawParcelBounds(
     project: PlannerProject,
@@ -716,6 +762,7 @@ private fun DrawScope.drawParcelBounds(
 }
 
 private val GRID_INK = Color(0x1CFFFFFF)
+private val GRID_MAJOR_INK = Color(0x40FFFFFF)
 private val PARCEL_STRING = Color(0xEEF4EBD0)
 private val ROPE = Color(0xFFD9C8A0)
 private val STAKE = Color(0xFF3B2A1A)

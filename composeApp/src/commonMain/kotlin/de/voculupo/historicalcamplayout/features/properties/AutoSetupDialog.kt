@@ -307,7 +307,8 @@ internal fun AutoSetupDialog(
                                 modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()),
                                 verticalArrangement = Arrangement.spacedBy(8.dp),
                             ) { content() }
-                            Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
+                            // No scroll here: a swipe on the preview would fight its block drag.
+                            Column(modifier = Modifier.weight(1f)) {
                                 preview(
                                     Modifier.fillMaxWidth().aspectRatio(
                                         (req.parcel.widthMeters / req.parcel.heightMeters).coerceIn(0.6f, 2.2f),

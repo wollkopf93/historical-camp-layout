@@ -23,6 +23,8 @@ android {
         // CI passes these from the release tag; local builds keep the defaults.
         versionCode = System.getenv("VERSION_CODE")?.toInt() ?: 1
         versionName = System.getenv("APP_VERSION") ?: "1.0"
+        // Device UI tests: ./gradlew :androidApp:connectedDebugAndroidTest (emulator or phone attached).
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     signingConfigs {
         create("release") {
@@ -57,4 +59,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.compose.uiToolingPreview)
     debugImplementation(libs.compose.uiTooling)
+    androidTestImplementation(libs.compose.uiTestJunit4)
+    androidTestImplementation(libs.androidx.testExt.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
 }
