@@ -4,6 +4,9 @@ Plan your reenactment or medieval market camp before you get there. Lay out Saxo
 wedge tents and sun sails on a to-scale plot, see right away where guy ropes cross or an entry is blocked,
 or let the auto setup draft the whole camp for you. Runs on **Android** and **desktop** (Windows, macOS, Linux).
 
+🌐 **Website:** [wollkopf93.github.io/historical-camp-layout](https://wollkopf93.github.io/historical-camp-layout/) (English / Deutsch)
+· ⬇️ **Download:** [latest release](https://github.com/wollkopf93/historical-camp-layout/releases/latest)
+
 ![Desktop: camp with a selected sun sail and its properties](docs/screenshots/desktop-selection.png)
 
 <p align="center">
