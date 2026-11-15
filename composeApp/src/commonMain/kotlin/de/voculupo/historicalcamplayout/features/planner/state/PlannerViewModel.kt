@@ -348,6 +348,7 @@ class PlannerViewModel(
         val state = _uiState.value
         val movedIds = movableAssetIds(state)
         val presetsById = state.presets.associateBy { it.id }
+        val committedPositions = undoStack.lastOrNull()?.assets?.associate { it.id to it.position }.orEmpty()
         // The drag and its snap are one undo step; otherwise the first undo only "unsnaps" by millimetres.
         mutateProject(foldLiveEdits = true) {
             val snappedAssets =
@@ -355,7 +356,14 @@ class PlannerViewModel(
                     if (asset.id !in movedIds) {
                         asset
                     } else {
-                        val snapped = GeometryEngine.snapToGrid(asset.position, gridMeters)
+                        // Snap the move, not the position: off-grid layouts (auto setup) keep their exact gaps.
+                        val start = committedPositions[asset.id] ?: asset.position
+                        val delta =
+                            GeometryEngine.snapToGrid(
+                                Vec2(asset.position.x - start.x, asset.position.y - start.y),
+                                gridMeters,
+                            )
+                        val snapped = Vec2(start.x + delta.x, start.y + delta.y)
                         val preset = presetsById[asset.presetId] ?: return@map asset
                         val constrained = constrainAssetCenterToParcel(snapped, preset, parcel, asset.rotationDeg)
                         asset.copy(position = constrained)
