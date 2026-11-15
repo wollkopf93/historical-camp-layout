@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lagerplaner – Historical Camp Layout</title>
+  <meta name="description" content="Plan your reenactment or medieval market camp to scale, on Android and desktop.">
+  <link rel="alternate" hreflang="de" href="de/">
+  <link rel="stylesheet" href="style.css">
+  <script>
+    // German browsers go to /de/, unless the visitor picked a language themselves.
+    try {
+      var choice = localStorage.getItem('lang');
+      if (!choice && navigator.language.toLowerCase().startsWith('de')) location.replace('de/');
+    } catch (e) {}
+  </script>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <span class="brand">⛺ Lagerplaner</span>
+    <nav class="lang">
+      <a href="./" aria-current="page" onclick="try{localStorage.setItem('lang','en')}catch(e){}">English</a>
+      <a href="de/" onclick="try{localStorage.setItem('lang','de')}catch(e){}">Deutsch</a>
+    </nav>
+  </header>
+
+  <section class="hero">
+    <h1>Plan your camp before you get there</h1>
+    <p>Lay out Saxon tents, round tents, wedge tents and sun sails on a to-scale plot. See right away where guy ropes
+      cross or an entry is blocked, or let the auto setup draft the whole camp for you.
+      For Android and desktop (Windows, macOS, Linux).</p>
+    <a class="btn" href="https://github.com/wollkopf93/historical-camp-layout/releases/latest">Download</a>
+    <a class="btn secondary" href="https://github.com/wollkopf93/historical-camp-layout">Source on GitHub</a>
+  </section>
+
+  <img class="shot-main" src="screenshots/desktop-selection.png" alt="Desktop: camp with a selected sun sail and its properties">
+
+  <h2>Features</h2>
+  <div class="features">
+    <div class="card">
+      <h3>Plan to scale</h3>
+      <ul>
+        <li>Plot size in metres, with a measure tool to check distances.</li>
+        <li>28 tent and sun sail presets, searchable and filterable. Drag them onto the plot.</li>
+        <li>Move, rotate, duplicate, group and lock tents. Undo and redo for every step.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Real tents, real ropes</h3>
+      <ul>
+        <li>Every tent has guy ropes and a door. Change their length, angle and anchor point, or add and remove ropes.</li>
+        <li>Top-down art for tents, sun sails and fire pits, on a grass background.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Checks while you plan</h3>
+      <ul>
+        <li>Tent bodies or ropes that run into other tents are marked red.</li>
+        <li>Blocked entries and walkways narrower than your setting are marked orange.</li>
+        <li>Draw your own no-go zones for trees, paths or a neighbour's space.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Auto setup</h3>
+      <ul>
+        <li>Give it the plot, visitor side, sun sails, fire pit and your tents. It drafts the camp: horseshoe, circle, U-shape, along the edges or spread out.</li>
+        <li>Live preview. If not everything fits, it shrinks walkways and tells you which tents were left out.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Share it</h3>
+      <ul>
+        <li>Export the layout as PNG, or as a project file to open on another device.</li>
+        <li>English and German, light and dark theme, keyboard shortcuts on desktop.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Auto setup</h2>
+  <img class="shot-main" src="screenshots/desktop-auto-setup.png" alt="Desktop: auto setup with live preview">
+
+  <h2>On your phone</h2>
+  <div class="phones">
+    <img src="screenshots/android-selection.png" alt="Android: camp on the phone with a selected tent">
+    <img src="screenshots/android-auto-setup.png" alt="Android: auto setup sheet with live preview">
+  </div>
+
+  <p class="center"><a class="btn" href="https://github.com/wollkopf93/historical-camp-layout/releases/latest">Download the APK or Windows installer</a></p>
+
+  <footer>Lagerplaner · <a href="https://github.com/wollkopf93/historical-camp-layout">GitHub</a></footer>
+</div>
+</body>
+</html>

@@ -1,0 +1,60 @@
+:root {
+  --bg: #f6f1e7;
+  --surface: #fffaf0;
+  --text: #2b2418;
+  --muted: #6b5f4b;
+  --accent: #6b8e23;
+  --accent-text: #ffffff;
+  --border: #e2d8c3;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #1c1a15;
+    --surface: #26231c;
+    --text: #efe8d8;
+    --muted: #b3a88f;
+    --accent: #9cc04a;
+    --accent-text: #1c1a15;
+    --border: #3a352a;
+  }
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+img { max-width: 100%; height: auto; display: block; border-radius: 10px; }
+a { color: var(--accent); }
+
+.wrap { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+
+header.top { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; }
+header.top .brand { font-weight: 700; }
+.lang a { text-decoration: none; color: var(--muted); margin-left: 12px; }
+.lang a[aria-current] { color: var(--text); font-weight: 600; }
+
+.hero { text-align: center; padding: 32px 0 24px; }
+.hero h1 { font-size: clamp(2rem, 6vw, 3rem); line-height: 1.15; margin: 0 0 12px; }
+.hero p { color: var(--muted); max-width: 680px; margin: 0 auto 24px; }
+
+.btn {
+  display: inline-block; padding: 12px 22px; border-radius: 999px;
+  background: var(--accent); color: var(--accent-text); text-decoration: none; font-weight: 600;
+}
+.btn.secondary { background: transparent; color: var(--text); border: 1px solid var(--border); margin-left: 8px; }
+
+.shot-main { margin: 32px auto; box-shadow: 0 10px 40px rgba(0, 0, 0, .15); }
+.phones { display: flex; gap: 24px; justify-content: center; flex-wrap: wrap; margin: 32px 0; }
+.phones img { width: 280px; }
+
+.features { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin: 40px 0; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px 22px; }
+.card h3 { margin: 0 0 8px; }
+.card ul { margin: 0; padding-left: 20px; color: var(--muted); }
+
+h2 { text-align: center; margin-top: 56px; }
+.center { text-align: center; }
+footer { color: var(--muted); text-align: center; padding: 40px 0; font-size: .9rem; }
