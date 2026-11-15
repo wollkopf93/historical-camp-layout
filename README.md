@@ -82,3 +82,6 @@ SCREENSHOT_DIR=docs/screenshots ./gradlew :composeApp:jvmTest --tests '*ReadmeSc
 
 The Android screenshots come from an emulator, with that sample camp copied into the app's
 `files/historical_camp_project.json`.
+
+The website uses smaller WebP copies in `docs/screenshots/web/` (1600 px wide for desktop, 560 px for Android,
+quality 80). Recreate them when the PNGs change.
